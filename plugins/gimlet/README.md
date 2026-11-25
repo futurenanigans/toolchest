@@ -1,6 +1,6 @@
 # Gimlet
 
-A Claude Code plugin that runs [opengrep](https://github.com/opengrep/opengrep) with a bundled C#/.NET ruleset. `bin/gimlet` downloads opengrep release binaries into the plugin data directory (`$CLAUDE_PLUGIN_DATA`, or `~/.local/share/gimlet` outside Claude Code), runs scans, and prints a summary. The `gimlet` skill tells Claude when to scan and how to triage what comes back.
+A Claude Code plugin that runs [opengrep](https://github.com/opengrep/opengrep) with a bundled C#/.NET ruleset. `bin/gimlet` downloads opengrep release binaries into the plugin data directory (`$CLAUDE_PLUGIN_DATA`, or `~/.local/share/gimlet` outside Claude Code), and runs scans. The `gimlet` skill tells Claude when to scan and how to triage what comes back.
 
 ```
 bin/gimlet scan --baseline origin/main   # findings introduced since main
@@ -9,7 +9,7 @@ bin/gimlet update                        # move to the latest opengrep release
 bin/gimlet test                          # rule tests against their fixtures
 ```
 
-Needs `bash`, `curl`, `jq`, and `git` for baseline scans. Linux and macOS only; opengrep ships Windows as a zip that this script does not unpack.
+Needs `bash`, `curl`, and `git` for baseline scans. Linux and macOS only; opengrep ships Windows as a zip that this script does not unpack.
 
 Install with `/plugin install gimlet@toolchest`. Add `.gimlet/` to the `.gitignore` of a repository you scan; results land there.
 

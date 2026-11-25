@@ -29,7 +29,6 @@ usage: gimlet <command> [options]
       --audit            also run the audit rules (entrypoint inventory; noisy by design)
       --sarif            also write SARIF next to the JSON results
       --rules DIR        use DIR instead of the bundled rules (repeatable)
-  summary [FILE]         print the summary of a results file (default: $GIMLET_RESULTS_DIR/results.json)
   test                   run opengrep's rule tests over the bundled rules and fixtures
 EOF
 }
@@ -140,7 +139,6 @@ cmd_version() {
 }
 
 cmd_scan() {
-  need jq
   local baseline="" audit=0 sarif=0 configs=() paths=()
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -161,7 +159,7 @@ cmd_scan() {
   og="$(opengrep_bin)"
   mkdir -p "$GIMLET_RESULTS_DIR"
   out="$GIMLET_RESULTS_DIR/results.json"
-  args=(scan "${configs[@]}" --no-rewrite-rule-ids --json --output "$out" --quiet)
+  args=(scan "${configs[@]}" --no-rewrite-rule-ids --json-output="$out" --max-lines-per-finding=3)
   [[ $sarif -eq 1 ]] && args+=(--sarif-output "$GIMLET_RESULTS_DIR/results.sarif")
   [[ -n "$baseline" ]] && args+=(--baseline-commit "$baseline")
 
@@ -169,29 +167,7 @@ cmd_scan() {
   local rc=0
   "$og" "${args[@]}" "${paths[@]}" || rc=$?
   [[ $rc -le 1 ]] || die "opengrep exited with status $rc (see $out and stderr above)"
-  cmd_summary "$out"
-}
-
-cmd_summary() {
-  need jq
-  local file="${1:-$GIMLET_RESULTS_DIR/results.json}"
-  [[ -f "$file" ]] || die "no results file at $file; run: gimlet scan"
-  jq -r '
-    def sev: {"ERROR":0,"WARNING":1,"INFO":2}[.extra.severity] // 3;
-    (.results | length) as $n
-    | "\($n) finding(s) in \([.results[].path] | unique | length) file(s); \(.errors | length) error(s); results: \(input_filename)",
-      (if $n > 0 then
-        "",
-        "by rule:",
-        (.results | group_by(.check_id) | sort_by(-length) | .[]
-          | "  \(length)\t\(.[0].extra.severity)\t\(.[0].check_id)"),
-        "",
-        "findings:",
-        (.results | sort_by(sev, .path, .start.line) | .[]
-          | "  \(.extra.severity)\t\(.path):\(.start.line)\t\(.check_id)\t\(.extra.message | split("\n")[0])")
-       else empty end),
-      (if (.errors | length) > 0 then "", "errors:", (.errors[] | "  \(.level // "error")\t\((.type | if type == "array" then .[0] else . end) // "error")\t\(.message // "" | gsub("\n *"; " ") | .[0:200])") else empty end)
-  ' "$file"
+  echo "results: $out"
 }
 
 cmd_test() {
@@ -208,7 +184,6 @@ main() {
     update) cmd_update "$@" ;;
     version) cmd_version ;;
     scan) cmd_scan "$@" ;;
-    summary) cmd_summary "$@" ;;
     test) cmd_test ;;
     ""|-h|--help|help) usage ;;
     *) usage >&2; exit 2 ;;

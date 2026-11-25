@@ -19,7 +19,7 @@ Pick the narrowest scan that answers the question:
 
 `--baseline` reports only findings absent at that git ref, so pre-existing findings stay out of a review of new code. Opengrep picks the files to scan from the diff between the ref and the index, then scans their working-tree content. A file whose only changes are unstaged is skipped and reported as zero findings. Run `git add` on the files to review before a baseline scan.
 
-Results go to `.gimlet/results.json` in the working directory (`--sarif` adds `results.sarif`). Add `.gimlet/` to the repository's `.gitignore`. `gimlet summary` reprints the last result without rescanning; read the JSON with `jq` for the full message, matched lines, and rule metadata (`.results[].extra.metadata` carries CWE and OWASP tags).
+Results go to `.gimlet/results.json` in the working directory (`--sarif` adds `results.sarif`). Add `.gimlet/` to the repository's `.gitignore`. The scan prints findings grouped by file and rule; the JSON holds the full message, matched lines, and rule metadata (`.results[].extra.metadata` carries CWE and OWASP tags).
 
 ## Triage
 
