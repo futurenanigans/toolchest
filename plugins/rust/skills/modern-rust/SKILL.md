@@ -1,9 +1,11 @@
 ---
 name: modern-rust
-description: Reference for modern Rust (edition 2024, current stable toolchain), covering old-versus-modern idioms, Cargo workspace and lint setup, module layout, error types, API design, and clippy and rustfmt config. Use when scaffolding, reviewing or refactoring Rust code or a Cargo workspace, or when the user asks "is this idiomatic". The always-apply conventions live in the rust rule, which loads for Rust files.
+description: Reference for modern Rust (edition 2024, current stable toolchain), covering old-versus-modern idioms, Cargo workspace and lint setup, module layout, error types, API design, and clippy and rustfmt config. Use when scaffolding, reviewing or refactoring Rust code or a Cargo workspace, or when the user asks "is this idiomatic". The always-apply conventions live in the plugin's rust rule.
 ---
 
 # Modern Rust
+
+The always-apply conventions are in `${CLAUDE_SKILL_DIR}/../../rules/rust.md`; read it before writing or reviewing Rust. This skill is the full reference behind it.
 
 Rust has evolved steadily since 2015. Much older code (and older training data) is still *valid* but no longer *preferred*. This skill captures what current, idiomatic Rust looks like so generated code reads like it was written by someone who follows the ecosystem today.
 
@@ -117,7 +119,7 @@ Migrate with `cargo fix --edition` then bump `edition`.
 ## Unsafe
 
 - `#![forbid(unsafe_code)]` in every crate that doesn't need it.
-- Each `unsafe {}` block does one thing and carries a `// SAFETY:` comment naming the invariant. `clippy::undocumented_unsafe_blocks` enforces this. It is a constraint comment under the `comments` rule, so it also names the test that pins the invariant.
+- Each `unsafe {}` block does one thing and carries a `// SAFETY:` comment naming the invariant. `clippy::undocumented_unsafe_blocks` enforces this. It is a constraint comment under the writing plugin's `comments` rule, so it also names the test that pins the invariant.
 - Public functions that are only sound under caller obligations are `unsafe fn` with a `# Safety` doc section.
 - Wrap unsafe internals in a safe API; run Miri on crates that contain unsafe.
 
@@ -133,7 +135,7 @@ Migrate with `cargo fix --edition` then bump `edition`.
 - Unit tests in `#[cfg(test)] mod tests` next to the code; integration tests in `tests/` against the public API.
 - `#![allow(clippy::unwrap_used)]` (or `#![cfg_attr(test, allow(...))]`) is fine in test modules.
 - Property tests with `proptest`; fuzz parsers with `cargo fuzz`; `cargo nextest` as the runner, `insta` for snapshots.
-- Comments follow the `comments` rule: a `//!` module doc of one short paragraph at the top of a file, and no `///` on items. Where Mortise runs, its finding is the rule. The one item doc that stays is the `# Safety` section clippy requires on a public `unsafe fn`.
+- Comments follow the writing plugin's `comments` rule: a `//!` module doc of one short paragraph at the top of a file, and no `///` on items. Where Mortise runs, its finding is the rule. The one item doc that stays is the `# Safety` section clippy requires on a public `unsafe fn`.
 
 ## Workflow before declaring code done
 

@@ -17,7 +17,7 @@ Prefer the newer convention when both work. An existing project's consistent con
 - **Idioms**: `let ... else` and let-chains over nested `match`, inline format arguments (`format!("{name}")`), native `async fn` in traits, and `#[expect(lint, reason = "...")]` where a lint is wrong for one spot.
 - **Unsafe**: `#![forbid(unsafe_code)]` in every crate that needs none. Each `unsafe {}` block does one thing and carries a `// SAFETY:` comment naming the invariant and the test that pins it.
 - **Async**: no `std::sync::Mutex` guard held across `.await`, blocking work in `spawn_blocking`, a timeout on every network call.
-- **Comments**: the `comments` rule governs. A file opens with a `//!` module doc and items carry no `///`; where Mortise runs, its finding is the rule.
+- **Comments**: the writing plugin's `comments` rule governs. A file opens with a `//!` module doc and items carry no `///`; where Mortise runs, its finding is the rule.
 
 Before reporting Rust work done, run `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings` and `cargo test`, unless the project names its own commands.
 

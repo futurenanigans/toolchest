@@ -32,7 +32,7 @@ When in doubt, ask: "What production bug would make this test fail?" No concrete
 
 ## Report
 
-Write the report to `.claude/state/test-noise-report.md`, using the report format in `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` with these fill-ins. A finding here is one test, and noise has no severity or effort, so findings are table rows instead of numbered entries.
+Write the report to `.claude/state/test-noise-report.md`, using the report format in `${CLAUDE_SKILL_DIR}/../../references/audit-procedure.md` with these fill-ins. A finding here is one test, and noise has no severity or effort, so findings are table rows instead of numbered entries.
 
 - **Title**: `Test noise audit`.
 - **Summary**: `{total} tests, {valuable} valuable, {noise} noise ({noise_pct}%)`, followed by a table with the columns Category, Count, and Example (`TestClass.TestName`).

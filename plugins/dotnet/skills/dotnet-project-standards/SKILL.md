@@ -1,6 +1,6 @@
 ---
 name: dotnet-project-standards
-description: Sets up the canonical .editorconfig and Directory.Build.props for a C# project and converts existing code to standard conventions, with a blast-radius check before enabling them on an existing codebase. Use when the user asks to "set up .editorconfig and analyzers", "add the standard Directory.Build.props", "reformat to standard conventions", "apply Microsoft conventions", or to refactor or format existing C# files wholesale. The conventions themselves live in the dotnet rule, which loads for C# files.
+description: Sets up the canonical .editorconfig and Directory.Build.props for a C# project and converts existing code to standard conventions, with a blast-radius check before enabling them on an existing codebase. Use when the user asks to "set up .editorconfig and analyzers", "add the standard Directory.Build.props", "reformat to standard conventions", "apply Microsoft conventions", or to refactor or format existing C# files wholesale. The conventions themselves live in the plugin's dotnet rule.
 ---
 
 # .NET standard setup and reformatting

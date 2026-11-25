@@ -46,7 +46,7 @@ If a package's license is found to have changed during the update:
 
 - Discover the projects from the solution file.
 - Tests may require Docker for Testcontainers.
-- Follow the project's C# conventions (see `CLAUDE.md` and the `dotnet` rule).
+- Follow the project's C# conventions (see `CLAUDE.md` and `${CLAUDE_SKILL_DIR}/../../rules/dotnet.md`).
 - All tests must pass before each commit.
 
 ## Step-by-step instructions

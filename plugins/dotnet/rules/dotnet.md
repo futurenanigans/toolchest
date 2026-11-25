@@ -44,7 +44,7 @@ Apply the conventions from existing knowledge rather than re-deriving them from 
 
 ## XML doc comments
 
-The `comments` rule governs `///` exactly as it governs `//`: a member carries no doc comment. The member's name and signature carry the meaning, and a constraint they cannot express goes in a type, a guard, or a test-anchored constraint comment.
+The writing plugin's `comments` rule governs `///` exactly as it governs `//`: a member carries no doc comment. The member's name and signature carry the meaning, and a constraint they cannot express goes in a type, a guard, or a test-anchored constraint comment.
 
 - Delete a member's `///` in the lines a task touches, `<inheritdoc/>` included.
 - `CS1591` as an error demands a comment on every public member. Put `CS1591` in `NoWarn` for application code and libraries alike, and keep `GenerateDocumentationFile` only where docs are packed or consumed by tooling. Say so when a project has it enabled as an error.
@@ -54,7 +54,7 @@ The `comments` rule governs `///` exactly as it governs `//`: a member carries n
 - `IList<T>` not `List<T>` for collection properties (CA2227, CA1002)
 - Explicit `StringComparer` on ordering (MA0002)
 - `string.Equals` with `StringComparison` instead of `==` (MA0006)
-- No TODO comments. The `comments` rule bans them and MA0026 enforces the ban where it is enabled; the work goes in the tracker or gets finished.
+- No TODO comments. The writing plugin's `comments` rule bans them and MA0026 enforces the ban where it is enabled; the work goes in the tracker or gets finished.
 
 Fix warnings when they appear. Suppress only with a written reason at the suppression site.
 

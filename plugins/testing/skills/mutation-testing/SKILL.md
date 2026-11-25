@@ -5,7 +5,7 @@ argument-hint: "[--plan] [--chunk <n>|next] [--diff <base>] [--address [1,3]] [-
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash
 ---
 
-Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for the report format, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/mutation-report.md`. Mutation flag: `--address`. Tool commands, configuration keys and output layouts per stack are in `${CLAUDE_SKILL_DIR}/references/tools.md`; read it before the first command and do not write flags from memory.
+Follow `${CLAUDE_SKILL_DIR}/../../references/audit-procedure.md` for the report format, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/mutation-report.md`. Mutation flag: `--address`. Tool commands, configuration keys and output layouts per stack are in `${CLAUDE_SKILL_DIR}/references/tools.md`; read it before the first command and do not write flags from memory.
 
 A mutation run changes one expression at a time and reruns tests. A mutant no test fails on marks behaviour the suite does not pin. The run is slow by construction, so this skill is on demand only: it never becomes a gate, a pre-commit step or part of the default test command, and no score threshold is ever set to fail a build.
 
@@ -87,7 +87,7 @@ Use the shared report format with these fill-ins:
 Each finding's subagent:
 
 1. Writes or extends a test at the public surface of the unit, asserting the behaviour the finding names. The test must pass on the unmutated code and would fail on each mutant in the finding.
-2. Holds the test to the `test-quality` rule. A test that mirrors the mutant (asserting an internal constant, a call count, an implementation detail) kills the mutant and pins nothing, so it is not written.
+2. Holds the test to `${CLAUDE_SKILL_DIR}/../../rules/test-quality.md`. A test that mirrors the mutant (asserting an internal constant, a call count, an implementation detail) kills the mutant and pins nothing, so it is not written.
 3. Changes production code only where a finding says the code cannot be tested as it stands, and then only to add the seam.
 
 After each finding, rerun only that finding's mutants with the tool's narrowest filter. The finding is done when they are caught and the fast tests pass. A mutant that still survives means the test does not assert what it claims: fix the test, never the filter.

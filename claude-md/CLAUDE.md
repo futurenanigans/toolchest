@@ -183,7 +183,7 @@ Guidance that applies only to some files ships as a rules file inside the plugin
 
 | Rule | Plugin | Read before touching |
 | :- | :- | :- |
-| `comments` | dotnet, rust, writing | any comment or doc comment in code |
+| `comments` | writing | any comment or doc comment in code |
 | `code-organization` | refactoring | file placement, new files and folders |
 | `inline-defect-prevention` | refactoring | any code being written |
 | `test-quality` | testing | test files |

@@ -143,4 +143,4 @@ components = ["rustfmt", "clippy"]
 
 - `cargo doc --open` locally; enable `#![doc = include_str!("../README.md")]` on `lib.rs` so README and crate docs stay in sync.
 - Intra-doc links: `` [`Config`] ``, `` [`Self::parse`] ``; never bare URLs to docs.rs.
-- Items carry no `///`; the `comments` rule allows a `//!` module doc and a test-anchored constraint comment only.
+- Items carry no `///`; the writing plugin's `comments` rule allows a `//!` module doc and a test-anchored constraint comment only.
