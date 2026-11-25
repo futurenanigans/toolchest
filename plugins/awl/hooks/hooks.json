@@ -1,0 +1,83 @@
+{
+  "description": "Awl semantic validation; a repository without .awl/awl.json at the repository root answers {} and loads nothing",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "awl hook --agent claude --project-dir \"${CLAUDE_PROJECT_DIR}\"",
+            "timeout": 120,
+            "statusMessage": "Awl semantic validation"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^(Edit|Write|Bash|PowerShell|NotebookEdit|MultiEdit|mcp__.*)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "awl hook --agent claude --project-dir \"${CLAUDE_PROJECT_DIR}\"",
+            "timeout": 120,
+            "statusMessage": "Awl semantic validation"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Edit|Write|Bash|PowerShell|NotebookEdit|MultiEdit|mcp__.*)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "awl hook --agent claude --project-dir \"${CLAUDE_PROJECT_DIR}\"",
+            "timeout": 120,
+            "statusMessage": "Awl semantic validation"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "^(Edit|Write|Bash|PowerShell|NotebookEdit|MultiEdit|mcp__.*)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "awl hook --agent claude --project-dir \"${CLAUDE_PROJECT_DIR}\"",
+            "timeout": 120,
+            "statusMessage": "Awl semantic validation"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "awl hook --agent claude --project-dir \"${CLAUDE_PROJECT_DIR}\"",
+            "timeout": 120,
+            "statusMessage": "Awl semantic validation"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "awl hook --agent claude --project-dir \"${CLAUDE_PROJECT_DIR}\"",
+            "timeout": 120,
+            "statusMessage": "Awl semantic validation"
+          }
+        ]
+      }
+    ]
+  },
+  "modules": [
+    "./status.tsx"
+  ]
+}

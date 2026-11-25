@@ -6,6 +6,11 @@
   "description": "Claude Code skills, hooks and output styles",
   "plugins": [
     {
+      "name": "awl",
+      "source": "./plugins/awl",
+      "description": "Roslyn semantic analysis on every C# edit (alpha). Needs the awl .NET tool; install steps at github.com/futurenanigans/awl-dist"
+    },
+    {
       "name": "dotnet",
       "source": "./plugins/dotnet",
       "description": ".NET project standards and NuGet updates"
