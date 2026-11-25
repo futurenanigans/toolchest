@@ -1,6 +1,12 @@
 {
   "name": "lam",
   "version": "0.1.0",
-  "description": "Local Agent Monitor: advisory checks on edits and deletions with per-check correction counts, a status line, a /guard-stats pane, and a git fetch at session start",
-  "types": "./types/index.d.ts"
+  "description": "Local Agent Monitor: advisory checks on edits and deletions with per-check advisory counts, a status line, a /guard-stats pane, and a git fetch at session start",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "haikuMultiplier": { "type": "string", "title": "Haiku cost multiplier", "description": "Shown after a Haiku model name in the status line; empty hides it", "default": "0.3x" },
+    "sonnetMultiplier": { "type": "string", "title": "Sonnet cost multiplier", "description": "Shown after a Sonnet model name in the status line; empty hides it", "default": "1x" },
+    "opusMultiplier": { "type": "string", "title": "Opus cost multiplier", "description": "Shown after an Opus model name in the status line; empty hides it", "default": "1.7x" },
+    "fableMultiplier": { "type": "string", "title": "Fable and Mythos cost multiplier", "description": "Shown after a Fable or Mythos model name in the status line; empty hides it", "default": "3.3x" }
+  }
 }

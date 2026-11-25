@@ -1,7 +1,7 @@
-// The status line (model, effort, git, usage and the session's correction total) and the session-start
+// The status line (model, effort, git, usage and the session's advisory total) and the session-start
 // `git fetch` whose outcome the model is told, so remote-tracking refs are never assumed fresh.
 import { atom, read } from 'claude-code'
-import type { EngineInterface as Engine, SessionContextUsage } from 'claude-code'
+import type { EngineInterface as Engine, PluginOptions, SessionContextUsage } from 'claude-code'
 
 import type { LamCounts, StatusSegment } from '../types'
 
@@ -10,11 +10,11 @@ const FETCH_TIMEOUT_MS = 20_000
 const STALE_ADVICE =
   'Remote-tracking refs are STALE: treat origin/* and any ahead/behind count as unverified, and say so rather than reporting them as current.'
 
-const MODEL_FAMILIES: readonly { family: RegExp; multiplier: string; color: string }[] = [
-  { family: /haiku/i, multiplier: '0.3x', color: 'green' },
-  { family: /sonnet/i, multiplier: '1x', color: 'green' },
-  { family: /opus/i, multiplier: '1.7x', color: 'yellow' },
-  { family: /fable|mythos/i, multiplier: '3.3x', color: 'red' },
+const MODEL_FAMILIES: readonly { family: RegExp; multiplierOption: string; color: string }[] = [
+  { family: /haiku/i, multiplierOption: 'haikuMultiplier', color: 'green' },
+  { family: /sonnet/i, multiplierOption: 'sonnetMultiplier', color: 'green' },
+  { family: /opus/i, multiplierOption: 'opusMultiplier', color: 'yellow' },
+  { family: /fable|mythos/i, multiplierOption: 'fableMultiplier', color: 'red' },
 ]
 
 const EFFORT_COLORS: Readonly<Record<string, string>> = { low: 'green', medium: 'yellow', high: 'redBright', xhigh: 'red', max: 'red' }
@@ -27,8 +27,8 @@ const NON_INTERACTIVE_GIT_ENV: Record<string, string> = {
   GIT_ASKPASS: 'echo',
   SSH_ASKPASS: 'echo',
   GCM_INTERACTIVE: 'never',
-  GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new',
 }
+const BATCH_SSH_COMMAND = 'ssh -o BatchMode=yes'
 
 function lastLines(text: string, count: number): string {
   return text.replace(/\r/g, '').trimEnd().split('\n').slice(-count).join('\n')
@@ -47,14 +47,20 @@ async function git($: Engine, cwd: string, args: readonly string[]): Promise<str
   }
 }
 
+async function fetchEnv($: Engine, cwd: string): Promise<Record<string, string>> {
+  const userSsh = (await $.env.get('GIT_SSH_COMMAND')) || (await git($, cwd, ['config', '--get', 'core.sshCommand']))
+  return userSsh ? NON_INTERACTIVE_GIT_ENV : { ...NON_INTERACTIVE_GIT_ENV, GIT_SSH_COMMAND: BATCH_SSH_COMMAND }
+}
+
 export async function fetchRemotes($: Engine, cwd: string): Promise<string | null> {
   if ((await $.session.repo()) === null) return null
   const remotes = await git($, cwd, ['remote'])
   if (!remotes) return null
 
+  const env = await fetchEnv($, cwd)
   try {
     const { exitCode, stderr } = await $.process.run(['git', '-C', cwd, 'fetch', '--all', '--prune', '--quiet'], {
-      env: NON_INTERACTIVE_GIT_ENV,
+      env,
       timeoutMs: FETCH_TIMEOUT_MS,
     })
     if (exitCode !== 0) {
@@ -99,14 +105,20 @@ function contextLimit({ window, breakdown }: SessionContextUsage): number {
   return isAutoCompactEnabled && autoCompactThreshold !== undefined ? autoCompactThreshold : rawMaxTokens
 }
 
-export async function statusSegments($: Engine): Promise<StatusSegment[]> {
+function modelSegment(model: string, options: PluginOptions): StatusSegment {
+  const family = MODEL_FAMILIES.find(({ family }) => family.test(model))
+  if (family === undefined) return { text: model }
+  const multiplier = options[family.multiplierOption]
+  return { text: typeof multiplier === 'string' && multiplier !== '' ? `${model} ${multiplier}` : model, color: family.color }
+}
+
+export async function statusSegments($: Engine, options: PluginOptions): Promise<StatusSegment[]> {
   const cwd = await $.session.cwd()
   const model = await $.session.model()
-  const family = MODEL_FAMILIES.find(({ family }) => family.test(model))
   const settings = (await $.settings.read()) as { effortLevel?: string }
   const usage = await $.session.usage({ breakdown: 'summary' })
 
-  const parts: StatusSegment[] = [family ? { text: `${model} ${family.multiplier}`, color: family.color } : { text: model }]
+  const parts: StatusSegment[] = [modelSegment(model, options)]
   if (settings.effortLevel) parts.push({ text: `effort:${settings.effortLevel}`, color: EFFORT_COLORS[settings.effortLevel] })
   parts.push(...(await gitSegments($, cwd)))
   if (usage.cost) parts.push({ text: `$${usage.cost.usd.toFixed(2)}` })

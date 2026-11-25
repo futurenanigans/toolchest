@@ -79,7 +79,7 @@ Change what the task requires; leave the rest alone. Restraint preserves reviewa
 - Bug fixes do not need surrounding code cleaned up. Simple features do not need extra configurability. Every changed line should trace to the request.
 - Introduce a new interface, helper, or abstraction when the design calls for it: a seam for substitution or testing, a dependency direction the code should depend on, or a boundary a separate unit (a crate, package, module, or project) makes mechanical instead of a convention. Caller count is not the test in either direction. What does not earn it is speculation about future needs with no present design reason.
 - Validate at boundaries (HTTP handlers, file I/O, user input, external APIs) with a proper validation library, not hand-rolled guards. Do not add defensive checks in interior code that the type system, the framework, or the boundary already guarantees.
-- Do not add docstrings, comments, or type annotations to unchanged code. Comments are limited to a module doc and an anchored constraint comment; the `comments` rule has the detail.
+- Do not add docstrings, comments, or type annotations to unchanged code. Comments are limited to a module doc and an anchored constraint comment; the `writing:comments` skill has the detail.
 - Do not reformat, rename, or "improve" adjacent code the task did not reach. If a separate cleanup is warranted, surface it as a follow-up instead of folding it into the current change.
 
 This rule is not in tension with "Fix defects in the path of work" below: completing correctness in code already being touched is part of the task. Reformatting code not being touched is not.
@@ -165,7 +165,7 @@ Apply these when the task is on a hot path or involves expensive resources. Do n
 - After changing DI or module wiring, verify no circular dependencies by tracing constructor or import chains.
 
 ### Testing discipline
-Which tests are worth writing is the `test-quality` rule's job; read it before writing or reviewing test files. This rule applies during any task.
+Which tests are worth writing is the job of the `testing:test-quality` skill; load it before writing or reviewing test files. This rule applies during any task.
 
 - **No test-gaming**: when a test fails, the working assumption is that the production code is wrong. Do not mock the system under test, hard-code values to match test inputs, downgrade types to silence errors, or skip or delete a failing test to remove it from the suite. If the test itself appears wrong, say so and wait for confirmation before changing it.
 - **Test runs cost time**: while iterating, run the narrowest check that answers the current question: a typecheck, the one test file, or the one project the edit touched. When several changes are planned, make all of them, then run the full suite once at the end. Once a suite takes more than about 30 seconds, and certainly past 90, rerunning it after every edit stalls the work for that long each time. Do not rerun a passing suite to double-check, or after an edit it does not exercise. After a failure, rerun only the failing tests until they pass, then the full suite once before reporting completion.
@@ -177,11 +177,11 @@ Load the `writing-style` skill before writing or editing any prose artifact: a R
 
 When searching for current information, check today's date from the system context before assuming the year.
 
-## Rules files and stack-specific standards
+## Convention skills and stack-specific standards
 
-Guidance that applies only to some files ships as a rules file inside the plugin whose skills use it, under that plugin's `rules/` folder. A plugin rule does not load on its own: read it before writing or reviewing the files it covers, and a skill that depends on one names its path as `${CLAUDE_SKILL_DIR}/../../rules/<name>.md`. Skills hold workflows that are invoked, not guidance that must always apply.
+Guidance that applies only to some files ships as a skill in the named plugin. Each loads by its description or by invoking it as `/<plugin>:<name>`; load it before writing or reviewing the files it covers. A skill that depends on one reads it at `${CLAUDE_SKILL_DIR}/../<name>/SKILL.md`.
 
-| Rule | Plugin | Read before touching |
+| Skill | Plugin | Load before touching |
 | :- | :- | :- |
 | `comments` | writing | any comment or doc comment in code |
 | `code-organization` | refactoring | file placement, new files and folders |
@@ -190,9 +190,9 @@ Guidance that applies only to some files ships as a rules file inside the plugin
 | `dotnet` | dotnet | C# files and projects |
 | `rust` | rust | Rust files and Cargo manifests |
 
-- **.NET**: the `dotnet` rule covers formatting and naming, DI lifetimes, async and CancellationToken, IOptions config, XML docs, analyzer codes, build discipline and hot paths. Standard Microsoft conventions win over a project's deviating local style. The `dotnet-project-standards` skill sets up `.editorconfig` and analyzers and reformats existing code.
-- **Rust**: the `rust` rule covers edition 2024 idioms, module layout, error types, unsafe, async and the pre-completion checks. The `modern-rust` skill holds the full reference for scaffolding and review. An existing project's consistent convention wins over the modern default.
+- **.NET**: the `dotnet` skill covers formatting and naming, DI lifetimes, async and CancellationToken, IOptions config, XML docs, analyzer codes, build discipline and hot paths. Standard Microsoft conventions win over a project's deviating local style. The `dotnet-project-standards` skill sets up `.editorconfig` and analyzers and reformats existing code.
+- **Rust**: the `rust` skill covers edition 2024 idioms, module layout, error types, unsafe, async and the pre-completion checks. The `modern-rust` skill holds the full reference for scaffolding and review. An existing project's consistent convention wins over the modern default.
 
 The `pattern-awareness` skill in the refactoring plugin applies while writing code that resembles existing code.
 
-A new stack's conventions go in a rules file in that stack's plugin, and its invoked workflows in a skill beside it. Never add stack-specific rules to this global file.
+A new stack's conventions go in a skill in that stack's plugin, beside its workflow skills. Never add stack-specific rules to this global file.

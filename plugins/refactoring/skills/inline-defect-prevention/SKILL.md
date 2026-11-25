@@ -1,25 +1,6 @@
 ---
-paths:
-  - "**/*.cs"
-  - "**/*.fs"
-  - "**/*.ts"
-  - "**/*.tsx"
-  - "**/*.js"
-  - "**/*.jsx"
-  - "**/*.mjs"
-  - "**/*.cjs"
-  - "**/*.vue"
-  - "**/*.svelte"
-  - "**/*.py"
-  - "**/*.rs"
-  - "**/*.go"
-  - "**/*.java"
-  - "**/*.kt"
-  - "**/*.rb"
-  - "**/*.swift"
-  - "**/*.sql"
-  - "**/*.ps1"
-  - "**/*.sh"
+name: inline-defect-prevention
+description: Defect shapes to catch while writing code. Data loss paths, unvalidated input at trust boundaries, swallowed errors, resource leaks, race-prone sequences and defensive cruft. Load before writing or editing source code in any language.
 ---
 
 # Inline defect prevention

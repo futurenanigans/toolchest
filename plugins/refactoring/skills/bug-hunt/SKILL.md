@@ -11,7 +11,7 @@ This skill also executes code: it may write and run throwaway reproduction harne
 
 ## Where this skill fits
 
-`bug-hunt` scans the whole current codebase on disk and centers test-skeptic epistemics. `code-review` hunts bugs in a git diff (change-scoped); the `inline-defect-prevention` rule (`${CLAUDE_SKILL_DIR}/../../rules/inline-defect-prevention.md`) catches them at write time. Reach for `bug-hunt` when there is no diff to anchor on: an audit of code that already exists, where a green test suite has been mistaken for a clean bill of health.
+`bug-hunt` scans the whole current codebase on disk and centers test-skeptic epistemics. `code-review` hunts bugs in a git diff (change-scoped); the `inline-defect-prevention` skill (`${CLAUDE_SKILL_DIR}/../inline-defect-prevention/SKILL.md`) catches them at write time. Reach for `bug-hunt` when there is no diff to anchor on: an audit of code that already exists, where a green test suite has been mistaken for a clean bill of health.
 
 ## Human-authored claims are not oracles
 

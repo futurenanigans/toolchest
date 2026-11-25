@@ -6,9 +6,10 @@ export const CWD = '/repo/widget'
 type On = Parameters<TestBody>[1]
 type TestEngine = Parameters<TestBody>[0]
 type GitOutput = { exitCode: number; stdout?: string; stderr?: string }
-export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; denial?: string; denyFirstCall?: string; gitMissing?: boolean; contextTokens?: number; contextWindow?: number; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number } }
+export type ProcessRun = { argv: readonly string[]; env?: Readonly<Record<string, string>> }
+export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; env?: Record<string, string>; runs?: ProcessRun[]; fetchGate?: Promise<void>; denial?: string; denyFirstCall?: string; gitMissing?: boolean; contextTokens?: number; contextWindow?: number; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number } }
 
-export function stubEngine(on: On, { git = {}, files = {}, denial, denyFirstCall, gitMissing = false, contextTokens = 234_000, contextWindow = 1_000_000, compaction }: EngineSetup = {}): void {
+export function stubEngine(on: On, { git = {}, files = {}, env = {}, runs = [], fetchGate, denial, denyFirstCall, gitMissing = false, contextTokens = 234_000, contextWindow = 1_000_000, compaction }: EngineSetup = {}): void {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('command.register', () => ({ value: { command: 'guard-stats' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -26,9 +27,12 @@ export function stubEngine(on: On, { git = {}, files = {}, denial, denyFirstCall
     return { value: { startedAt: 0, context, rateLimits: [], cost: { usd: 1.234 } } as never }
   })
   on('clock.now', () => ({ value: Date.UTC(2026, 10, 25, 9, 30, 0) }))
-  on('process.run', (_, e) => {
+  on('env.get', (_, e) => ({ value: env[e.name] }))
+  on('process.run', async (_, e) => {
     if (gitMissing) throw new Error('spawn git ENOENT')
+    runs.push({ argv: e.argv, env: e.init?.env })
     const key = e.argv.filter(arg => !arg.startsWith('-') && arg !== 'git' && arg !== CWD)[0] ?? ''
+    if (key === 'fetch' && fetchGate !== undefined) await fetchGate
     const out = git[key] ?? { exitCode: 0 }
     return { value: { exitCode: out.exitCode, stdout: out.stdout ?? '', stderr: out.stderr ?? '', isStdoutTruncated: false, isStderrTruncated: false } }
   })

@@ -1,25 +1,6 @@
 ---
-paths:
-  - "**/*.cs"
-  - "**/*.fs"
-  - "**/*.ts"
-  - "**/*.tsx"
-  - "**/*.js"
-  - "**/*.jsx"
-  - "**/*.mjs"
-  - "**/*.cjs"
-  - "**/*.vue"
-  - "**/*.svelte"
-  - "**/*.py"
-  - "**/*.rs"
-  - "**/*.go"
-  - "**/*.java"
-  - "**/*.kt"
-  - "**/*.rb"
-  - "**/*.swift"
-  - "**/*.sql"
-  - "**/*.ps1"
-  - "**/*.sh"
+name: code-organization
+description: Where a new file goes and whether new code belongs in the file it is landing in. Load before creating a source file or folder, placing new code, or adding code to an existing source file in any language.
 ---
 
 # Code organization

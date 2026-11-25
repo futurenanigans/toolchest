@@ -1,0 +1,24 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  plugins:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Claude Code
+        run: npm install --global @anthropic-ai/claude-code@2.1.332
+      - name: Validate the marketplace and every plugin
+        run: |
+          set -euo pipefail
+          claude plugin validate .
+          for plugin in plugins/*/; do claude plugin validate "$plugin"; done
+      - name: Test lam
+        run: claude plugin test plugins/lam

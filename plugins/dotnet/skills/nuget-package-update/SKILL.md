@@ -45,7 +45,7 @@ If a package's license is found to have changed during the update:
 
 - Discover the projects from the solution file.
 - Tests may require Docker for Testcontainers.
-- Follow the project's C# conventions (see `CLAUDE.md` and `${CLAUDE_SKILL_DIR}/../../rules/dotnet.md`).
+- Follow the project's C# conventions (see `CLAUDE.md` and `${CLAUDE_SKILL_DIR}/../dotnet/SKILL.md`).
 - All tests must pass before each commit.
 
 ## Step-by-step instructions
@@ -125,7 +125,7 @@ git commit -m "Update [package group name] packages"
 
 4.2. **Identify errors**: read build errors and test failures with their stack traces; use Grep to find usages of the problematic APIs.
 
-4.3. **Apply fixes**: update code to the new APIs, fix compilation errors, update tests if needed, and write the new code to the conventions in `${CLAUDE_SKILL_DIR}/../../rules/dotnet.md`, which win over a deviating local style.
+4.3. **Apply fixes**: update code to the new APIs, fix compilation errors, update tests if needed, and write the new code to the conventions in `${CLAUDE_SKILL_DIR}/../dotnet/SKILL.md`, which win over a deviating local style.
 
 4.4. **Verify**: rebuild and retest with the commands from step 3.
 

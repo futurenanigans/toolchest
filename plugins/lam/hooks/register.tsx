@@ -1,19 +1,24 @@
 // Local Agent Monitor. Runs the advisory checks on every Edit, Write and shell call and attaches their warnings to
-// the tool result for the model, counts each warning per check, keeps the status line current, draws the counts in
-// the /guard-stats pane, and tells the model how the session-start git fetch went.
+// the tool result for the model, leaving out the checks the awl or loom analyzer covers for the file, counts each
+// warning per check, keeps the status line current, draws the counts in the /guard-stats pane, and tells the model
+// how the session-start git fetch went.
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface as Engine, Register, ToolCallInput } from 'claude-code'
+import type { EngineInterface as Engine, PluginOptions, Register, ToolCallInput } from 'claude-code'
 
 import type { LamCounts, StatusSegment } from '../types'
-import { type CheckInput, CORRECTING_CHECKS, adviseAll, isReadme } from '../checks'
+import { type CheckInput, CORRECTING_CHECKS, DELEGATIONS, adviseAll, isReadme } from '../checks'
+import { fileExtension } from '../checks/text'
 import { fetchRemotes, statusSegments } from './status'
 
 const PANE = 'guard-stats'
-const PANE_TITLE = 'Guardrail corrections'
+const PANE_TITLE = 'Guardrail advisories'
 const corrections = atom({ plugin: 'lam', key: 'counts' } as const, {} as LamCounts, { shape: 'counts-1' })
 const status = atom({ plugin: 'lam', key: 'status' } as const, [] as StatusSegment[], { shape: 'status-1' })
 const STATUS_SEPARATOR = ' | '
 const FETCH_SECTION = 'lam:fetch'
+const FETCH_WAIT_MS = 2_000
+const FETCH_PENDING =
+  'The session-start git fetch is still running. Remote-tracking refs are unverified: treat origin/* and any ahead/behind count as unverified until a later notice in this prompt reports how the fetch went.'
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 
 const readmeGuided = { plugin: 'lam', key: 'readmeGuided' } as const
@@ -51,43 +56,62 @@ async function checkInput($: Engine, e: ToolCallInput): Promise<CheckInput | nul
   }
 }
 
-async function refreshStatus($: Engine): Promise<void> {
-  const segments = await statusSegments($)
+async function refreshStatus($: Engine, options: PluginOptions): Promise<void> {
+  const segments = await statusSegments($, options)
   await update($, status, () => segments)
 }
 
-export const register: Register = on => {
+async function delegatedChecks($: Engine, filePath: string | undefined): Promise<ReadonlySet<string>> {
+  if (filePath === undefined) return new Set()
+  const extension = fileExtension(filePath)
+  const repo = await $.session.repo()
+  if (repo === null) return new Set()
+  const skipped = new Set<string>()
+  for (const { marker, extensions, checks } of DELEGATIONS) {
+    if (!extensions.has(extension) || !(await $.fs.exists(`${repo.root}/${marker}`))) continue
+    for (const check of checks) skipped.add(check)
+  }
+  return skipped
+}
+
+export const register: Register = (on, options) => {
   let fetchOutcome: Promise<string | null> = Promise.resolve(null)
+  let fetched: { outcome: string | null } | undefined = { outcome: null }
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'guard-stats', description: 'Show how often each guardrail check corrected the model this session' })
+    await $.command.register({ name: 'guard-stats', description: 'Show how many advisories each guardrail check delivered this session' })
     const started = await next(e)
-    fetchOutcome = fetchRemotes($, e.cwd)
-    await refreshStatus($)
+    fetched = undefined
+    fetchOutcome = fetchRemotes($, e.cwd).then(outcome => {
+      fetched = { outcome }
+      return outcome
+    })
+    await refreshStatus($, options)
     return started
   })
 
   on('turn.complete', async ($, e, next) => {
     const completed = await next(e)
-    await refreshStatus($)
+    await refreshStatus($, options)
     return completed
   })
 
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
-    const fetched = await fetchOutcome
-    if (!fetched) return composed
-    return { sections: [...composed.sections, { id: FETCH_SECTION, text: fetched, scope: 'session' as const }] }
+    if (fetched === undefined) await Promise.race([fetchOutcome, $.clock.sleep(FETCH_WAIT_MS)])
+    const text = fetched === undefined ? FETCH_PENDING : fetched.outcome
+    if (!text) return composed
+    return { sections: [...composed.sections, { id: FETCH_SECTION, text, scope: 'session' as const }] }
   })
 
   on('command.run', { command: 'guard-stats' }, async $ => {
     await $.ui.open({ id: PANE, title: PANE_TITLE })
-    return { text: 'Guardrail corrections pane opened.' }
+    return { text: 'Guardrail advisories pane opened.' }
   })
 
   on('tool.call', async ($, e, next) => {
     const input = await checkInput($, e)
-    const advice = input === null ? [] : adviseAll(input)
+    const advice = input === null ? [] : adviseAll(input, await delegatedChecks($, input.filePath))
     if (advice.length === 0) return next(e)
 
     const ran = await next(e)
@@ -98,7 +122,7 @@ export const register: Register = on => {
       for (const { check, corrects } of advice) if (corrects) tallied[check] = (tallied[check] ?? 0) + 1
       return tallied
     })
-    await refreshStatus($)
+    await refreshStatus($, options)
     if (input?.isFirstReadmeEdit) await $.state.set(readmeGuided, true)
     return { ...ran, context: [...(ran.context ?? []), advice.map(a => a.message).join('\n\n')] }
   })
@@ -129,7 +153,7 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        <Text bold>{total} correction{total === 1 ? '' : 's'} this session</Text>
+        <Text bold>{total} {total === 1 ? 'advisory' : 'advisories'} this session</Text>
         {rows.map(row => (
           <Text dimColor={row.count === 0}>
             {row.name.padEnd(width)}  {String(row.count).padStart(4)}

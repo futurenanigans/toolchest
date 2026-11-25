@@ -1,6 +1,6 @@
 # writing
 
-A house style for prose Claude writes to disk, a rule that limits code comments, and three output styles that cap how long Claude's replies get. Install it if generated READMEs, commit messages and chat replies read as padded or machine-written to you.
+A house style for prose Claude writes to disk, a skill that limits code comments, and three output styles that cap how long Claude's replies get. Install it if generated READMEs, commit messages and chat replies read as padded or machine-written to you.
 
 ## writing-style skill
 
@@ -16,11 +16,11 @@ What it asks for:
 
 It also carries a vocabulary warning list and limits on editing prose someone else wrote. Allowed text is changed only when it is false or breaks the rules, and only in code the task already reaches. A requested sweep is the exception.
 
-## The comments rule
+## The comments skill
 
-`rules/comments.md` covers source files in most common languages. It allows two kinds of comment: a short module doc at the top of a file, and a constraint comment that names the test keeping it true. Every other comment in lines Claude touches gets deleted, except sections a compiler or lint requires.
+The `comments` skill covers code comments in any language. It allows two kinds of comment: a short module doc at the top of a file, and a constraint comment that names the test keeping it true. Every other comment in lines Claude touches gets deleted, except sections a compiler or lint requires.
 
-Plugin rules do not load automatically. The global `CLAUDE.md` in this repository tells Claude to read this rule before touching any comment. Without that, add a similar line to your own instructions or copy the file into `~/.claude/rules/`.
+Claude loads it from its description before writing or editing a comment, and the global `CLAUDE.md` in this repository points to it as well. You can also run `/writing:comments` directly.
 
 ## Output styles
 

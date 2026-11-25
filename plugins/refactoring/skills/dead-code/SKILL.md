@@ -33,7 +33,7 @@ When the scanned code is a library, the root set is its public surface, and the 
 Use the most exact source available for each question and name it in the finding. Where a source cannot answer, say so; an unanswered question keeps the code alive.
 
 1. **The compiler and its lints.** They are exact about what they cover: unused locals, parameters, private members and imports, unreachable statements. Examples are rustc `dead_code` and `unused_*`, the C# compiler and IDE0051, IDE0052 and IDE0060, and TypeScript `noUnusedLocals`. Turn a silenced lint back on for the scan when the project disabled it.
-2. **A reachability tool built for the stack**, when one is installed. For .NET that is Rotfeste (`rot analyze`, with `--library` for a library), which composes the application to derive its roots and reports where its analysis stops. For TypeScript and JavaScript it is `knip`; for Cargo dependencies, `cargo machete` or `cargo udeps`. A tool's own unknowns are reported as unknowns.
+2. **A reachability tool built for the stack**, when one is installed. No public reachability tool exists for .NET, so this skill's own root inventory applies there. For TypeScript and JavaScript it is `knip`; for Cargo dependencies, `cargo machete` or `cargo udeps`. A tool's own unknowns are reported as unknowns.
 3. **The language server**, for references to a named symbol across the workspace.
 4. **Reading**, for what no tool models: a registration that scans by convention, a string that becomes a type name, a feature flag nothing sets.
 
@@ -93,7 +93,7 @@ Possible findings are never removed automatically; if cherry-picked explicitly, 
 Each finding's subagent:
 
 1. Deletes the code. It leaves no commented-out copy, no shim and no re-export for the old name.
-2. Deletes what the removal strands: tests that exercised only the dead code, private helpers, imports, fields, configuration keys, and dependencies nothing else uses.
+2. Deletes what the removal strands: tests that exercised only the dead code, private helpers, imports, fields, configuration keys, and dependencies nothing else uses. Deleting those tests may draw a test-deletion advisory; answer it with the finding's evidence (why the test is dead) instead of retrying.
 3. Checks again inside the files it touched. A removal exposes the next layer, so repeat until nothing newly unreferenced remains.
 4. Leaves live code alone. A signature that only dead code needed is narrowed; nothing else is refactored.
 
@@ -105,4 +105,4 @@ Only Proven and Probable findings are dispatched. Findings that share a file run
 
 ## External context
 
-A `--context` file seeds the candidate list: a Rotfeste reachability map or SARIF file, `knip` JSON, a coverage capture, linker or trimmer output. Coverage shows what ran in one execution and nothing about what can run, so uncovered code is a candidate and never a finding. Every seeded candidate still goes through the liveness checks.
+A `--context` file seeds the candidate list: a SARIF file, `knip` JSON, a coverage capture, linker or trimmer output. Coverage shows what ran in one execution and nothing about what can run, so uncovered code is a candidate and never a finding. Every seeded candidate still goes through the liveness checks.

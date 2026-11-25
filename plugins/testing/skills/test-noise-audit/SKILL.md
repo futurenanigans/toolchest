@@ -26,7 +26,7 @@ Run the audit and write the report in one subagent, as the "Run the scan in a su
 
 ## Categories
 
-Before classifying, read `${CLAUDE_SKILL_DIR}/../../rules/test-quality.md`. Its "Noise" list gives the categories to classify as noise, and its "Valuable" list gives categories never to classify as noise. That file is the single source for both lists; if it cannot be read, stop and say so instead of classifying from memory.
+Before classifying, read `${CLAUDE_SKILL_DIR}/../test-quality/SKILL.md`. Its "Noise" list gives the categories to classify as noise, and its "Valuable" list gives categories never to classify as noise. That file is the single source for both lists; if it cannot be read, stop and say so instead of classifying from memory.
 
 When in doubt, ask: "What production bug would make this test fail?" No concrete answer means noise.
 
@@ -44,7 +44,7 @@ Write the report to `.claude/state/test-noise-report.md`, using the report forma
 
 After the report is written (under `--auto`, or after user confirmation otherwise):
 
-- Delete the test methods listed in the Findings tables. If every test in a class or file is noise, delete the class or file.
+- Delete the test methods listed in the Findings tables. If every test in a class or file is noise, delete the class or file. The deletion may draw a test-deletion advisory; answer it with the finding's evidence (why the test is noise) instead of retrying.
 - Remove orphaned fields, imports, helper methods, and setup or teardown code left behind.
 - Run the full test suite; every remaining test must still pass.
 - Commit the removal with a message stating the noise count and category breakdown.

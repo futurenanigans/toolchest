@@ -1,14 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
 import { looksLikeTestFile } from '../checks/text'
-import { statusRow, stubEngine } from './engine'
+import { CWD, statusRow, stubEngine } from './engine'
 
 const PANE = {
   plugin: 'lam',
   component: 'Pane',
   requestId: 'guard-stats',
   surface: 'terminal',
-  props: { title: 'Guardrail corrections', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 20 }, view: {} },
+  props: { title: 'Guardrail advisories', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 20 }, view: {} },
 } as const
 
 test('an edit adding a type escape hatch reaches the model as context and is counted per check', async ($, on) => {
@@ -21,7 +21,7 @@ test('an edit adding a type escape hatch reaches the model as context and is cou
 
   expect(ran.context?.join('')).toContain('escape hatch (: any)')
   const ui = await $.ui.mount(PANE)
-  expect((await ui.find({ type: 'Text', text: /corrections? this session/ }))?.text).toBe('2 corrections this session')
+  expect((await ui.find({ type: 'Text', text: /advisor(y|ies) this session/ }))?.text).toBe('2 advisories this session')
   expect((await ui.find({ type: 'Text', text: /^type-downgrade/ }))?.text).toMatch(/type-downgrade\s+1$/)
   expect((await ui.find({ type: 'Text', text: /^test-deletion/ }))?.text).toMatch(/test-deletion\s+1$/)
   expect((await ui.find({ type: 'Text', text: /^secrets/ }))?.text).toMatch(/secrets\s+0$/)
@@ -97,4 +97,64 @@ test('a delete command is recognized only in command position', async ($, on) =>
   expect(chained.context?.join('')).toContain('a.test.ts')
   expect(piped.context).toBeUndefined()
   expect(argument.context).toBeUndefined()
+})
+
+test('an EF Core async single-element lookup is flagged', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const ran = await $.tool.call({ tool: 'Edit', file_path: '/repo/Orders.cs', old_string: 'var x = 1;', new_string: 'var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == id);' })
+  expect(ran.context?.join('')).toContain('takes one element from a collection')
+})
+
+test('a C# catch of a specific exception type is a deliberate handler and is not flagged', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const cancelled = await $.tool.call({ tool: 'Write', file_path: '/repo/A.cs', content: 'try { Run(); } catch (OperationCanceledException) { }' })
+  const format = await $.tool.call({ tool: 'Write', file_path: '/repo/B.cs', content: 'try { return Parse(s); } catch (FormatException) { return null; }' })
+  const named = await $.tool.call({ tool: 'Write', file_path: '/repo/C.java', content: 'try { run(); } catch (final IOException | SQLException e) { }' })
+  expect(cancelled.context).toBeUndefined()
+  expect(format.context).toBeUndefined()
+  expect(named.context).toBeUndefined()
+})
+
+test('catch-all handlers that discard the exception are still flagged', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const bodies = [
+    ['/repo/A.cs', 'try { Run(); } catch { }'],
+    ['/repo/B.cs', 'try { Run(); } catch (Exception) { return null; }'],
+    ['/repo/C.cs', 'try { Run(); } catch (System.Exception ex) { return null; }'],
+    ['/repo/D.java', 'try { run(); } catch (Throwable t) { }'],
+    ['/repo/E.kt', 'try { run() } catch (e: Exception) { }'],
+    ['/repo/f.ts', 'try { run() } catch (e) { }'],
+  ] as const
+  for (const [file_path, content] of bodies) {
+    const ran = await $.tool.call({ tool: 'Write', file_path, content })
+    expect(ran.context?.join('')).toContain('discards the exception')
+  }
+})
+
+test('C# checks awl covers are skipped when the repo has an awl config, and others still run', async ($, on) => {
+  stubEngine(on, { files: { [`${CWD}/.awl/awl.json`]: '{}' } })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+
+  const covered = await $.tool.call({ tool: 'Write', file_path: `${CWD}/A.cs`, content: 'var a = xs.First(); try { Run(); } catch { } dynamic d = 1;' })
+  const secret = await $.tool.call({ tool: 'Write', file_path: `${CWD}/B.cs`, content: 'var key = "AKIAABCDEFGHIJKLMNOP";' })
+  const script = await $.tool.call({ tool: 'Write', file_path: `${CWD}/c.ts`, content: 'const x = y as any' })
+  expect(covered.context).toBeUndefined()
+  expect(secret.context?.join('')).toContain('real credential')
+  expect(script.context?.join('')).toContain('escape hatch')
+})
+
+test('script checks loom covers, skip markers included, are skipped when the repo has a loom config', async ($, on) => {
+  stubEngine(on, { files: { [`${CWD}/.loom/loom.json`]: '{}' } })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+
+  const skipped = await $.tool.call({ tool: 'Write', file_path: `${CWD}/a.test.ts`, content: 'it.skip("x", () => { const v = y as any })' })
+  const csharp = await $.tool.call({ tool: 'Write', file_path: `${CWD}/A.cs`, content: 'var a = xs.First();' })
+  expect(skipped.context).toBeUndefined()
+  expect(csharp.context?.join('')).toContain('takes one element from a collection')
 })

@@ -3,7 +3,6 @@ name: task-implementer
 description: Builds and verifies one bounded task with stated acceptance criteria, such as a task from a build sequence or a scoped bug fix. Never runs git.
 tools: Bash, Glob, Grep, Read, Edit, Write
 model: inherit
-permissionMode: acceptEdits
 color: blue
 ---
 

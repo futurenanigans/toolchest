@@ -1,11 +1,6 @@
 ---
-paths:
-  - "**/*.cs"
-  - "**/*.csproj"
-  - "**/*.props"
-  - "**/*.targets"
-  - "**/*.razor"
-  - "**/*.cshtml"
+name: dotnet
+description: C# and .NET conventions. Formatting and naming, DI lifetimes, async and CancellationToken, IOptions config, XML docs, analyzer codes, build discipline and hot paths. Load before writing, editing or reviewing C# files (.cs, .razor, .cshtml) or MSBuild files (.csproj, .props, .targets).
 ---
 
 # .NET conventions
@@ -44,7 +39,7 @@ Apply the conventions from existing knowledge rather than re-deriving them from 
 
 ## XML doc comments
 
-The writing plugin's `comments` rule governs `///` exactly as it governs `//`: a member carries no doc comment. The member's name and signature carry the meaning, and a constraint they cannot express goes in a type, a guard, or a test-anchored constraint comment.
+The `writing:comments` skill governs `///` exactly as it governs `//`: a member carries no doc comment. The member's name and signature carry the meaning, and a constraint they cannot express goes in a type, a guard, or a test-anchored constraint comment.
 
 - Delete a member's `///` in the lines a task touches, `<inheritdoc/>` included.
 - `CS1591` as an error demands a comment on every public member. Put `CS1591` in `NoWarn` for application code and libraries alike, and keep `GenerateDocumentationFile` on: build-time IDE0005 (unused usings) reports only when the documentation file is generated. Say so when a project has CS1591 enabled as an error.
@@ -53,7 +48,7 @@ The writing plugin's `comments` rule governs `///` exactly as it governs `//`: a
 
 - Collection properties are get-only (CA2227), and public APIs expose `Collection<T>` or `ReadOnlyCollection<T>` instead of `List<T>` (CA1002)
 - Explicit `StringComparison` on string comparison and ordering calls (CA1310)
-- No TODO comments. The writing plugin's `comments` rule bans them; the work goes in the tracker or gets finished.
+- No TODO comments. The `writing:comments` skill bans them; the work goes in the tracker or gets finished.
 
 Fix warnings when they appear. Suppress only with a written reason at the suppression site.
 

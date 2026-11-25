@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { CWD, statusRow, stubEngine } from './engine'
+import { CWD, type ProcessRun, statusRow, stubEngine } from './engine'
 
 const COMPOSE = { model: 'claude-opus-5-5', promptModel: 'claude-opus-5-5', surfaces: ['terminal'], tools: [], outputStyle: null, traits: [] } as const
 
@@ -89,4 +89,58 @@ test('a missing git binary leaves the session running with the directory name an
   const { sections } = await $.prompt.compose(COMPOSE)
   expect(sections.map(s => s.id)).toEqual(['intro'])
   expect((await statusRow($)).text).toContain('widget')
+})
+
+test('the model multiplier comes from the plugin options, and an empty one hides it', { options: { opusMultiplier: '' } }, async ($, on) => {
+  stubEngine(on, { git: { remote: { exitCode: 0, stdout: '' } } })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  const row = await statusRow($)
+  expect(row.text).toMatch(/^claude-opus-5-5 \| /)
+  expect(await row.colorOf('claude-opus-5-5')).toBe('yellow')
+})
+
+test('the fetch runs ssh in batch mode without accepting unknown host keys when the user configured no ssh command', async ($, on) => {
+  const runs: ProcessRun[] = []
+  stubEngine(on, { git: { remote: { exitCode: 0, stdout: 'origin\n' } }, runs })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  await $.prompt.compose(COMPOSE)
+  const fetch = runs.find(run => run.argv.includes('fetch'))
+  expect(fetch?.env?.GIT_SSH_COMMAND).toBe('ssh -o BatchMode=yes')
+  expect(fetch?.env?.GIT_TERMINAL_PROMPT).toBe('0')
+})
+
+test('the fetch leaves the ssh command alone when core.sshCommand is set', async ($, on) => {
+  const runs: ProcessRun[] = []
+  stubEngine(on, { git: { remote: { exitCode: 0, stdout: 'origin\n' }, config: { exitCode: 0, stdout: 'op-ssh-sign\n' } }, runs })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  await $.prompt.compose(COMPOSE)
+  const fetch = runs.find(run => run.argv.includes('fetch'))
+  expect(fetch?.env?.GIT_TERMINAL_PROMPT).toBe('0')
+  expect(fetch?.env?.GIT_SSH_COMMAND).toBeUndefined()
+})
+
+test('the fetch leaves the ssh command alone when GIT_SSH_COMMAND is set', async ($, on) => {
+  const runs: ProcessRun[] = []
+  stubEngine(on, { git: { remote: { exitCode: 0, stdout: 'origin\n' } }, env: { GIT_SSH_COMMAND: 'ssh -i key' }, runs })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  await $.prompt.compose(COMPOSE)
+  const fetch = runs.find(run => run.argv.includes('fetch'))
+  expect(fetch?.env?.GIT_TERMINAL_PROMPT).toBe('0')
+  expect(fetch?.env?.GIT_SSH_COMMAND).toBeUndefined()
+})
+
+test('a slow fetch does not hold the prompt: it says the fetch is running, and a later compose carries the outcome', async ($, on) => {
+  let release = (): void => {}
+  const fetchGate = new Promise<void>(resolve => { release = resolve })
+  stubEngine(on, { git: { remote: { exitCode: 0, stdout: 'origin\n' } }, fetchGate })
+  on('clock.sleep', () => ({ value: undefined }))
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+
+  const pending = await $.prompt.compose(COMPOSE)
+  expect(pending.sections.at(-1)?.text).toContain('still running')
+  release()
+  let settled = await $.prompt.compose(COMPOSE)
+  for (let attempt = 0; attempt < 20 && settled.sections.at(-1)?.text.includes('still running'); attempt++) settled = await $.prompt.compose(COMPOSE)
+  expect(settled.sections.map(s => s.id)).toEqual(['intro', 'lam:fetch'])
+  expect(settled.sections.at(-1)?.text).toContain('git fetch --all --prune completed')
 })

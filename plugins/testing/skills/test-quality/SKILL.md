@@ -1,19 +1,6 @@
 ---
-paths:
-  - "**/*Test.cs"
-  - "**/*Tests.cs"
-  - "**/*.Tests/**"
-  - "**/*.UnitTests/**"
-  - "**/*.IntegrationTests/**"
-  - "**/test/**"
-  - "**/tests/**"
-  - "**/__tests__/**"
-  - "**/*.test.*"
-  - "**/*.spec.*"
-  - "**/test_*.py"
-  - "**/*_test.py"
-  - "**/*_test.go"
-  - "**/*_spec.rb"
+name: test-quality
+description: Which tests are worth writing and which are noise. Load before writing, editing, reviewing or deleting tests, or touching any test file (test projects, test/ and tests/ folders, *.test.*, *.spec.*, test_*.py, *_test.go and similar).
 ---
 
 # Adversarial test quality gate

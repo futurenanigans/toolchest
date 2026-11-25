@@ -11,7 +11,7 @@ type SelectionPatterns = { select: RegExp; remove: RegExp }
 function selectionPatterns(extension: string): SelectionPatterns | null {
   if (extension === '.cs') {
     return {
-      select: new RegExp(String.raw`\.(First|Last|Single)(OrDefault)?\s*\(|\.ElementAt(OrDefault)?\s*\(\s*0\s*\)|${INDEX_ZERO}`, 'g'),
+      select: new RegExp(String.raw`\.(First|Last|Single)(OrDefault)?(Async)?\s*\(|\.ElementAt(OrDefault)?\s*\(\s*0\s*\)|${INDEX_ZERO}`, 'g'),
       remove: /\.(Pop|Dequeue)\s*\(\s*\)/g,
     }
   }
@@ -76,7 +76,7 @@ If none holds, the code works on the single-item case and silently drops the res
   },
 }
 
-const CATCH = /\bcatch\b\s*(?:\(\s*(?:[\w.<>?]+\s+)?(?<name>[A-Za-z_]\w*)?\s*\))?/g
+const CATCH = /\bcatch\b\s*(?:\((?<params>[^()]*)\))?/g
 const HANDLED = [
   /\bthrow\b/,
   /\bconsole\.(?:error|warn)\b/,
@@ -85,11 +85,35 @@ const HANDLED = [
   /\breject\s*\(/,
   /\bExceptionDispatchInfo\b/,
 ]
-const BRACE_CATCH_EXTENSIONS = new Set([...SCRIPT_EXTENSIONS, '.cs', '.java', '.kt', '.swift'])
+const TYPED_CATCH_EXTENSIONS = new Set(['.cs', '.java', '.kt'])
+const BRACE_CATCH_EXTENSIONS = new Set([...SCRIPT_EXTENSIONS, ...TYPED_CATCH_EXTENSIONS, '.swift'])
+const CATCH_ALL_TYPES = new Set(['Exception', 'Throwable', 'Error', 'object', 'Object', 'Any'])
 
-type CatchBlock = { start: number; end: number; name: string }
+type CatchClause = { name: string; isNarrow: boolean }
+type CatchBlock = CatchClause & { start: number; end: number }
 
-function braceCatchBlocks(text: string): CatchBlock[] {
+function typedCatchClause(params: string): CatchClause {
+  const kotlin = /^(?<name>[A-Za-z_]\w*)\s*:\s*(?<type>.+)$/.exec(params)
+  let name = kotlin?.groups?.name ?? ''
+  let type = kotlin?.groups?.type ?? ''
+  if (kotlin === null) {
+    const tokens = params.replace(/^final\s+/, '').split(/\s+/)
+    const last = tokens.at(-1) ?? ''
+    const hasName = tokens.length > 1 && /^[A-Za-z_]\w*$/.test(last)
+    name = hasName ? last : ''
+    type = (hasName ? tokens.slice(0, -1) : tokens).join(' ')
+  }
+  const isNarrow = type.split('|').every(part => !CATCH_ALL_TYPES.has(part.trim().split('.').pop() ?? ''))
+  return { name, isNarrow }
+}
+
+function catchClause(params: string | undefined, extension: string): CatchClause {
+  const text = (params ?? '').trim()
+  if (text === '' || !TYPED_CATCH_EXTENSIONS.has(extension)) return { name: /^[A-Za-z_]\w*/.exec(text)?.[0] ?? '', isNarrow: false }
+  return typedCatchClause(text)
+}
+
+function braceCatchBlocks(text: string, extension: string): CatchBlock[] {
   const blocks: CatchBlock[] = []
   CATCH.lastIndex = 0
   for (let found = CATCH.exec(text); found !== null; found = CATCH.exec(text)) {
@@ -111,7 +135,7 @@ function braceCatchBlocks(text: string): CatchBlock[] {
       else if (text[i] === '}') depth--
       if (depth > 0) i++
     }
-    blocks.push({ start: open + 1, end: i, name: found.groups?.name ?? '' })
+    blocks.push({ start: open + 1, end: i, ...catchClause(found.groups?.params, extension) })
     CATCH.lastIndex = open + 1
   }
   return blocks
@@ -119,9 +143,10 @@ function braceCatchBlocks(text: string): CatchBlock[] {
 
 const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-function swallowingBraceCatchCount(text: string): number {
-  const blocks = braceCatchBlocks(text)
+function swallowingBraceCatchCount(text: string, extension: string): number {
+  const blocks = braceCatchBlocks(text, extension)
   return blocks.filter(block => {
+    if (block.isNarrow) return false
     const body = [...text.slice(block.start, block.end)]
     for (const inner of blocks) {
       if (inner.start <= block.start || inner.end > block.end) continue
@@ -136,7 +161,7 @@ function swallowingBraceCatchCount(text: string): number {
 
 function swallowingCount(text: string, extension: string): number {
   if (isBlank(text)) return 0
-  if (BRACE_CATCH_EXTENSIONS.has(extension)) return swallowingBraceCatchCount(text)
+  if (BRACE_CATCH_EXTENSIONS.has(extension)) return swallowingBraceCatchCount(text, extension)
   if (extension === '.py') return countMatches(text, /\bexcept\b[^\n:]*:\s*(\r?\n)\s*pass\b/)
   if (extension === '.rb') return countMatches(text, /\brescue\b[^\n]*(\r?\n)\s*end\b/)
   return 0

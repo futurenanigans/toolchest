@@ -1,14 +1,14 @@
 # rust
 
-Modern Rust conventions for Claude Code: a short rule for everyday edits and a longer reference for scaffolding and review. Install it if Claude keeps producing Rust that compiles but reads like 2018, with `mod.rs` files, `format!("{}", x)`, `#[allow]` and per-file lint attributes.
+Modern Rust conventions for Claude Code: a short `rust` skill for everyday edits and a longer reference for scaffolding and review. Install it if Claude keeps producing Rust that compiles but reads like 2018, with `mod.rs` files, `format!("{}", x)`, `#[allow]` and per-file lint attributes.
 
-## The rust rule
+## The rust skill
 
-`rules/rust.md` is scoped to `*.rs`, `Cargo.toml`, `rustfmt.toml` and `clippy.toml`. Plugin rules do not load on their own. The `modern-rust` skill names the rule's path and reads it first, and the toolchest `CLAUDE.md` (installed as `~/.claude/CLAUDE.md`) lists it with the instruction to read it before touching Rust files and Cargo manifests.
+The `rust` skill loads from its description before Claude writes or reviews `*.rs`, `Cargo.toml`, `rustfmt.toml` or `clippy.toml`, or when you run `/rust:rust`. The `modern-rust` skill reads it first, and the toolchest `CLAUDE.md` (installed as `~/.claude/CLAUDE.md`) lists it too.
 
-The rule prefers the newer convention when both work, but a project's existing, consistent convention wins; Claude mentions the modern alternative once and moves on. It covers:
+The skill prefers the newer convention when both work, but a project's existing, consistent convention wins; Claude mentions the modern alternative once and moves on. It covers:
 
-| Area | What the rule asks for |
+| Area | What the skill asks for |
 | :- | :- |
 | Manifest | `edition = "2024"` and `rust-version` in every package; lints in `[workspace.lints]`, versions in `[workspace.dependencies]` |
 | Modules | `foo.rs` beside `foo/`, no `mod.rs` except `tests/common/mod.rs` |

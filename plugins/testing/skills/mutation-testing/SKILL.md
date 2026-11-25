@@ -87,7 +87,7 @@ Use the shared report format with these fill-ins:
 Each finding's subagent:
 
 1. Writes or extends a test at the public surface of the unit, asserting the behaviour the finding names. The test must pass on the unmutated code and would fail on each mutant in the finding.
-2. Holds the test to `${CLAUDE_SKILL_DIR}/../../rules/test-quality.md`. A test that mirrors the mutant (asserting an internal constant, a call count, an implementation detail) kills the mutant and pins nothing, so it is not written.
+2. Holds the test to `${CLAUDE_SKILL_DIR}/../test-quality/SKILL.md`. A test that mirrors the mutant (asserting an internal constant, a call count, an implementation detail) kills the mutant and pins nothing, so it is not written.
 3. Changes production code only where a finding says the code cannot be tested as it stands, and then only to add the seam.
 
 After each finding, rerun only that finding's mutants with the tool's narrowest filter. The finding is done when they are caught and the fast tests pass. A mutant that still survives means the test does not assert what it claims: fix the test, never the filter.

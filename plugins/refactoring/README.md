@@ -45,7 +45,7 @@ Add the mutation flag to act on all findings, or pass numbers such as `--fix [1,
 
 1. Pre-flight: the working tree must be clean outside `.claude/state/`. If it is dirty, Claude stops and asks you to commit or stash.
 2. Claude records the test baseline. Every test passing now must still pass afterwards.
-3. Each finding goes to its own subagent, which is told to read the plugin's two rules before writing code.
+3. Each finding goes to its own subagent, which is told to read the plugin's two convention skills before writing code.
 4. After each finding, Claude runs the build and tests. A pass is committed, staging only that finding's files and never `.claude/state/`. A failure stops the run so you can step in.
 
 With `--auto`, Claude skips your review of the report and dispatches every actionable finding. Findings on disjoint files run as a parallel batch, findings that share a file run in sequence, and each passing batch gets one commit.
@@ -60,13 +60,13 @@ With `--auto`, Claude skips your review of the report and dispatches every actio
 
 `task-implementer` is told never to run git, and a `PreToolUse` hook enforces it. `hooks/gate-implementer-git.ps1` inspects every Bash and PowerShell command, and when the caller is `task-implementer` and the command invokes git, it denies the call and tells the agent to return `NEEDS_CONTEXT` or `BLOCKED` instead. Other agents and the main session are unaffected. The hook runs under `pwsh`, so PowerShell 7 must be on your `PATH`.
 
-## Rules
+## Convention skills
 
-The plugin ships two rules in `rules/`, scoped to common source file types.
+The plugin ships two skills that apply while writing code in any language.
 
-| Rule | Covers |
+| Skill | Covers |
 | --- | --- |
 | `code-organization` | Where a new file goes (following `.claude/state/structure-report.md` from `architecture-scan` when present, then `CLAUDE.md`, then the directory layout) and whether new code belongs in the file it is landing in. |
 | `inline-defect-prevention` | Defect shapes to catch while writing: data loss paths, unvalidated input at trust boundaries, swallowed errors, resource leaks, race-prone sequences and defensive cruft. Obvious fixes are made silently; design choices are flagged for you. |
 
-Plugin rules do not load on their own. The skills name the rule paths in their subagent prompts, and the companion `CLAUDE.md` in this repository tells Claude to read them before writing code or placing files. Without that file, the rules apply only inside the audit and mutation workflows.
+Claude loads each from its description before writing code or placing files, or you can run `/refactoring:code-organization` and `/refactoring:inline-defect-prevention` directly. The audit skills also name their paths in subagent prompts, since a subagent does not load them on its own.

@@ -2,11 +2,11 @@
 
 C# conventions for Claude Code, a canonical `.editorconfig` and `Directory.Build.props`, and a guarded workflow for updating NuGet packages. Install it if you want Claude to write C# to Microsoft's published conventions regardless of what the surrounding file does, and to update dependencies in small, tested, locally committed steps.
 
-## The dotnet rule
+## The dotnet skill
 
-`rules/dotnet.md` is scoped to `*.cs`, `*.csproj`, `*.props`, `*.targets`, `*.razor` and `*.cshtml`. Plugin rules do not load on their own. Each skill in this plugin names the rule's path and reads it, and the toolchest `CLAUDE.md` (installed as `~/.claude/CLAUDE.md`) lists it with the instruction to read it before touching C# files and projects.
+The `dotnet` skill loads from its description before Claude writes or reviews `*.cs`, `*.csproj`, `*.props`, `*.targets`, `*.razor` or `*.cshtml`, or when you run `/dotnet:dotnet`. The other skills in this plugin read it, and the toolchest `CLAUDE.md` (installed as `~/.claude/CLAUDE.md`) lists it too.
 
-The rule's central policy is that standard Microsoft conventions win over a project's local style, even when the project's own `CLAUDE.md` or `.editorconfig` says otherwise. Lines Claude writes get Allman braces, `_camelCase` fields, `is null`, file-scoped namespaces and the rest, even inside a K&R file. A direct instruction from you in the session to follow local style overrides this.
+The skill's central policy is that standard Microsoft conventions win over a project's local style, even when the project's own `CLAUDE.md` or `.editorconfig` says otherwise. Lines Claude writes get Allman braces, `_camelCase` fields, `is null`, file-scoped namespaces and the rest, even inside a K&R file. A direct instruction from you in the session to follow local style overrides this.
 
 It also fixes house choices where the standard allows variance: `var` only when the type is apparent, expression bodies for properties and lambdas but not methods, no default `sealed`, nullable enabled for new projects but never switched on during a format pass. It covers DI lifetimes, `CancellationToken` threading, `IOptions<T>` configuration, validation at boundaries, and a handful of CA analyzer rules. Members carry no `///` doc comments; CS1591 goes in `NoWarn` while `GenerateDocumentationFile` stays on so IDE0005 still reports unused usings.
 

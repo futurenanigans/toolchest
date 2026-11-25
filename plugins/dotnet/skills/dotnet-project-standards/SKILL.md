@@ -1,11 +1,11 @@
 ---
 name: dotnet-project-standards
-description: Sets up the canonical .editorconfig and Directory.Build.props for a C# project and converts existing code to standard conventions, with a blast-radius check before enabling them on an existing codebase. Use when the user asks to "set up .editorconfig and analyzers", "add the standard Directory.Build.props", "reformat to standard conventions", "apply Microsoft conventions", or to refactor or format existing C# files wholesale. The conventions themselves live in the plugin's dotnet rule.
+description: Sets up the canonical .editorconfig and Directory.Build.props for a C# project and converts existing code to standard conventions, with a blast-radius check before enabling them on an existing codebase. Use when the user asks to "set up .editorconfig and analyzers", "add the standard Directory.Build.props", "reformat to standard conventions", "apply Microsoft conventions", or to refactor or format existing C# files wholesale. The conventions themselves live in the `dotnet` skill in this plugin.
 ---
 
 # .NET standard setup and reformatting
 
-The conventions are in `${CLAUDE_SKILL_DIR}/../../rules/dotnet.md`. This skill applies them to a whole project or file set.
+The conventions are in `${CLAUDE_SKILL_DIR}/../dotnet/SKILL.md`. This skill applies them to a whole project or file set.
 
 ## Standard `.editorconfig` and analyzer setup
 
@@ -22,7 +22,7 @@ With the setup in place, `dotnet format` and the build enforce the conventions: 
 
 ## Refactoring or formatting existing code
 
-1. Convert the target files wholesale: braces, naming (subject to the public-API limit in the dotnet rule), `var` policy, expression bodies, switch expressions, null patterns, file-scoped namespaces, using ordering, comment cleanup. Local conventions the files previously followed are not preserved.
+1. Convert the target files wholesale: braces, naming (subject to the public-API limit in the `dotnet` skill), `var` policy, expression bodies, switch expressions, null patterns, file-scoped namespaces, using ordering, comment cleanup. Local conventions the files previously followed are not preserved.
 2. **Member reordering** only when the user explicitly asks, into this order: constants, fields (`readonly` first), constructors (static, then instance), properties, methods (public, then protected, then private), nested types. Reordering swamps the diff and makes the pass unreviewable. Otherwise leave member order alone and mention that it deviates, if it does.
 3. Set up or align the `.editorconfig` and `Directory.Build.props` from `assets/` if missing or deviating, with the user's consent and the blast-radius check above.
 4. Run `dotnet format`, then `dotnet build`; run tests if present.

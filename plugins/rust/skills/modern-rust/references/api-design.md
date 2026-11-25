@@ -143,7 +143,7 @@ Avoid:
 
 ## Documentation shape
 
-The writing plugin's `comments` rule governs: a file opens with a `//!` module doc of one short paragraph, and items carry no `///`. A contract a caller must know lives in the signature (a typed error enum for failures, a newtype for a valid range) or in a test that pins it.
+The `writing:comments` skill governs: a file opens with a `//!` module doc of one short paragraph, and items carry no `///`. A contract a caller must know lives in the signature (a typed error enum for failures, a newtype for a valid range) or in a test that pins it.
 
 ## Semver-conscious public APIs (libraries)
 

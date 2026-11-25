@@ -1,6 +1,6 @@
 # testing
 
-Two skills that measure how much a test suite really protects, and one rule for writing tests worth keeping. Install it when you want to find behaviour your tests do not pin, or to cut tests that could never fail on a real regression.
+Two skills that measure how much a test suite really protects, and one skill for writing tests worth keeping. Install it when you want to find behaviour your tests do not pin, or to cut tests that could never fail on a real regression.
 
 ## mutation-testing
 
@@ -33,8 +33,8 @@ Classifies passing tests as valuable or noise, where noise means removing the te
 
 It needs a clean working tree. The audit runs in a subagent and writes `.claude/state/test-noise-report.md`, with per-file tables and a list of failing, skipped or flaky tests it did not audit. Without `--auto` you review the findings and confirm before anything is removed. Then it deletes the tests and any helpers they orphan, runs the full suite, and commits with the noise count by category. If the suite fails, it restores the deleted code and stops.
 
-## The test-quality rule
+## The test-quality skill
 
-`rules/test-quality.md` lists six kinds of noise test (constructor assignment, mock call verification, trivial mapping, framework behaviour, constant values, config binding) and six kinds worth writing (state transitions, boundaries, business rules, error paths with consequences, integration boundaries, regression anchors). Both skills read it.
+The `test-quality` skill lists six kinds of noise test (constructor assignment, mock call verification, trivial mapping, framework behaviour, constant values, config binding) and six kinds worth writing (state transitions, boundaries, business rules, error paths with consequences, integration boundaries, regression anchors). The other two skills read it.
 
-Plugin rules do not load automatically. The global `CLAUDE.md` in this repository tells Claude to read this rule before touching test files; without that, add a similar line to your own instructions or copy the file into `~/.claude/rules/`.
+Claude loads it from its description before writing, reviewing or deleting tests, and the global `CLAUDE.md` in this repository points to it as well. You can also run `/testing:test-quality` directly.

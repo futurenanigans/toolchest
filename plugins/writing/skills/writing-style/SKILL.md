@@ -1,6 +1,6 @@
 ---
 name: writing-style
-description: House style for prose written to disk, on top of the always-on response rules. The why must be a property of the code, genre decides whether repo history belongs in a file, limits apply to editing prose someone else wrote, and a vocabulary list warns of register words. Use whenever prose is written or edited on disk (module docs, constraint comments, READMEs, doc pages, commit bodies, PR descriptions), or when the user asks for a "style sweep", "clean up the comments", or "rewrite this doc". Which comments may exist at all is the `comments` rule's job.
+description: House style for prose written to disk, on top of the always-on response rules. The why must be a property of the code, genre decides whether repo history belongs in a file, limits apply to editing prose someone else wrote, and a vocabulary list warns of register words. Use whenever prose is written or edited on disk (module docs, constraint comments, READMEs, doc pages, commit bodies, PR descriptions), or when the user asks for a "style sweep", "clean up the comments", or "rewrite this doc". Which comments may exist at all is the job of the `comments` skill.
 ---
 
 # Writing style
@@ -139,7 +139,7 @@ That test screens for session-local provenance and lets durable repo history thr
 
 ## Editing prose someone else wrote
 
-A comment the `comments` rule (`${CLAUDE_SKILL_DIR}/../../rules/comments.md`) does not allow gets deleted in the lines a task touches, with no benefit of the doubt; rewording it keeps a comment that should not exist. A module doc or constraint comment that is allowed stays as written, unless it breaks the always-on punctuation and sentence-shape rules or the why-is-in-the-code rule above. Rewrite it when it is false or stale against the code beside it, or when its stated reason is provenance instead of mechanism. The trigger is wrongness, not taste, and the comment must be attached to code the task already reaches. Do not open a file solely to correct its prose.
+A comment the `comments` skill (`${CLAUDE_SKILL_DIR}/../comments/SKILL.md`) does not allow gets deleted in the lines a task touches, with no benefit of the doubt; rewording it keeps a comment that should not exist. A module doc or constraint comment that is allowed stays as written, unless it breaks the always-on punctuation and sentence-shape rules or the why-is-in-the-code rule above. Rewrite it when it is false or stale against the code beside it, or when its stated reason is provenance instead of mechanism. The trigger is wrongness, not taste, and the comment must be attached to code the task already reaches. Do not open a file solely to correct its prose.
 
 **Text that is moved is text that is written.** Prose carried into a new file, merged into another document, or restated at a different tier gets the full ruleset applied at the moment of the move. Prior presence in the repo is not a pass: relocating prose re-authors it. The "stays as written" limit protects prose left in place, never prose being lifted. Re-run the punctuation and sentence-shape checks over the destination file.
 

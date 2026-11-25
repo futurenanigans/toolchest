@@ -1,25 +1,6 @@
 ---
-paths:
-  - "**/*.cs"
-  - "**/*.fs"
-  - "**/*.ts"
-  - "**/*.tsx"
-  - "**/*.js"
-  - "**/*.jsx"
-  - "**/*.mjs"
-  - "**/*.cjs"
-  - "**/*.vue"
-  - "**/*.svelte"
-  - "**/*.py"
-  - "**/*.rs"
-  - "**/*.go"
-  - "**/*.java"
-  - "**/*.kt"
-  - "**/*.rb"
-  - "**/*.swift"
-  - "**/*.sql"
-  - "**/*.ps1"
-  - "**/*.sh"
+name: comments
+description: Which code comments may exist. A short module doc and a constraint comment that names its test. Load before writing, editing or reviewing any code comment or doc comment.
 ---
 
 # Comments
