@@ -1,9 +1,0 @@
-schema_version: "1.1"
-name: packages-config-declined
-tags: [nuget-package-update, should-decline]
-context:
-  scaffold_script: place-files.sh
-expected_outcome: |
-  The solution is a classic .NET Framework project with packages.config, which the skill
-  states it does not handle. It says so, changes no files, makes no commit, and does not
-  migrate the project to PackageReference on its own; it may suggest migration as a next step.

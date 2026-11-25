@@ -1,9 +1,0 @@
-[project]
-name = "slugkit"
-version = "1.4.0"
-description = "URL slugs and their reverse for titles"
-requires-python = ">=3.11"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"

@@ -71,7 +71,3 @@ The plugin ships two skills that apply while writing code in any language.
 | `inline-defect-prevention` | Defect shapes to catch while writing: data loss paths, unvalidated input at trust boundaries, swallowed errors, resource leaks, race-prone sequences and defensive cruft. Obvious fixes are made silently; design choices are flagged for you. |
 
 Claude loads each from its description before writing code or placing files, or you can run `/refactoring:code-organization` and `/refactoring:inline-defect-prevention` directly. The audit skills also name their paths in subagent prompts, since a subagent does not load them on its own.
-
-## Evals
-
-`evals/` holds cases for `dead-code` in the `claude plugin eval` format. A small Python CLI loads one exporter by name from `exporters.toml` and has a second exporter nothing reaches; the cases check that a scan without `--remove` reports the dead one and changes no file, that `--remove` deletes it and its helper while keeping the config-loaded one, and that a published library's public function survives `--remove` while a private dead helper goes. Fixtures come from `place-files.sh` scaffolds, so run them with `claude plugin eval plugins/refactoring --scaffold` from the repo root; each run is a real agent session and costs money.
