@@ -36,9 +36,7 @@ EOF
 }
 
 curl_get() {
-  local auth=()
-  [[ -n "${GITHUB_TOKEN:-}" ]] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
-  curl --fail --silent --show-error --location --max-time "$GIMLET_HTTP_TIMEOUT_SECONDS" "${auth[@]}" "$@"
+  curl --fail --silent --show-error --location --max-time "$GIMLET_HTTP_TIMEOUT_SECONDS" "$@"
 }
 
 asset_name() {
@@ -54,8 +52,10 @@ asset_name() {
 }
 
 latest_tag() {
-  need jq
-  curl_get "$GIMLET_GITHUB_API/repos/$GIMLET_OPENGREP_REPO/releases/latest" | jq -er .tag_name
+  local url
+  url="$(curl_get --head -o /dev/null -w '%{url_effective}' "$GIMLET_GITHUB_DOWNLOAD/$GIMLET_OPENGREP_REPO/releases/latest")"
+  [[ "$url" == */releases/tag/* ]] || die "could not resolve the latest opengrep release (landed on $url)"
+  echo "${url##*/releases/tag/}"
 }
 
 installed_tag() {
