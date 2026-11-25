@@ -1,6 +1,6 @@
 # toolchest
 
-Claude Code plugin marketplace. Add it with `/plugin marketplace add <owner>/<repo>`, then install plugins from `/plugin`.
+Claude Code plugin marketplace. Add it with `/plugin marketplace add futurenanigans/toolchest`, then install plugins from `/plugin`.
 
 Each plugin lives under `plugins/`. Rules ship in a plugin's `rules/` folder beside the skills that reference them.
 
