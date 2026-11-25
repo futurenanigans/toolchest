@@ -8,10 +8,12 @@ export { isReadme } from './structure-checks'
 
 export const CHECKS: readonly Check[] = [collectionFirst, readmeGuidance, secrets, skipAttributes, swallowedCatch, testDeletion, typeDowngrade]
 
-export type Advice = { check: string; message: string }
+export type Advice = { check: string; message: string; corrects: boolean }
+
+export const CORRECTING_CHECKS: readonly Check[] = CHECKS.filter(check => !check.guidance)
 
 export const adviseAll = (input: CheckInput): Advice[] =>
-  CHECKS.flatMap(({ name, advise }) => {
+  CHECKS.flatMap(({ name, advise, guidance }) => {
     const message = advise(input)?.trim()
-    return message ? [{ check: name, message }] : []
+    return message ? [{ check: name, message, corrects: !guidance }] : []
   })

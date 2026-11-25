@@ -1,0 +1,37 @@
+# writing
+
+A house style for prose Claude writes to disk, a rule that limits code comments, and three output styles that cap how long Claude's replies get. Install it if generated READMEs, commit messages and chat replies read as padded or machine-written to you.
+
+## writing-style skill
+
+The skill holds the rules for anything written to a file: module docs, comments, READMEs, doc pages, commit bodies and PR descriptions. Claude loads it on its own when it writes prose, and the global `CLAUDE.md` in this repository tells it to. You can also ask for a "style sweep" or run `/writing:writing-style` directly. It takes no arguments and changes no files by itself.
+
+What it asks for:
+
+- No em-dashes or en-dashes in any file, and a grep of touched files before work is reported done.
+- No sentence shapes that mark text as generated, such as "not X but Y", "serves as", trailing ", ensuring ..." clauses and rhetorical questions.
+- Markdown with sentence-case headings, no emoji, no `---` separators, no boilerplate sections and no closing summary.
+- Commit and PR bodies that explain why in a few sentences, without a "This PR" opener or a Summary/Changes/Testing scaffold.
+- A why that names a property of the code (an invariant, a failure mode, a limit) instead of where the request came from.
+
+It also carries a vocabulary warning list and limits on editing prose someone else wrote. Allowed text is changed only when it is false or breaks the rules, and only in code the task already reaches. A requested sweep is the exception.
+
+## The comments rule
+
+`rules/comments.md` covers source files in most common languages. It allows two kinds of comment: a short module doc at the top of a file, and a constraint comment that names the test keeping it true. Every other comment in lines Claude touches gets deleted, except sections a compiler or lint requires.
+
+Plugin rules do not load automatically. The global `CLAUDE.md` in this repository tells Claude to read this rule before touching any comment. Without that, add a similar line to your own instructions or copy the file into `~/.claude/rules/`.
+
+## Output styles
+
+All three keep Claude's coding instructions and tell it to work without asking on low-risk changes. They differ in how much it says.
+
+| Style | Reply length |
+| --- | --- |
+| Direct | One or two lines by default, four at most; answer first, one recommendation with its reason |
+| Impatient | One line by default, with a fixed budget per kind of reply; findings stated without the justification |
+| One Line | A single line, two only for a blocker, a failure, a warning or an assumption that changes the result |
+
+Each bans the same sentence shapes and dashes as the skill. None of them lets Claude hide a blocker, invent a passing result or skip confirmation before a destructive action. Code, quoted failing output and confirmation dialogs are outside the limits.
+
+Pick one under Output style in `/config`, or set `outputStyle` in your settings file.

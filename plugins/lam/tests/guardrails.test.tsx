@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { looksLikeTestFile } from '../checks/text'
-import { stubEngine } from './engine'
+import { statusRow, stubEngine } from './engine'
 
 const PANE = {
   plugin: 'lam',
@@ -48,6 +48,7 @@ test('README guidance comes on the first edit of a session only', async ($, on) 
   const second = await $.tool.call({ tool: 'Edit', file_path: '/repo/README.md', old_string: '# New', new_string: '# Newer' })
   expect(first.context?.join('')).toContain('README guidance')
   expect(second.context).toBeUndefined()
+  expect((await statusRow($)).text).not.toContain('guard')
 })
 
 test('a .NET Tests suffix is matched case-sensitively', () => {

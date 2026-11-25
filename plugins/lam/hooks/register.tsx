@@ -5,7 +5,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface as Engine, Register, ToolCallInput } from 'claude-code'
 
 import type { LamCounts, StatusSegment } from '../types'
-import { type CheckInput, CHECKS, adviseAll, isReadme } from '../checks'
+import { type CheckInput, CORRECTING_CHECKS, adviseAll, isReadme } from '../checks'
 import { fetchRemotes, statusSegments } from './status'
 
 const PANE = 'guard-stats'
@@ -95,7 +95,7 @@ export const register: Register = on => {
 
     await update($, corrections, current => {
       const tallied: LamCounts = { ...current }
-      for (const { check } of advice) tallied[check] = (tallied[check] ?? 0) + 1
+      for (const { check, corrects } of advice) if (corrects) tallied[check] = (tallied[check] ?? 0) + 1
       return tallied
     })
     await refreshStatus($)
@@ -124,8 +124,8 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const current = await read($, corrections)
     const total = Object.values(current).reduce((sum, n) => sum + n, 0)
-    const width = Math.max(...CHECKS.map(c => c.name.length))
-    const rows = CHECKS.map(c => ({ name: c.name, count: current[c.name] ?? 0 })).sort((a, b) => b.count - a.count)
+    const width = Math.max(...CORRECTING_CHECKS.map(c => c.name.length))
+    const rows = CORRECTING_CHECKS.map(c => ({ name: c.name, count: current[c.name] ?? 0 })).sort((a, b) => b.count - a.count)
 
     return (
       <Box flexDirection="column">

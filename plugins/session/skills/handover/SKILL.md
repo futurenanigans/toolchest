@@ -10,7 +10,7 @@ allowed-tools: Read, Glob, Grep, Agent, Bash(date:*), Bash(git check-ignore:*), 
 
 # Handover
 
-Produce a brief that lets a fresh session make progress on ONE stated goal. The user runs `/clear` and then `/continue <path>` to resume from the saved file. This is a forward-looking briefing filtered against the goal, not a session summary.
+Produce a brief that lets a fresh session make progress on ONE stated goal. The user runs `/clear` and then `/session:continue <path>` to resume from the saved file. This is a forward-looking briefing filtered against the goal, not a session summary.
 
 ## Inputs captured up front
 
@@ -95,7 +95,7 @@ Then:
 2. Do not output the brief to chat. Reply with exactly one line: the command the user runs after `/clear`:
 
 ```
-/continue .claude/handover/latest.md
+/session:continue .claude/handover/latest.md
 ```
 
 Use this structure exactly. Omit any section whose content would be empty.
@@ -139,4 +139,4 @@ Use this structure exactly. Omit any section whose content would be empty.
 
 ---
 
-End the response immediately after the `/continue` line. No closing remarks.
+End the response immediately after the `/session:continue` line. No closing remarks.

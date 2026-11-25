@@ -10,7 +10,7 @@ export type CheckInput = {
   isFirstReadmeEdit: boolean
 }
 
-export type Check = { name: string; advise: (input: CheckInput) => string | null }
+export type Check = { name: string; advise: (input: CheckInput) => string | null; guidance?: true }
 
 export const isEditOrWrite = (tool: string): boolean => tool === 'Edit' || tool === 'Write'
 

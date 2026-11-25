@@ -163,6 +163,7 @@ export const isReadme = (path: string | undefined): boolean =>
 
 export const readmeGuidance: Check = {
   name: 'readme-guidance',
+  guidance: true,
   advise: ({ tool, filePath, isFirstReadmeEdit }) => {
     if (!isEditOrWrite(tool) || !isReadme(filePath)) return null
     if (!isFirstReadmeEdit) return null

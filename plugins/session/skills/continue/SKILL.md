@@ -1,7 +1,7 @@
 ---
 name: continue
 description: Resumes work from a handover brief written by /handover. Takes the path of the brief and follows its instructions to reach the stated goal.
-when_to_use: Only when the user explicitly runs /continue with a handover file path. Not for general "keep going" requests without a brief.
+when_to_use: Only when the user explicitly runs /session:continue with a handover file path. Not for general "keep going" requests without a brief.
 disable-model-invocation: true
 argument-hint: "<path to handover brief, e.g. .claude/handover/latest.md>"
 arguments: [path]
