@@ -5,7 +5,7 @@ argument-hint: "[--auto] [--reorganize [1,3]] [path]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
-Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, the mutation pre-flight, and `--auto`. Report path: `.claude/state/structure-report.md`, which the `code-organization` rule also reads for file placement. Mutation flag: `--reorganize`. Extra git command: `git mv`, to preserve history when relocating files.
+Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, the mutation pre-flight, and `--auto`. Report path: `.claude/state/structure-report.md`, which the `code-organization` rule (`${CLAUDE_SKILL_DIR}/../../rules/code-organization.md`) also reads for file placement. Mutation flag: `--reorganize`. Extra git command: `git mv`, to preserve history when relocating files. A rename `git mv` staged counts among the files the finding changed and is committed with them.
 
 ## Scan: two passes
 

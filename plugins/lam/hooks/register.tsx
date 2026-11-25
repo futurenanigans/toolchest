@@ -90,15 +90,15 @@ export const register: Register = on => {
     const advice = input === null ? [] : adviseAll(input)
     if (advice.length === 0) return next(e)
 
+    const ran = await next(e)
+    if (ran.deny !== undefined) return ran
+
     await update($, corrections, current => {
       const tallied: LamCounts = { ...current }
       for (const { check } of advice) tallied[check] = (tallied[check] ?? 0) + 1
       return tallied
     })
     await refreshStatus($)
-
-    const ran = await next(e)
-    if (ran.deny !== undefined) return ran
     if (input?.isFirstReadmeEdit) await $.state.set(readmeGuided, true)
     return { ...ran, context: [...(ran.context ?? []), advice.map(a => a.message).join('\n\n')] }
   })

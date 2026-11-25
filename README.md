@@ -8,4 +8,4 @@ The global standards are not a plugin. [`claude-md/CLAUDE.md`](claude-md/CLAUDE.
 
 The `awl` plugin is a release archive from [awl-dist](https://github.com/futurenanigans/awl-dist), pinned by sha256. It carries `awl.dll` and runs it with `dotnet`, so it needs the .NET 10 runtime on PATH.
 
-The `loom` plugin is a release archive from [loom-dist](https://github.com/futurenanigans/loom-dist), pinned by sha256. It carries its own Bun runtime and engine, currently for linux-x64 (glibc) only.
+The `loom` plugin is a release archive from [loom-dist](https://github.com/futurenanigans/loom-dist), pinned by sha256. It runs on the machine's Bun, so it needs `bun` on PATH, and carries its engine, currently for linux-x64 (glibc) only.

@@ -9,8 +9,8 @@
       "name": "awl",
       "source": {
         "source": "archive",
-        "url": "https://github.com/futurenanigans/awl-dist/releases/download/v0.1.0-alpha.4/awl-plugin-0.1.0-alpha.4.zip",
-        "sha256": "72035f41da6a04fbe8cfaefdf9e931d252a9b928f0de1ea8fa149230257cd608"
+        "url": "https://github.com/futurenanigans/awl-dist/releases/download/v0.1.0-alpha.5/awl-plugin-0.1.0-alpha.5.zip",
+        "sha256": "c3ab625e9241131445a68f970bdca7c9abc7ccccfd64e1808fecc7201ee27c35"
       },
       "description": "Roslyn semantic analysis on every C# edit (alpha). Carries awl.dll and runs it with dotnet; needs the .NET 10 runtime"
     },
@@ -28,10 +28,10 @@
       "name": "loom",
       "source": {
         "source": "archive",
-        "url": "https://github.com/futurenanigans/loom-dist/releases/download/v0.1.0-alpha.1/loom-plugin-0.1.0-alpha.1.zip",
-        "sha256": "9be98ff1efdb89741f8f7a226b763c80661de0fd2f21fa85693890345ec59316"
+        "url": "https://github.com/futurenanigans/loom-dist/releases/download/v0.1.0-alpha.2/loom-plugin-0.1.0-alpha.2.zip",
+        "sha256": "a6f1c1c93d0b74cb78bc605caa92f95e3a09779fc02d7840e8943cd65528918b"
       },
-      "description": "TypeScript, JavaScript and Vue analysis on every edit (alpha, linux-x64 only). Carries its own Bun runtime and engine"
+      "description": "TypeScript, JavaScript and Vue analysis on every edit (alpha, linux-x64 only). Runs on the machine's Bun and carries its engine; needs Bun on PATH"
     },
     {
       "name": "memory",

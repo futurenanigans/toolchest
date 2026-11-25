@@ -28,13 +28,16 @@ test('an edit adding a type escape hatch reaches the model as context and is cou
   await ui.unmount()
 })
 
-test('a denied call keeps its deny and gains no context', async ($, on) => {
+test('a denied call keeps its deny, gains no context and is not counted', async ($, on) => {
   stubEngine(on, { denial: 'not allowed' })
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
 
   const ran = await $.tool.call({ tool: 'Write', file_path: '/repo/a.ts', content: 'const x = y as any' })
   expect(ran.deny).toBe('not allowed')
   expect(ran.context).toBeUndefined()
+  const ui = await $.ui.mount(PANE)
+  expect((await ui.find({ type: 'Text', text: /^type-downgrade/ }))?.text).toMatch(/type-downgrade\s+0$/)
+  await ui.unmount()
 })
 
 test('README guidance comes on the first edit of a session only', async ($, on) => {

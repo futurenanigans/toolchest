@@ -29,4 +29,4 @@ Code here is written and read by agents, and an agent treats every comment as a 
 1. A module doc: one short paragraph at the top of a file saying what it is responsible for, so a reader can decide whether to read the rest.
 2. A constraint comment the code cannot express, carrying its anchor: the name of the test that keeps it true. A link or issue number is not an anchor; it records where a claim came from and proves nothing about the code beside it. When no test can pin the constraint, encode it in the code (a named constant, a type, a guard) instead of a comment.
 
-Delete every other comment in lines you touch: doc comments on items, inline explanations, history, banners, commented-out code. Where an analyzer enforces this (Mortise in Rust), its finding is the rule.
+Delete every other comment in lines you touch: doc comments on items, inline explanations, history, banners, commented-out code. The one item doc that stays is a section a compiler or lint requires, such as the `# Safety` section on a public Rust `unsafe fn`. Where an analyzer enforces this (Mortise in Rust), its finding is the rule.

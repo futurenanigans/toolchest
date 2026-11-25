@@ -113,7 +113,7 @@ Legitimate deferrals, always explicit:
 When deferring, name the specific defect and the specific reason. "Pre-existing" is a description, not a reason.
 
 ### Hook-delivered analyzer findings
-Analyzer hooks report findings at stop or as advisories. A finding from one of them is in the path of work by definition: the hook fired on this session, and the repos they are enabled in are LLM-authored throughout, so a line this turn did not touch was still written by the same process on an earlier turn. Origin is never a reason to dismiss it.
+Analyzer hooks deny an edit before it applies, or report findings at stop or as advisories. A denied edit is a finding like any other. A finding from one of them is in the path of work by definition: the hook fired on this session, and the repos they are enabled in are LLM-authored throughout, so a line this turn did not touch was still written by the same process on an earlier turn. Origin is never a reason to dismiss it.
 
 Every finding gets one of exactly three responses:
 - Verify it against the code and fix it, then report the fix with the finding.
@@ -165,7 +165,7 @@ Apply these when the task is on a hot path or involves expensive resources. Do n
 - After changing DI or module wiring, verify no circular dependencies by tracing constructor or import chains.
 
 ### Testing discipline
-Which tests are worth writing is the `test-quality` rule's job; it loads with test files. This rule applies during any task.
+Which tests are worth writing is the `test-quality` rule's job; read it before writing or reviewing test files. This rule applies during any task.
 
 - **No test-gaming**: when a test fails, the working assumption is that the production code is wrong. Do not mock the system under test, hard-code values to match test inputs, downgrade types to silence errors, or skip or delete a failing test to remove it from the suite. If the test itself appears wrong, say so and wait for confirmation before changing it.
 - **Test runs cost time**: while iterating, run the narrowest check that answers the current question: a typecheck, the one test file, or the one project the edit touched. When several changes are planned, make all of them, then run the full suite once at the end. Once a suite takes more than about 30 seconds, and certainly past 90, rerunning it after every edit stalls the work for that long each time. Do not rerun a passing suite to double-check, or after an edit it does not exercise. After a failure, rerun only the failing tests until they pass, then the full suite once before reporting completion.

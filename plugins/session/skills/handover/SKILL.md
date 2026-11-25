@@ -5,7 +5,7 @@ when_to_use: Only when the user explicitly asks for a "handover", "handoff", "br
 disable-model-invocation: true
 argument-hint: "<next goal for the fresh session (required)>"
 effort: high
-allowed-tools: Read, Glob, Grep, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git rev-parse:*), Bash(git stash list:*), Write(/.claude/handover/*), Edit(/.claude/handover/*), Edit(/.gitignore), AskUserQuestion
+allowed-tools: Read, Glob, Grep, Agent, Bash(date:*), Bash(git check-ignore:*), Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git rev-parse:*), Bash(git stash list:*), Write(/.claude/handover/*), Edit(/.claude/handover/*), Edit(/.gitignore), Write(/.gitignore), AskUserQuestion
 ---
 
 # Handover
@@ -22,6 +22,7 @@ Produce a brief that lets a fresh session make progress on ONE stated goal. The 
 - **Unstaged:** !`git diff --stat 2>/dev/null || echo ""`
 - **Staged:** !`git diff --staged --stat 2>/dev/null || echo ""`
 - **Stashes:** !`git stash list 2>/dev/null || echo ""`
+- **Brief timestamp:** !`date +%Y%m%d-%H%M%S`
 
 ## Step 1: require the goal
 
@@ -90,7 +91,7 @@ Before writing, confirm every line of this list:
 
 Then:
 
-1. Write the brief to `.claude/handover/<YYYYMMDD-HHMMSS>.md` and copy it to `.claude/handover/latest.md`, so earlier briefs survive (create the directory; add `.claude/handover/` to `.gitignore` if not ignored).
+1. Write the brief to `.claude/handover/<brief timestamp>.md`, using the timestamp captured above, and copy it to `.claude/handover/latest.md`, so earlier briefs survive. If `git check-ignore -q .claude/handover/` exits non-zero, add `.claude/handover/` to `.gitignore`, creating the file if the repo has none.
 2. Do not output the brief to chat. Reply with exactly one line: the command the user runs after `/clear`:
 
 ```

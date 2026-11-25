@@ -13,10 +13,21 @@ test('the status line carries model, effort, repo, dirty branch, ahead and behin
   } })
   await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
   const row = await statusRow($)
-  expect(row.text).toBe('claude-opus-5-5 1.7x | effort:high | widget | main* | ↑2 ↓1 | $1.23 | ctx 23%')
+  expect(row.text).toBe('claude-opus-5-5 1.7x | effort:high | widget | main* | +2 -1 | $1.23 | ctx 23%')
   expect(await row.colorOf('claude-opus-5-5 1.7x')).toBe('yellow')
   expect(await row.colorOf('effort:high')).toBe('redBright')
   expect(await row.colorOf('ctx 23%')).toBe('yellow')
+})
+
+test('a branch level with its upstream shows an equals sign', async ($, on) => {
+  stubEngine(on, { git: {
+    remote: { exitCode: 0, stdout: 'origin\n' },
+    'symbolic-ref': { exitCode: 0, stdout: 'main\n' },
+    status: { exitCode: 0, stdout: '' },
+    'rev-list': { exitCode: 0, stdout: '0\t0\n' },
+  } })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  expect((await statusRow($)).text).toContain(' | main | = | ')
 })
 
 test('the system prompt gains a successful fetch notice after the engine sections', async ($, on) => {

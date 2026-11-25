@@ -51,10 +51,9 @@ The writing plugin's `comments` rule governs `///` exactly as it governs `//`: a
 
 ## Analyzer rules that bite here
 
-- `IList<T>` not `List<T>` for collection properties (CA2227, CA1002)
-- Explicit `StringComparer` on ordering (MA0002)
-- `string.Equals` with `StringComparison` instead of `==` (MA0006)
-- No TODO comments. The writing plugin's `comments` rule bans them and MA0026 enforces the ban where it is enabled; the work goes in the tracker or gets finished.
+- Collection properties are get-only (CA2227), and public APIs expose `Collection<T>` or `ReadOnlyCollection<T>` instead of `List<T>` (CA1002)
+- Explicit `StringComparison` on string comparison and ordering calls (CA1310)
+- No TODO comments. The writing plugin's `comments` rule bans them; the work goes in the tracker or gets finished.
 
 Fix warnings when they appear. Suppress only with a written reason at the suppression site.
 

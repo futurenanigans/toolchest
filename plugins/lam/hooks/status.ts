@@ -82,8 +82,8 @@ async function gitSegments($: Engine, cwd: string): Promise<StatusSegment[]> {
   const counts = await git($, cwd, ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'])
   if (counts) {
     const [ahead = 0, behind = 0] = counts.split(/\s+/).map(Number)
-    const arrows = [ahead > 0 ? `↑${ahead}` : '', behind > 0 ? `↓${behind}` : ''].filter(Boolean)
-    if (arrows.length > 0) segments.push({ text: arrows.join(' ') })
+    const drift = [ahead > 0 ? `+${ahead}` : '', behind > 0 ? `-${behind}` : ''].filter(Boolean)
+    segments.push({ text: drift.length > 0 ? drift.join(' ') : '=' })
   }
   return segments
 }

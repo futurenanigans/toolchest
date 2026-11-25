@@ -38,9 +38,8 @@ The examples below use `MyApp.slnx`. Locate the actual solution file (`.slnx` or
 
 If a package's license is found to have changed during the update:
 1. Research the change (changelog, GitHub issues, official announcements).
-2. Add a row to the table with all relevant details.
-3. Document the finding in the final summary.
-4. Suggest alternatives if known.
+2. Document the finding in the final summary, with the row the table should gain, so the user can add it to this skill.
+3. Suggest alternatives if known.
 
 ## Requirements
 
@@ -126,11 +125,11 @@ git commit -m "Update [package group name] packages"
 
 4.2. **Identify errors**: read build errors and test failures with their stack traces; use Grep to find usages of the problematic APIs.
 
-4.3. **Apply fixes**: update code to the new APIs, fix compilation errors, update tests if needed, and write the new code to `${CLAUDE_SKILL_DIR}/../../rules/dotnet.md`, which wins over a deviating local style.
+4.3. **Apply fixes**: update code to the new APIs, fix compilation errors, update tests if needed, and write the new code to the conventions in `${CLAUDE_SKILL_DIR}/../../rules/dotnet.md`, which win over a deviating local style.
 
 4.4. **Verify**: rebuild and retest with the commands from step 3.
 
-4.5. **Iteration limit**: attempt up to 3 fix iterations per group. If still failing, document the issue and move to the next group. Keep the failing update in place so the attempt is documented in the summary.
+4.5. **Iteration limit**: attempt up to 3 fix iterations per group. If still failing, revert the group's uncommitted changes with `git checkout -- .`, document the issue and the versions attempted in the summary, and move to the next group. A failing update left in the tree would be staged by the next group's `git add -u`.
 
 ### 5. Consolidate and summarize
 

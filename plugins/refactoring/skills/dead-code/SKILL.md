@@ -5,7 +5,7 @@ argument-hint: "[--auto] [--remove [1,3]] [--context <path>] [path]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
-Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/dead-code-report.md`. Mutation flag: `--remove`.
+Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/dead-code-report.md`. Mutation flag: `--remove`. Extra git command: `git restore --source=HEAD --staged --worktree -- <paths>`, to restore a failed finding's files.
 
 This skill also executes code: it runs the build, the project's analyzers and dead-code tools, and the test suite. That is execution of the current code, not history inspection. Age is never evidence: code nobody has changed in years is as alive as its callers make it.
 
@@ -97,7 +97,7 @@ Each finding's subagent:
 3. Checks again inside the files it touched. A removal exposes the next layer, so repeat until nothing newly unreferenced remains.
 4. Leaves live code alone. A signature that only dead code needed is narrowed; nothing else is refactored.
 
-After each finding, the build must pass with no new warnings and every test that survives must pass as it did at baseline. A failure means something was alive: restore the finding's files, move it to Possible with the failure as the mechanism, and continue with the next finding. Each passing finding gets its own commit, so one removal can be reverted alone.
+After each finding, the build must pass with no new warnings and every test that survives must pass as it did at baseline. A failure means something was alive: restore the finding's files, move it to Possible with the failure as the mechanism, and continue with the next finding. Each passing finding gets its own commit, under `--auto` too in place of the shared one commit per batch, so one removal can be reverted alone.
 
 ## `--auto`
 

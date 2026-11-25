@@ -5,7 +5,7 @@ argument-hint: "[--plan] [--chunk <n>|next] [--diff <base>] [--address [1,3]] [-
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
-Follow `${CLAUDE_SKILL_DIR}/../../references/audit-procedure.md` for the report format, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/mutation-report.md`. Mutation flag: `--address`. Tool commands, configuration keys and output layouts per stack are in `${CLAUDE_SKILL_DIR}/references/tools.md`; read it before the first command and do not write flags from memory.
+Follow `${CLAUDE_SKILL_DIR}/../../references/audit-procedure.md` for the report format, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/mutation-report.md`. Mutation flag: `--address`. Extra git command: `git diff <base>` to build the `--diff` chunk. Tool commands, configuration keys and output layouts per stack are in `${CLAUDE_SKILL_DIR}/references/tools.md`; read it before the first command and do not write flags from memory.
 
 A mutation run changes one expression at a time and reruns tests. A mutant no test fails on marks behaviour the suite does not pin. The run is slow by construction, so this skill is on demand only: it never becomes a gate, a pre-commit step or part of the default test command, and no score threshold is ever set to fail a build.
 

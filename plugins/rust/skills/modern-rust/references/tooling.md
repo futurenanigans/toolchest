@@ -18,10 +18,10 @@ nursery = { level = "warn", priority = -1 }   # optional; some lints are noisy
 # pedantic lints commonly turned back off:
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
-missing_errors_doc = "allow"           # re-enable for published libraries
+missing_errors_doc = "allow"           # items carry no `///` under the comments rule
+missing_panics_doc = "allow"
 # stricter than the defaults:
-unwrap_used = "warn"
-expect_used = "warn"
+unwrap_used = "warn"                   # `expect("why")` stays allowed for invariants
 undocumented_unsafe_blocks = "deny"
 dbg_macro = "warn"
 todo = "warn"
@@ -98,7 +98,7 @@ overflow-checks = true  # cheap; turns silent wraparound into a panic
 panic = "unwind"        # keep unless embedded; Tokio isolates panicked tasks
 ```
 
-For faster dev builds: `[profile.dev] opt-level = 1` on hot dependencies via `[profile.dev.package."*"] opt-level = 2`, and consider the `mold`/`lld` linker.
+For faster dev builds, optimize dependencies while keeping your own crates at the default with `[profile.dev.package."*"] opt-level = 2`, and consider the `mold`/`lld` linker.
 
 ## CI baseline
 
@@ -142,5 +142,5 @@ components = ["rustfmt", "clippy"]
 ## Docs
 
 - `cargo doc --open` locally; enable `#![doc = include_str!("../README.md")]` on `lib.rs` so README and crate docs stay in sync.
-- Intra-doc links: `` [`Config`] ``, `` [`Self::parse`] ``; never bare URLs to docs.rs.
+- Intra-doc links in the `//!` module doc: `` [`Config`] ``, `` [`Self::parse`] ``; never bare URLs to docs.rs.
 - Items carry no `///`; the writing plugin's `comments` rule allows a `//!` module doc and a test-anchored constraint comment only.
