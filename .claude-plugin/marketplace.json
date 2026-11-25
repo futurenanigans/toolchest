@@ -1,0 +1,49 @@
+{
+  "name": "toolchest",
+  "owner": {
+    "name": "toolchest maintainers"
+  },
+  "description": "Claude Code skills, hooks and output styles",
+  "plugins": [
+    {
+      "name": "dotnet",
+      "source": "./plugins/dotnet",
+      "description": ".NET project standards and NuGet updates"
+    },
+    {
+      "name": "lam",
+      "source": "./plugins/lam",
+      "description": "Local Agent Monitor: advisory checks on edits and deletions with per-check correction counts, a status line, a /guard-stats pane, and a git fetch at session start"
+    },
+    {
+      "name": "memory",
+      "source": "./plugins/memory",
+      "description": "Consolidate Claude memory files"
+    },
+    {
+      "name": "refactoring",
+      "source": "./plugins/refactoring",
+      "description": "Code health, architecture, dead code, pattern and defect scans, plus the feature-architect, task-implementer and implementation-reviewer agents, with the git gate on task-implementer"
+    },
+    {
+      "name": "rust",
+      "source": "./plugins/rust",
+      "description": "Modern Rust reference"
+    },
+    {
+      "name": "session",
+      "source": "./plugins/session",
+      "description": "Hand over and resume work across sessions"
+    },
+    {
+      "name": "testing",
+      "source": "./plugins/testing",
+      "description": "Mutation testing and test noise audits"
+    },
+    {
+      "name": "writing",
+      "source": "./plugins/writing",
+      "description": "House writing style and response output styles"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "refactoring",
+  "version": "0.1.0",
+  "description": "Code health, architecture, dead code, pattern and defect scans, plus the feature-architect, task-implementer and implementation-reviewer agents, with the git gate on task-implementer"
+}

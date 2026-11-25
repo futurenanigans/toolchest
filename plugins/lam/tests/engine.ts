@@ -1,0 +1,53 @@
+// The engine beneath lam in tests: a git repository, a session, files on disk and tool answers, each settable per test.
+import type { TestBody } from 'claude-code/testing'
+
+export const CWD = '/repo/widget'
+
+type On = Parameters<TestBody>[1]
+type TestEngine = Parameters<TestBody>[0]
+type GitOutput = { exitCode: number; stdout?: string; stderr?: string }
+export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; denial?: string; contextTokens?: number; contextWindow?: number; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number } }
+
+export function stubEngine(on: On, { git = {}, files = {}, denial, contextTokens = 234_000, contextWindow = 1_000_000, compaction }: EngineSetup = {}): void {
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('command.register', () => ({ value: { command: 'guard-stats' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('session.repo', () => ({ value: { root: CWD, remote: 'git@github.com:example/widget.git', internal: false, name: 'widget' } }))
+  on('session.cwd', () => ({ value: CWD }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('settings.read', () => ({ value: { effortLevel: 'high' } }))
+  on('session.usage', () => {
+    const breakdown = {
+      rawMaxTokens: compaction?.rawMaxTokens ?? contextWindow,
+      autoCompactThreshold: compaction?.autoCompactThreshold,
+      isAutoCompactEnabled: compaction?.autoCompactThreshold !== undefined,
+    }
+    const context = { window: contextWindow, tokens: contextTokens, percent: Math.round((contextTokens / contextWindow) * 100), breakdown }
+    return { value: { startedAt: 0, context, rateLimits: [], cost: { usd: 1.234 } } as never }
+  })
+  on('clock.now', () => ({ value: Date.UTC(2026, 10, 25, 9, 30, 0) }))
+  on('process.run', (_, e) => {
+    const key = e.argv.filter(arg => !arg.startsWith('-') && arg !== 'git' && arg !== CWD)[0] ?? ''
+    const out = git[key] ?? { exitCode: 0 }
+    return { value: { exitCode: out.exitCode, stdout: out.stdout ?? '', stderr: out.stderr ?? '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  on('fs.exists', (_, e) => ({ value: e.path in files }))
+  on('fs.stat', () => ({ value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false } }))
+  on('fs.read', (_, e) => ({ value: files[e.path] ?? '' }))
+  on('tool.call', () => (denial === undefined ? { result: {} } : { deny: denial }))
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'engine intro', scope: 'shared' }] }))
+  on('turn.complete', () => ({ text: '' }))
+}
+
+const PROMPT_HINT = { plugin: 'lam', component: 'PromptHint', surface: 'terminal', props: { isDraft: false, isWorking: false, hint: '? for shortcuts' } } as const
+
+export type StatusRow = { text: string | undefined; colorOf: (segment: string) => Promise<unknown> }
+
+export async function statusRow($: TestEngine): Promise<StatusRow> {
+  const ui = await $.ui.mount(PROMPT_HINT)
+  const text = (await ui.find({ type: 'Text', text: / \| ctx / }))?.text
+  const colors = new Map<string, unknown>()
+  for (const segment of text?.split(' | ') ?? []) colors.set(segment, (await ui.find({ type: 'Text', text: new RegExp(`^${segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) }))?.props.color)
+  await ui.unmount()
+  return { text, colorOf: async segment => colors.get(segment) }
+}

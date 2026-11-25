@@ -1,0 +1,14 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Enable recommended CA quality rules (design, performance, security, reliability) -->
+    <AnalysisMode>Recommended</AnalysisMode>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <!-- Run IDE code-style rules (IDE0xxx, IDE1006) at build time, not just in the IDE -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- IDE0005 (unused usings) is enforced at build only when the documentation file is generated; CS1591 is suppressed because members carry no doc comments -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>
