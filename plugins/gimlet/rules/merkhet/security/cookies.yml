@@ -1,0 +1,64 @@
+# Insecure cookie flags — session/auth cookies must carry HttpOnly
+# (blocks JS access), Secure (HTTPS-only), and a SameSite policy
+# (CSRF-lite). Missing or explicitly-disabled flags weaken session
+# integrity.
+rules:
+- id: merk.security.cookie-httponly-disabled-csharp
+  message: |
+    CookieOptions.HttpOnly = false lets JavaScript read the cookie
+    value (document.cookie), enabling theft via XSS. Leave HttpOnly
+    at its default (true) for auth/session cookies.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern: |
+    new CookieOptions { ..., HttpOnly = false, ... }
+  metadata:
+    signal: insecure-cookie
+    category: security
+    cwe: CWE-1004
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    - A07:2021 — Identification and Authentication Failures
+    confidence: high
+    source: OWASP Session Management Cheat Sheet — HttpOnly
+- id: merk.security.cookie-secure-disabled-csharp
+  message: |
+    CookieOptions.Secure = false allows the cookie to travel over
+    plain HTTP, exposing it to network sniffing. For auth/session
+    cookies, require Secure (or CookiePolicyOptions.Secure =
+    CookieSecurePolicy.Always at the pipeline level).
+  severity: WARNING
+  languages:
+  - csharp
+  pattern: |
+    new CookieOptions { ..., Secure = false, ... }
+  metadata:
+    signal: insecure-cookie
+    category: security
+    cwe: CWE-614
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    - A07:2021 — Identification and Authentication Failures
+    confidence: high
+    source: OWASP Session Management Cheat Sheet — Secure attribute
+- id: merk.security.cookie-samesite-none-csharp
+  message: |
+    CookieOptions.SameSite = SameSiteMode.None permits cross-site
+    cookie submission — only valid when combined with Secure and
+    required for legitimate cross-origin auth flows (OAuth, embedded
+    widgets). For regular session cookies, use Lax or Strict.
+  severity: INFO
+  languages:
+  - csharp
+  pattern: |
+    new CookieOptions { ..., SameSite = SameSiteMode.None, ... }
+  metadata:
+    signal: insecure-cookie
+    category: security
+    cwe: CWE-1275
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    - A07:2021 — Identification and Authentication Failures
+    confidence: low
+    source: MDN — SameSite cookie policy

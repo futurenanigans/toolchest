@@ -1,0 +1,91 @@
+# IdentityModel OAuth2 client (server-to-server token acquisition)
+# misconfiguration. Different threat model from user-facing OIDC —
+# no browser redirect, no user context — so weak settings are about
+# backend service identity rather than session security. Keeps a
+# dedicated rule file so messaging stays accurate.
+rules:
+- id: merk.security.identitymodel-discovery-http-csharp
+  message: |
+    DiscoveryCache.Policy.RequireHttps = false allows the OIDC
+    discovery document to be fetched over plain HTTP. A network
+    attacker swaps the document, redirects token issuance to
+    their own issuer, and phishes the client secret. Set
+    RequireHttps = true (the default) in production.
+  severity: ERROR
+  languages:
+  - csharp
+  patterns:
+  - pattern: RequireHttps = false
+  - pattern-inside: new DiscoveryCache(...) { ... }
+  metadata:
+    signal: oauth2-misconfiguration
+    category: security
+    cwe: CWE-295
+    owasp:
+    - A02:2021 — Cryptographic Failures
+    confidence: high
+    source: IdentityModel docs — DiscoveryCache
+- id: merk.security.identitymodel-discovery-issuer-off-csharp
+  message: |
+    DiscoveryCache.Policy.ValidateIssuerName = false accepts
+    discovery documents from any issuer URL. Set
+    ValidateIssuerName = true (the default) and only modify when
+    a deliberate, documented issuer override is required.
+  severity: ERROR
+  languages:
+  - csharp
+  patterns:
+  - pattern: ValidateIssuerName = false
+  - pattern-inside: new DiscoveryCache(...) { ... }
+  metadata:
+    signal: oauth2-misconfiguration
+    category: security
+    cwe: CWE-345
+    owasp:
+    - A02:2021 — Cryptographic Failures
+    confidence: high
+    source: IdentityModel docs — DiscoveryPolicy
+- id: merk.security.identitymodel-client-secret-literal-csharp
+  message: |
+    ClientSecret set to a non-empty string literal on a
+    ClientCredentialsTokenRequest embeds the credential in source.
+    Read the secret from configuration (IConfiguration, environment
+    variables, Key Vault) and leave the literal out of the repo.
+  severity: ERROR
+  languages:
+  - csharp
+  patterns:
+  - pattern: ClientSecret = "$V"
+  - pattern-not: ClientSecret = ""
+  - pattern-inside: new ClientCredentialsTokenRequest { ... }
+  metadata:
+    signal: oauth2-misconfiguration
+    category: security
+    cwe: CWE-798
+    owasp:
+    - A07:2021 — Identification and Authentication Failures
+    confidence: high
+    source: IdentityModel docs — ClientCredentialsTokenRequest
+- id: merk.security.identitymodel-cert-validation-bypass-csharp
+  message: |
+    ServerCertificateCustomValidationCallback returning true for
+    every request disables TLS verification on the HttpClient used
+    for token acquisition. Any certificate — including an
+    attacker's — is accepted. Remove the callback; if the server
+    uses a private CA, install the root certificate instead.
+  severity: ERROR
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+    - pattern: ServerCertificateCustomValidationCallback = ($A, $B, $C, $D) => true
+    - pattern: ServerCertificateCustomValidationCallback = delegate { return true; }
+  metadata:
+    signal: tls-validation-bypass
+    category: security
+    cwe: CWE-295
+    owasp:
+    - A02:2021 — Cryptographic Failures
+    confidence: high
+    source: CWE-295 — Improper Certificate Validation

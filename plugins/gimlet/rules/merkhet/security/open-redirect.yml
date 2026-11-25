@@ -1,0 +1,76 @@
+# Open Redirect — redirect targets reached by HTTP request input
+# without validation. Attackers use this for phishing (the URL looks
+# legitimate, then bounces the user to a fake login page). Taint-
+# tracked; sanitizer is a local-URL check or host allowlist.
+rules:
+- id: merk.security.open-redirect-csharp
+  message: |
+    Redirect target reached by a value derived from the HTTP request
+    without a `Url.IsLocalUrl` / allowlist check. Attackers use this
+    for phishing — the initial URL looks legitimate, then bounces to
+    an attacker-controlled site. Gate the redirect on `Url.IsLocalUrl`
+    or a host allowlist.
+  severity: WARNING
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - pattern: $REQ.Query[...]
+  - pattern: $REQ.Form[...]
+  - pattern: $REQ.Headers[...]
+  - pattern: $REQ.Cookies[...]
+  - pattern: $REQ.RouteValues[...]
+  - pattern: $REQ.QueryString[...]
+  - pattern: $REQ.Params[...]
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - pattern: Redirect($X)
+  - pattern: return Redirect($X)
+  - pattern: Results.Redirect($X)
+  - pattern: Results.Redirect($X, ...)
+  - pattern: TypedResults.Redirect($X)
+  - pattern: Server.Transfer($X)
+  - pattern: Server.Transfer($X, ...)
+  - pattern: Server.Execute($X)
+  - pattern: Server.Execute($X, ...)
+  - pattern: HttpContext.Server.Transfer($X)
+  - pattern: HttpContext.Server.Execute($X)
+  pattern-sanitizers:
+  - pattern: Url.IsLocalUrl($X)
+  - pattern: $U.IsLocalUrl($X)
+  - pattern: AllowedHosts.Contains($X)
+  - patterns:
+    - pattern-either:
+      - pattern-inside: |
+          if (Url.IsLocalUrl($X)) { ... }
+      - pattern-inside: |
+          if ($U.IsLocalUrl($X)) { ... }
+      - pattern-inside: |
+          if (AllowedHosts.Contains($X)) { ... }
+    - pattern: $X
+  metadata:
+    signal: open-redirect
+    category: security
+    cwe: CWE-601
+    owasp:
+    - A01:2021 — Broken Access Control
+    confidence: high
+    source: OWASP Unvalidated Redirects and Forwards Cheat Sheet (taint-tracked)

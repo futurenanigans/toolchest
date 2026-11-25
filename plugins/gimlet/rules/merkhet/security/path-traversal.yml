@@ -1,0 +1,73 @@
+# Path traversal — file I/O where the path is reached by HTTP request
+# input. Attacker input containing "../" or absolute paths reads/writes
+# files outside the intended directory. Taint-tracked intra-file.
+# Sanitizer: canonicalization via Path.GetFullPath + prefix check, or
+# allowlist lookup.
+rules:
+- id: merk.security.path-traversal-csharp
+  message: |
+    File I/O reached by a value derived from the HTTP request. Call
+    `Path.GetFullPath` on the composed path and verify it stays
+    under an allowlisted base directory before performing I/O.
+    `Path.Combine` does NOT prevent traversal — an absolute path or
+    `..` sequence in a later argument overrides earlier ones.
+  severity: ERROR
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - pattern: $REQ.Query[...]
+  - pattern: $REQ.Form[...]
+  - pattern: $REQ.Headers[...]
+  - pattern: $REQ.Cookies[...]
+  - pattern: $REQ.RouteValues[...]
+  - pattern: $REQ.QueryString[...]
+  - pattern: $REQ.Params[...]
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - pattern: File.ReadAllText($X, ...)
+  - pattern: File.ReadAllBytes($X)
+  - pattern: File.ReadAllLines($X, ...)
+  - pattern: File.WriteAllText($X, ...)
+  - pattern: File.WriteAllBytes($X, ...)
+  - pattern: File.WriteAllLines($X, ...)
+  - pattern: File.AppendAllText($X, ...)
+  - pattern: File.Open($X, ...)
+  - pattern: File.OpenRead($X)
+  - pattern: File.OpenWrite($X)
+  - pattern: File.Delete($X)
+  - pattern: new FileStream($X, ...)
+  - pattern: new StreamReader($X)
+  - pattern: new StreamWriter($X, ...)
+  - pattern: Directory.GetFiles($X, ...)
+  - pattern: Directory.EnumerateFiles($X, ...)
+  pattern-sanitizers:
+  - pattern: Path.GetFullPath($X)
+  - pattern: $ALLOW.Contains($X)
+  - pattern: ValidatePath($X)
+  metadata:
+    signal: path-traversal
+    category: security
+    cwe: CWE-22
+    owasp:
+    - A01:2021 — Broken Access Control
+    confidence: high
+    source: CWE-22 — Path Traversal (taint-tracked)

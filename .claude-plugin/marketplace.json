@@ -20,6 +20,11 @@
       "description": ".NET project standards and NuGet updates"
     },
     {
+      "name": "gimlet",
+      "source": "./plugins/gimlet",
+      "description": "Opengrep runner with a bundled C#/.NET security and quality ruleset, and a skill for running scans and triaging findings. Downloads opengrep on first use; needs curl, jq and python3 with PyYAML"
+    },
+    {
       "name": "lam",
       "source": "./plugins/lam",
       "description": "Local Agent Monitor: advisory checks on edits and deletions with per-check correction counts, a status line, a /guard-stats pane, and a git fetch at session start"

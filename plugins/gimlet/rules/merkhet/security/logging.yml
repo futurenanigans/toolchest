@@ -1,0 +1,103 @@
+# A09 Security Logging and Monitoring Failures — patterns that either
+# log sensitive data (credentials/tokens/PII into logs that may ship to
+# aggregators, backups, or support tickets) or leak diagnostic data
+# back to callers (stack traces in responses).
+rules:
+- id: merk.security.logging-sensitive-field-csharp
+  message: |
+    Logger call receives a value from a property with a sensitive-
+    looking name (Password, Token, Secret, ApiKey, etc.). Even at
+    Information/Debug this can leak into Serilog sinks, Application
+    Insights, or file logs. Redact the value first or log a non-
+    sensitive identifier.
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: $LOGGER.LogInformation(..., $OBJ.$FIELD, ...)
+    - pattern: $LOGGER.LogDebug(..., $OBJ.$FIELD, ...)
+    - pattern: $LOGGER.LogWarning(..., $OBJ.$FIELD, ...)
+    - pattern: $LOGGER.LogError(..., $OBJ.$FIELD, ...)
+    - pattern: $LOGGER.LogCritical(..., $OBJ.$FIELD, ...)
+    - pattern: $LOGGER.LogTrace(..., $OBJ.$FIELD, ...)
+  - metavariable-regex:
+      metavariable: $FIELD
+      regex: ^(Password|Passwd|Pwd|Secret|Token|AccessToken|RefreshToken|IdToken|ApiKey|ApiSecret|Credential|Authorization|Cvv|Ssn|Pin|PrivateKey|SessionId|BearerToken)$
+  metadata:
+    signal: sensitive-data-logged
+    category: security
+    cwe: CWE-532
+    owasp:
+    - A09:2021 — Security Logging and Monitoring Failures
+    confidence: medium
+    source: CWE-532 — Insertion of Sensitive Information into Log File
+- id: merk.security.stacktrace-in-response-csharp
+  message: |
+    Exception stack trace serialized into an HTTP response. Stack
+    traces reveal source paths, framework versions, and internal
+    logic. Log the exception server-side (ILogger.LogError) and
+    return a generic message + correlation id — in ASP.NET Core,
+    rely on the built-in ProblemDetails middleware.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: return Content($EX.ToString())
+  - pattern: return Content($EX.ToString(), ...)
+  - pattern: return StatusCode($CODE, $EX.ToString())
+  - pattern: return StatusCode($CODE, $EX.StackTrace)
+  - pattern: return Ok($EX.ToString())
+  - pattern: return BadRequest($EX.ToString())
+  - pattern: return BadRequest($EX.StackTrace)
+  - pattern: return Results.Content($EX.ToString())
+  - pattern: 'return Results.Problem(detail: $EX.ToString())'
+  - pattern: 'return Results.Problem(detail: $EX.StackTrace)'
+  - pattern: $RES.WriteAsync($EX.ToString())
+  - pattern: $RES.WriteAsync($EX.StackTrace)
+  metadata:
+    signal: stacktrace-disclosure
+    category: security
+    cwe: CWE-209
+    owasp:
+    - A09:2021 — Security Logging and Monitoring Failures
+    confidence: high
+    source: CWE-209 — Generation of Error Message Containing Sensitive Information
+- id: merk.security.stacktrace-middleware-csharp
+  message: |
+    UseExceptionHandler middleware that writes Exception.ToString()
+    (or StackTrace) back to the caller. Every unhandled exception
+    the middleware catches leaks the full trace to the client. Keep
+    the exception server-side (logger) and respond with a generic
+    ProblemDetails payload; the default UseExceptionHandler does
+    this correctly when passed no lambda.
+  severity: ERROR
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: |
+      app.UseExceptionHandler($OPTS => {
+          ...
+          $CTX.Response.WriteAsync($EX.ToString());
+          ...
+      })
+  - pattern: |
+      app.UseExceptionHandler($OPTS => {
+          ...
+          $CTX.Response.WriteAsync($EX.StackTrace);
+          ...
+      })
+  - pattern: |
+      app.UseExceptionHandler($OPTS => {
+          ...
+          await $CTX.Response.WriteAsync($EX.ToString());
+          ...
+      })
+  metadata:
+    signal: stacktrace-disclosure
+    category: security
+    cwe: CWE-209
+    owasp:
+    - A09:2021 — Security Logging and Monitoring Failures
+    confidence: medium
+    source: ASP.NET Core docs — Exception handling

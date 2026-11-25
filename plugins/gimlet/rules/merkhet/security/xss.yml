@@ -1,0 +1,68 @@
+rules:
+- id: merk.security.xss-response-write
+  message: |
+    Response.Write emits content without HTML encoding — use `HtmlEncode`
+    (WebUtility.HtmlEncode / AntiXssEncoder) or switch to Razor syntax
+    (`@Model.Field`) for automatic context-aware encoding.
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: Response.Write($X)
+    - pattern: HttpContext.Response.Write($X)
+  - pattern-not: Response.Write("...")
+  - pattern-not: HttpContext.Response.Write("...")
+  - pattern-not: Response.Write(HttpUtility.HtmlEncode(...))
+  - pattern-not: Response.Write(WebUtility.HtmlEncode(...))
+  - pattern-not: Response.Write(AntiXssEncoder.HtmlEncode(...))
+  - pattern-not: HttpContext.Response.Write(HttpUtility.HtmlEncode(...))
+  - pattern-not: HttpContext.Response.Write(WebUtility.HtmlEncode(...))
+  - pattern-not: HttpContext.Response.Write(AntiXssEncoder.HtmlEncode(...))
+  metadata:
+    signal: xss-risk
+    category: security
+    cwe: CWE-79
+    owasp:
+    - A03:2021 — Injection
+    confidence: medium
+    source: OWASP Top 10 A03:2021 — Injection (XSS)
+- id: merk.security.xss-viewbag-tainted-csharp
+  message: |
+    ViewBag / ViewData assigned a request-derived value in a
+    controller. The render site in the Razor view decides the
+    encoding: `@ViewBag.X` is auto-encoded, but `@Html.Raw(ViewBag.X)`
+    or concatenation into an attribute like `onclick="@ViewBag.X"`
+    is not. Intra-file taint can't see the render site, so this
+    fires low-confidence — validate by checking every .cshtml that
+    binds the key.
+  severity: WARNING
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - pattern: $REQ.Query[...]
+  - pattern: $REQ.Form[...]
+  - pattern: $REQ.Headers[...]
+  - pattern: $REQ.QueryString[...]
+  - pattern: $REQ.Params[...]
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - pattern: ViewBag.$P = $X
+  - pattern: ViewData[$K] = $X
+  - pattern: ViewData.$P = $X
+  metadata:
+    signal: xss-risk
+    category: security
+    cwe: CWE-79
+    owasp:
+    - A03:2021 — Injection
+    confidence: low
+    source: OWASP Top 10 A03:2021 — Injection (XSS)

@@ -1,0 +1,248 @@
+#!/usr/bin/env bash
+# gimlet: installs a pinned-or-latest opengrep release and runs it with the bundled C#/.NET rules.
+set -euo pipefail
+
+GIMLET_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../config/defaults.env
+source "$GIMLET_ROOT/config/defaults.env"
+
+DATA_DIR="${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/gimlet}"
+TOOLS_DIR="$DATA_DIR/opengrep"
+CURRENT_LINK="$TOOLS_DIR/current"
+RULES_DIR="$GIMLET_ROOT/rules"
+AUDIT_RULES_DIR="$GIMLET_ROOT/rules-audit"
+
+die() { echo "gimlet: $*" >&2; exit 1; }
+need() { command -v "$1" >/dev/null 2>&1 || die "required tool '$1' is not installed"; }
+
+usage() {
+  cat <<EOF
+usage: gimlet <command> [options]
+
+  install [--version TAG] [--require-signature]
+                         download an opengrep release (default: latest) into $TOOLS_DIR
+  update                 install the latest release if it is newer than the current one
+  version                print the installed opengrep version and its path
+  scan [options] [PATH...]
+                         scan PATHs (default: .) with the bundled rules
+      --baseline REF     report only findings introduced since git REF
+      --audit            also run the audit rules (entrypoint inventory; noisy by design)
+      --sarif            also write SARIF next to the JSON results
+      --rules DIR        use DIR instead of the bundled rules (repeatable)
+  summary [FILE]         print the summary of a results file (default: $GIMLET_RESULTS_DIR/results.json)
+  rules                  list bundled rule ids with severity and source
+  test                   run opengrep's rule tests over the bundled rules and fixtures
+EOF
+}
+
+curl_get() {
+  local auth=()
+  [[ -n "${GITHUB_TOKEN:-}" ]] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  curl --fail --silent --show-error --location --max-time "$GIMLET_HTTP_TIMEOUT_SECONDS" "${auth[@]}" "$@"
+}
+
+asset_name() {
+  local os arch
+  os="$(uname -s)"; arch="$(uname -m)"
+  case "$os/$arch" in
+    Linux/x86_64)          echo opengrep_linux_x86 ;;
+    Linux/aarch64|Linux/arm64) echo opengrep_linux_aarch64 ;;
+    Darwin/arm64)          echo opengrep_osx_arm64 ;;
+    Darwin/x86_64)         echo opengrep_osx_x86 ;;
+    *) die "no opengrep release asset for $os/$arch (Windows: use opengrep's install.ps1)" ;;
+  esac
+}
+
+latest_tag() {
+  need jq
+  curl_get "$GIMLET_GITHUB_API/repos/$GIMLET_OPENGREP_REPO/releases/latest" | jq -er .tag_name
+}
+
+installed_tag() {
+  [[ -L "$CURRENT_LINK" ]] && basename "$(readlink "$CURRENT_LINK")" || true
+}
+
+opengrep_bin() {
+  local bin="$CURRENT_LINK/opengrep"
+  if [[ ! -x "$bin" ]]; then
+    echo "gimlet: opengrep not installed; installing the latest release" >&2
+    cmd_install >&2
+  fi
+  echo "$bin"
+}
+
+cmd_install() (
+  need curl
+  local tag="" require_sig=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --version) tag="${2:?--version needs a tag}"; shift 2 ;;
+      --require-signature) require_sig=1; shift ;;
+      *) die "install: unknown option $1" ;;
+    esac
+  done
+  [[ -n "$tag" ]] || tag="$(latest_tag)"
+
+  local asset dest tmp url
+  asset="$(asset_name)"
+  dest="$TOOLS_DIR/$tag"
+  if [[ -x "$dest/opengrep" ]]; then
+    ln -sfn "$dest" "$CURRENT_LINK"
+    echo "opengrep $tag already installed at $dest/opengrep"
+    return
+  fi
+
+  mkdir -p "$TOOLS_DIR"
+  tmp="$(mktemp -d "$TOOLS_DIR/.download.XXXXXX")"
+  # cmd_install runs in a subshell (see its definition), so EXIT fires when it returns.
+  trap 'rm -rf "$tmp"' EXIT
+  url="$GIMLET_GITHUB_DOWNLOAD/$GIMLET_OPENGREP_REPO/releases/download/$tag/$asset"
+  echo "downloading $url"
+  curl_get -o "$tmp/opengrep" "$url"
+
+  if command -v cosign >/dev/null 2>&1; then
+    curl_get -o "$tmp/opengrep.sig" "$url.sig"
+    curl_get -o "$tmp/opengrep.cert" "$url.cert"
+    cosign verify-blob \
+      --signature "$tmp/opengrep.sig" --certificate "$tmp/opengrep.cert" \
+      --certificate-identity-regexp "$GIMLET_COSIGN_IDENTITY_REGEXP" \
+      --certificate-oidc-issuer "$GIMLET_COSIGN_OIDC_ISSUER" \
+      "$tmp/opengrep" >/dev/null || die "cosign signature verification failed for $asset $tag"
+    echo "signature verified with cosign"
+  elif [[ $require_sig -eq 1 ]]; then
+    die "--require-signature given but cosign is not installed (https://github.com/sigstore/cosign)"
+  else
+    echo "warning: cosign not installed; installing $tag without signature verification" >&2
+  fi
+
+  chmod +x "$tmp/opengrep"
+  "$tmp/opengrep" --version >/dev/null || die "downloaded opengrep does not run on this machine"
+  mkdir -p "$dest"
+  mv "$tmp/opengrep" "$dest/opengrep"
+  sha256sum "$dest/opengrep" > "$dest/opengrep.sha256"
+  ln -sfn "$dest" "$CURRENT_LINK"
+  echo "installed opengrep $tag at $dest/opengrep"
+)
+
+cmd_update() {
+  local latest current
+  latest="$(latest_tag)"; current="$(installed_tag)"
+  if [[ "$latest" == "$current" ]]; then
+    echo "opengrep $current is the latest release"
+  else
+    echo "updating opengrep ${current:-<none>} -> $latest"
+    cmd_install --version "$latest" "$@"
+  fi
+}
+
+cmd_version() {
+  local tag; tag="$(installed_tag)"
+  [[ -n "$tag" ]] || die "opengrep not installed; run: gimlet install"
+  echo "opengrep $tag ($CURRENT_LINK/opengrep)"
+}
+
+cmd_scan() {
+  need jq
+  local baseline="" audit=0 sarif=0 configs=() paths=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --baseline) baseline="${2:?--baseline needs a git ref}"; shift 2 ;;
+      --audit) audit=1; shift ;;
+      --sarif) sarif=1; shift ;;
+      --rules) configs+=(--config "${2:?--rules needs a directory}"); shift 2 ;;
+      --) shift; paths+=("$@"); break ;;
+      -*) die "scan: unknown option $1" ;;
+      *) paths+=("$1"); shift ;;
+    esac
+  done
+  [[ ${#configs[@]} -gt 0 ]] || configs=(--config "$RULES_DIR")
+  [[ $audit -eq 1 ]] && configs+=(--config "$AUDIT_RULES_DIR")
+  [[ ${#paths[@]} -gt 0 ]] || paths=(.)
+
+  local og out args
+  og="$(opengrep_bin)"
+  mkdir -p "$GIMLET_RESULTS_DIR"
+  out="$GIMLET_RESULTS_DIR/results.json"
+  args=(scan "${configs[@]}" --json --output "$out" --quiet)
+  [[ $sarif -eq 1 ]] && args+=(--sarif-output "$GIMLET_RESULTS_DIR/results.sarif")
+  [[ -n "$baseline" ]] && args+=(--baseline-commit "$baseline")
+
+  # Exit status 1 means findings were reported; anything higher is an opengrep failure.
+  local rc=0
+  "$og" "${args[@]}" "${paths[@]}" || rc=$?
+  [[ $rc -le 1 ]] || die "opengrep exited with status $rc (see $out and stderr above)"
+  cmd_summary "$out"
+}
+
+# JSON array of every bundled rule id. opengrep prefixes check_id with the rule file's directory
+# path (dots for slashes), so the summary maps each check_id back to the bundled id it ends with.
+rule_ids_json() {
+  need python3
+  python3 -I - "$RULES_DIR" "$AUDIT_RULES_DIR" <<'PY'
+import json, pathlib, sys, yaml
+ids = [r["id"]
+       for root in map(pathlib.Path, sys.argv[1:])
+       for f in [*root.rglob("*.yml"), *root.rglob("*.yaml")]
+       for r in (yaml.safe_load(f.read_text()) or {}).get("rules", [])]
+print(json.dumps(ids))
+PY
+}
+
+cmd_summary() {
+  need jq
+  local file="${1:-$GIMLET_RESULTS_DIR/results.json}"
+  [[ -f "$file" ]] || die "no results file at $file; run: gimlet scan"
+  jq -r --argjson ids "$(rule_ids_json)" '
+    def sev: {"ERROR":0,"WARNING":1,"INFO":2}[.extra.severity] // 3;
+    .results |= map(.check_id as $c
+      | .check_id = ([$ids[] | . as $i | select($c == $i or ($c | endswith("." + $i)))] | max_by(length) // $c))
+    | (.results | length) as $n
+    | "\($n) finding(s) in \([.results[].path] | unique | length) file(s); \(.errors | length) error(s); results: \(input_filename)",
+      (if $n > 0 then
+        "",
+        "by rule:",
+        (.results | group_by(.check_id) | sort_by(-length) | .[]
+          | "  \(length)\t\(.[0].extra.severity)\t\(.[0].check_id)"),
+        "",
+        "findings:",
+        (.results | sort_by(sev, .path, .start.line) | .[]
+          | "  \(.extra.severity)\t\(.path):\(.start.line)\t\(.check_id)\t\(.extra.message | split("\n")[0])")
+       else empty end),
+      (if (.errors | length) > 0 then "", "errors:", (.errors[] | "  \(.level // "error")\t\((.type | if type == "array" then .[0] else . end) // "error")\t\(.message // "" | gsub("\n *"; " ") | .[0:200])") else empty end)
+  ' "$file"
+}
+
+cmd_rules() {
+  need python3
+  python3 -I - "$RULES_DIR" "$AUDIT_RULES_DIR" <<'PY'
+import pathlib, sys, yaml
+for root in map(pathlib.Path, sys.argv[1:]):
+    for f in sorted([*root.rglob("*.yml"), *root.rglob("*.yaml")]):
+        for r in (yaml.safe_load(f.read_text()) or {}).get("rules", []):
+            print(f"{r.get('severity','?'):8} {r['id']}\t{f.relative_to(root.parent)}")
+PY
+}
+
+cmd_test() {
+  local og rc=0; og="$(opengrep_bin)"
+  "$og" scan --test "$RULES_DIR" || rc=$?
+  "$og" scan --test "$AUDIT_RULES_DIR" || rc=$?
+  return $rc
+}
+
+main() {
+  local cmd="${1:-}"; shift || true
+  case "$cmd" in
+    install) cmd_install "$@" ;;
+    update) cmd_update "$@" ;;
+    version) cmd_version ;;
+    scan) cmd_scan "$@" ;;
+    summary) cmd_summary "$@" ;;
+    rules) cmd_rules ;;
+    test) cmd_test ;;
+    ""|-h|--help|help) usage ;;
+    *) usage >&2; exit 2 ;;
+  esac
+}
+
+main "$@"

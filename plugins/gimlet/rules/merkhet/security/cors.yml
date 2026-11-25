@@ -1,0 +1,45 @@
+# CORS misconfiguration — wildcard origins combined with credentials,
+# reflected origin without an allowlist, or express/aspnet patterns
+# that accept any origin.
+rules:
+- id: merk.security.cors-wildcard-aspnet-csharp
+  message: |
+    AllowAnyOrigin() combined with AllowCredentials() lets any origin
+    read authenticated responses — browsers enforce this specific pair
+    as invalid, but the policy should not be wired that way. Call
+    WithOrigins(...) with an explicit allowlist before AllowCredentials.
+  severity: ERROR
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: $B.AllowAnyOrigin().AllowCredentials()
+  - pattern: $B.AllowCredentials().AllowAnyOrigin()
+  - pattern: $B.AllowAnyOrigin().$M1().AllowCredentials()
+  - pattern: $B.AllowAnyOrigin().$M1().$M2().AllowCredentials()
+  - pattern: $B.AllowCredentials().$M1().AllowAnyOrigin()
+  - pattern: $B.AllowCredentials().$M1().$M2().AllowAnyOrigin()
+  metadata:
+    signal: cors-misconfiguration
+    category: security
+    cwe: CWE-346
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: high
+    source: ASP.NET Core CORS — AllowAnyOrigin cannot be combined with AllowCredentials
+- id: merk.security.cors-wildcard-origin-aspnet-csharp
+  message: |
+    CORS policy set with AllowAnyOrigin() permits every origin to call
+    the API. If the endpoints return sensitive data or accept session
+    credentials, restrict origins to an explicit list via WithOrigins.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern: $B.AllowAnyOrigin()
+  metadata:
+    signal: cors-misconfiguration
+    category: security
+    cwe: CWE-346
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: low
+    source: ASP.NET Core CORS — prefer WithOrigins() over AllowAnyOrigin()

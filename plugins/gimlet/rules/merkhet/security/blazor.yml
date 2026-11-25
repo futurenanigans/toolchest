@@ -1,0 +1,32 @@
+# Blazor-specific XSS risk — MarkupString bypasses Blazor's automatic
+# HTML encoding. Any non-literal value passed to MarkupString or cast
+# to it is a potential XSS vector if the content originates from user
+# input or an untrusted source.
+rules:
+- id: merk.security.blazor-markupstring-tainted-csharp
+  message: |
+    MarkupString wraps HTML without encoding — Blazor renders it as raw
+    markup. Passing a non-literal value (variable, parameter, or
+    expression) to MarkupString or casting a value to it with
+    (MarkupString) risks XSS if the content is user-controlled or
+    fetched from an untrusted source. Sanitize the HTML with a trusted
+    library (e.g. HtmlSanitizer) before wrapping, or avoid MarkupString
+    altogether and use Razor's default encoding.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-either:
+  - patterns:
+    - pattern: new MarkupString($X)
+    - pattern-not: new MarkupString("...")
+  - patterns:
+    - pattern: (MarkupString)$X
+    - pattern-not: (MarkupString)"..."
+  metadata:
+    signal: xss-risk
+    category: security
+    cwe: CWE-79
+    owasp:
+    - A03:2021 — Injection
+    confidence: medium
+    source: Blazor security — MarkupString disables HTML encoding

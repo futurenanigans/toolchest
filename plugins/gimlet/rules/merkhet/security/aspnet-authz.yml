@@ -1,0 +1,65 @@
+# Custom IAuthorizationHandler that calls context.Succeed on every
+# path, in a broad exception catch, or returns without ever calling
+# Succeed or Fail. The last shape is safe when multiple handlers are
+# registered for the same requirement (another handler may Succeed),
+# but dangerous when it's the sole handler — a silent pass lets
+# everything through.
+rules:
+- id: merk.security.aspnet-authz-unconditional-succeed-csharp
+  message: |
+    HandleRequirementAsync calls context.Succeed(requirement) on
+    every control path with no prior condition. The handler
+    authorizes every request — the registered requirement is
+    effectively ignored. Gate the call on the actual authorization
+    check, or return Task.CompletedTask to let another handler
+    decide.
+  severity: ERROR
+  languages:
+  - csharp
+  patterns:
+  - pattern: |
+      protected override Task HandleRequirementAsync(
+          AuthorizationHandlerContext $CTX,
+          $REQ_T $REQ)
+      {
+          $CTX.Succeed($REQ);
+          return Task.CompletedTask;
+      }
+  metadata:
+    signal: authz-bypass
+    category: security
+    cwe: CWE-285
+    owasp:
+    - A01:2021 — Broken Access Control
+    confidence: high
+    source: ASP.NET Core docs — Policy-based authorization
+- id: merk.security.aspnet-authz-succeed-in-catch-csharp
+  message: |
+    context.Succeed(requirement) called inside a catch block
+    treats every handler exception as an authorization pass. An
+    attacker who can induce an exception (null user, stale token,
+    downstream service down) gains access. Log the exception and
+    return without calling Succeed — the default is to leave the
+    requirement unfulfilled.
+  severity: ERROR
+  languages:
+  - csharp
+  patterns:
+  - pattern: |
+      try {
+          ...
+      } catch {
+          ...
+          $CTX.Succeed($REQ);
+          ...
+      }
+  - pattern-inside: |
+      class $H : AuthorizationHandler<$REQ_T> { ... }
+  metadata:
+    signal: authz-bypass
+    category: security
+    cwe: CWE-755
+    owasp:
+    - A01:2021 — Broken Access Control
+    confidence: high
+    source: ASP.NET Core docs — Policy-based authorization

@@ -1,0 +1,41 @@
+# Architectural layering rules. Weighted at 1.0× (spec Phase 5). Opt in via
+# `.healthrc.json` — `opengrep.categories: ["security", "architecture"]` —
+# not loaded by default.
+#
+# Seed rule detects controllers reaching directly into the persistence
+# layer (a DbContext) instead of going through a service/repository. Teams
+# typically customize these to their own conventions — replacing or
+# extending via `opengrep.extraRules` in .healthrc.json.
+rules:
+- id: merk.architecture.controller-uses-dbcontext-csharp
+  message: |
+    Controller injects or references DbContext directly. Consider moving
+    persistence access behind a service / repository boundary so the
+    controller depends on a domain-oriented interface rather than the
+    ORM. Helps isolate query logic and keeps controllers focused on
+    request/response concerns.
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: |
+        public class $C : ControllerBase {
+          ...
+          private readonly $DB $FIELD;
+          ...
+        }
+    - pattern: |
+        public class $C : Controller {
+          ...
+          private readonly $DB $FIELD;
+          ...
+        }
+  - metavariable-regex:
+      metavariable: $DB
+      regex: .*DbContext$
+  metadata:
+    signal: layer-violation
+    category: architecture
+    confidence: medium
+    source: Layered architecture — controllers depend on service abstractions, not ORM contexts

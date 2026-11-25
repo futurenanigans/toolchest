@@ -1,0 +1,125 @@
+# Legacy .NET Framework `web.config` hardening — development-mode flags
+# left enabled in production leak internal state (stack traces, SQL,
+# request/response data) or disable protections (SSL cookies, modern
+# request validation). Generic language mode — opengrep cannot AST-parse
+# web.config XML, so matching is line-oriented literal text. Some shapes
+# may bypass these patterns (attribute reordering, comments, whitespace)
+# — promote to a dedicated analyzer if false negatives become an issue.
+rules:
+- id: merk.security.webconfig-debug-compilation
+  message: |
+    <compilation debug="true"> in web.config emits debug symbols and
+    disables request caching / batch compilation. Stack traces in
+    error pages reveal source paths; the server is also markedly
+    slower. Ship production releases with debug="false" (or scrubbed
+    from web.config entirely).
+  severity: WARNING
+  languages:
+  - generic
+  paths:
+    include:
+    - '*.config'
+  pattern-either:
+  - pattern: debug="true"
+  - pattern: debug='true'
+  metadata:
+    signal: webconfig-debug
+    category: security
+    cwe: CWE-489
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: medium
+    source: Microsoft docs — compilation element (ASP.NET)
+- id: merk.security.webconfig-custom-errors-off
+  message: |
+    <customErrors mode="Off"> shows full YSOD error pages to every
+    caller — stack traces, source file paths, and inner exception
+    chains are exposed. Set mode="RemoteOnly" for ops access or
+    mode="On" to hide them entirely; pair with a <defaultRedirect>
+    for a user-friendly error page.
+  severity: ERROR
+  languages:
+  - generic
+  paths:
+    include:
+    - '*.config'
+  pattern-either:
+  - pattern: mode="Off"
+  - pattern: mode='Off'
+  metadata:
+    signal: webconfig-error-disclosure
+    category: security
+    cwe: CWE-209
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: medium
+    source: Microsoft docs — customErrors element (ASP.NET)
+- id: merk.security.webconfig-request-validation-legacy
+  message: |
+    <httpRuntime requestValidationMode="2.0"> reverts ASP.NET's built-in
+    XSS request validation to the pre-4.0 behavior — attribute and
+    header payloads that 4.x+ would reject are accepted silently.
+    Remove the override (default is 4.0+) unless a specific endpoint
+    requires it; scope narrow overrides via <location path>.
+  severity: WARNING
+  languages:
+  - generic
+  paths:
+    include:
+    - '*.config'
+  pattern-either:
+  - pattern: requestValidationMode="2.0"
+  - pattern: requestValidationMode='2.0'
+  metadata:
+    signal: legacy-request-validation
+    category: security
+    cwe: CWE-20
+    owasp:
+    - A03:2021 — Injection
+    confidence: high
+    source: Microsoft docs — httpRuntime.requestValidationMode
+- id: merk.security.webconfig-trace-enabled
+  message: |
+    <trace enabled="true"> exposes /trace.axd with per-request headers,
+    cookies, server variables, and session state. Set enabled="false"
+    and remove any <location> overrides that re-enable it, or delete
+    the entire <trace> element for production configurations.
+  severity: WARNING
+  languages:
+  - generic
+  paths:
+    include:
+    - '*.config'
+  pattern: <trace enabled="true"
+  metadata:
+    signal: trace-enabled
+    category: security
+    cwe: CWE-200
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: high
+    source: Microsoft docs — trace element (ASP.NET)
+- id: merk.security.webconfig-cookies-not-ssl
+  message: |
+    <httpCookies requireSSL="false"> — or the implicit default —
+    allows session cookies over plain HTTP. An attacker on the same
+    network can capture the cookie and impersonate the user. Set
+    requireSSL="true" and also enable httpOnlyCookies="true" to block
+    XSS cookie theft.
+  severity: WARNING
+  languages:
+  - generic
+  paths:
+    include:
+    - '*.config'
+  pattern-either:
+  - pattern: requireSSL="false"
+  - pattern: requireSSL='false'
+  metadata:
+    signal: cookie-not-ssl
+    category: security
+    cwe: CWE-614
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: medium
+    source: Microsoft docs — httpCookies element

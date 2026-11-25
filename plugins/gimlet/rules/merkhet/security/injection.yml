@@ -1,0 +1,167 @@
+# SQL injection — database query text built from attacker-influenced
+# input. Taint-tracked intra-file: HTTP request values flowing into
+# ADO.NET / EF Core / npm SQL clients. Parameterization (AddWithValue,
+# FromSqlInterpolated, driver `?`-placeholders) is the sanitizer.
+rules:
+- id: merk.security.sql-injection-csharp
+  message: |
+    SQL query text reached by a value derived from the HTTP request.
+    Replace the dynamic fragment with a parameter —
+    `new SqlCommand(sql, conn)` + `cmd.Parameters.AddWithValue(...)`,
+    or EF Core's `FromSqlInterpolated` / `ExecuteSqlInterpolated`
+    helpers (which auto-parameterize interpolation holes).
+  severity: ERROR
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - patterns:
+    - pattern-either:
+      - pattern: $REQ.Query[...]
+      - pattern: $REQ.Form[...]
+      - pattern: $REQ.Headers[...]
+      - pattern: $REQ.Cookies[...]
+      - pattern: $REQ.RouteValues[...]
+      - pattern: $REQ.QueryString[...]
+      - pattern: $REQ.Params[...]
+    - metavariable-regex:
+        metavariable: $REQ
+        regex: ^(req|request|httpRequest|Request|HttpRequest|_req|context|ctx)$
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - pattern: new SqlCommand($X, ...)
+  - pattern: new MySqlCommand($X, ...)
+  - pattern: new NpgsqlCommand($X, ...)
+  - pattern: new OracleCommand($X, ...)
+  - pattern: new SqliteCommand($X, ...)
+  - pattern: $CMD.CommandText = $X
+  - pattern: $DB.FromSqlRaw($X, ...)
+  - pattern: $DB.ExecuteSqlRaw($X, ...)
+  - pattern: $DB.ExecuteSqlRawAsync($X, ...)
+  pattern-sanitizers:
+  - pattern: $DB.FromSqlInterpolated(...)
+  - pattern: $DB.ExecuteSqlInterpolated(...)
+  - pattern: $DB.ExecuteSqlInterpolatedAsync(...)
+  - pattern: $CMD.Parameters.AddWithValue($NAME, $X)
+  - pattern: $CMD.Parameters.Add($P)
+  metadata:
+    signal: sql-injection
+    category: security
+    cwe: CWE-89
+    owasp:
+    - A03:2021 — Injection
+    confidence: high
+    source: OWASP Top 10 A03:2021 — Injection (taint-tracked)
+- id: merk.security.dapper-identifier-injection-csharp
+  message: |
+    Dapper Query/Execute SQL uses interpolated identifiers — table
+    name, column name, or ORDER BY clause built from a variable.
+    Parameter binding does NOT help here: parameters are values,
+    not identifiers. Guard the identifier against an allow-list
+    before composing the query (`if (!allowed.Contains(col)) throw;
+    var sql = $"SELECT * FROM t ORDER BY {col}"`).
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: $CONN.Query($SQL, ...)
+    - pattern: $CONN.QueryAsync($SQL, ...)
+    - pattern: $CONN.QueryFirst($SQL, ...)
+    - pattern: $CONN.QueryFirstOrDefault($SQL, ...)
+    - pattern: $CONN.QuerySingle($SQL, ...)
+    - pattern: $CONN.QuerySingleOrDefault($SQL, ...)
+    - pattern: $CONN.Execute($SQL, ...)
+    - pattern: $CONN.ExecuteAsync($SQL, ...)
+  - metavariable-regex:
+      metavariable: $SQL
+      regex: .*(?:ORDER BY|GROUP BY|FROM)\s*\{
+  metadata:
+    signal: sql-injection
+    category: security
+    cwe: CWE-89
+    owasp:
+    - A03:2021 — Injection
+    confidence: medium
+    source: Dapper — identifier-position SQL injection (beyond parameter binding)
+- id: merk.security.dapper-sql-injection-csharp
+  message: |
+    Dapper Query/Execute called with a SQL string that contains
+    interpolated or concatenated user input. Dapper has no built-in
+    SQL injection protection for the query string itself — only the
+    parameter object is bound safely. Build the query from a literal
+    string and pass user values in the parameters object.
+  severity: ERROR
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - patterns:
+    - pattern-either:
+      - pattern: $REQ.Query[...]
+      - pattern: $REQ.Form[...]
+      - pattern: $REQ.Headers[...]
+      - pattern: $REQ.Cookies[...]
+      - pattern: $REQ.RouteValues[...]
+      - pattern: $REQ.QueryString[...]
+      - pattern: $REQ.Params[...]
+    - metavariable-regex:
+        metavariable: $REQ
+        regex: ^(req|request|httpRequest|Request|HttpRequest|_req|context|ctx)$
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - patterns:
+    - pattern-either:
+      - pattern: $CONN.Query($X, ...)
+      - pattern: $CONN.QueryAsync($X, ...)
+      - pattern: $CONN.Execute($X, ...)
+      - pattern: $CONN.ExecuteAsync($X, ...)
+      - pattern: $CONN.QueryFirst($X, ...)
+      - pattern: $CONN.QueryFirstOrDefault($X, ...)
+      - pattern: $CONN.QuerySingle($X, ...)
+      - pattern: $CONN.QuerySingleOrDefault($X, ...)
+    - focus-metavariable: $X
+  metadata:
+    signal: sql-injection
+    category: security
+    cwe: CWE-89
+    owasp:
+    - A03:2021 — Injection
+    confidence: high
+    source: Dapper docs — parameterized queries

@@ -1,0 +1,1 @@
+C#/.NET rules and fixtures taken from Merkhet's opengrep rule packs at the commit before opengrep was removed (`44f32bc^`, `scripts/rules/`). Only rules whose `languages` include `csharp`, plus the `generic` rules scoped to `appsettings*.json`, `*.config`, `*.csproj`, `packages.config`, `*.cshtml` and `*.razor`, were kept. Rule ids are unchanged.
