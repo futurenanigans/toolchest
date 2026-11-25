@@ -62,3 +62,35 @@ test('README guidance denied on the first edit still comes on the next one', asy
   expect(denied.deny).toBe('not allowed')
   expect(allowed.context?.join('')).toContain('README guidance')
 })
+
+test('README guidance comes once whether the README is written or edited', async ($, on) => {
+  stubEngine(on, { files: { '/repo/README.md': '# Old\n' } })
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const written = await $.tool.call({ tool: 'Write', file_path: '/repo/README.md', content: '# New\n' })
+  const rewritten = await $.tool.call({ tool: 'Write', file_path: '/repo/README.md', content: '# Newer\n' })
+  const edited = await $.tool.call({ tool: 'Edit', file_path: '/repo/README.md', old_string: '# Newer', new_string: '# Newest' })
+  expect(written.context?.join('')).toContain('README guidance')
+  expect(rewritten.context).toBeUndefined()
+  expect(edited.context).toBeUndefined()
+})
+
+test('a Write that empties a test file is flagged as test deletion', async ($, on) => {
+  stubEngine(on, { files: { '/repo/a.test.ts': 'test("x", () => {})\n' } })
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const ran = await $.tool.call({ tool: 'Write', file_path: '/repo/a.test.ts', content: '' })
+  expect(ran.context?.join('')).toContain('removes test code')
+})
+
+test('a delete command is recognized only in command position', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const chained = await $.tool.call({ tool: 'Bash', command: 'cd src && rm a.test.ts' })
+  const piped = await $.tool.call({ tool: 'Bash', command: 'ls *.test.ts | xargs rm' })
+  const argument = await $.tool.call({ tool: 'Bash', command: 'grep del a.test.ts' })
+  expect(chained.context?.join('')).toContain('a.test.ts')
+  expect(piped.context).toBeUndefined()
+  expect(argument.context).toBeUndefined()
+})

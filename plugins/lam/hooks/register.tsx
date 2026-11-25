@@ -39,7 +39,7 @@ async function checkInput($: Engine, e: ToolCallInput): Promise<CheckInput | nul
   const onDisk = await readIfFile($, filePath)
   const oldString = stringField(e, 'old_string') ?? ''
   const regionStart = tool === 'Edit' ? onDisk.indexOf(oldString) : -1
-  const isFirstReadmeEdit = tool === 'Edit' && isReadme(filePath) && (await $.state.get(readmeGuided)).value !== true
+  const isFirstReadmeEdit = isReadme(filePath) && (await $.state.get(readmeGuided)).value !== true
 
   return {
     tool,
@@ -60,7 +60,7 @@ export const register: Register = on => {
   let fetchOutcome: Promise<string | null> = Promise.resolve(null)
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: PANE, description: 'Show how often each guardrail check corrected the model this session' })
+    await $.command.register({ name: 'guard-stats', description: 'Show how often each guardrail check corrected the model this session' })
     const started = await next(e)
     fetchOutcome = fetchRemotes($, e.cwd)
     await refreshStatus($)
@@ -80,7 +80,7 @@ export const register: Register = on => {
     return { sections: [...composed.sections, { id: FETCH_SECTION, text: fetched, scope: 'session' as const }] }
   })
 
-  on('command.run', { command: PANE }, async $ => {
+  on('command.run', { command: 'guard-stats' }, async $ => {
     await $.ui.open({ id: PANE, title: PANE_TITLE })
     return { text: 'Guardrail corrections pane opened.' }
   })

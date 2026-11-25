@@ -68,10 +68,10 @@ Do not list the **Keep** memories. Their count is enough.
 
 ## Apply
 
-1. Back up first. Archive the store to `memory-backup-<date>.tgz` beside the memory directory, replacing any earlier backup, and confirm the archive lists every file.
-2. Apply **Update** and **Merge** directly. A merged memory keeps the survivor's file name, carries every still-true detail of both, and the absorbed file is removed.
-3. Confirm before each of these, in one question that lists them all: every **Delete**, every **Promote** (it edits instruction files other sessions load), and anything touching a `feedback` memory or a caution.
-4. For a **Promote**, write the rule into its destination in that file's own style, then delete the memory. A fact that lives in two places drifts.
+1. Back up first. Archive the store to `memory-backup-<YYYYMMDD-HHMMSS>.tgz` beside the memory directory, keeping earlier backups, and confirm the archive lists every file.
+2. Confirm before changing anything, in one question that lists them all: every **Delete**, every **Promote** (it edits instruction files other sessions load), and every **Update** or **Merge** that touches a `feedback` memory or a caution. What the user declines stays as it is.
+3. Apply every **Update** and **Merge** the user did not decline. A merged memory keeps the survivor's file name, carries every still-true detail of both, and the absorbed file is removed.
+4. Apply each confirmed **Delete**. For a **Promote**, write the rule into its destination in that file's own style, then delete the memory. A fact that lives in two places drifts.
 5. Rewrite `MEMORY.md` to match the files: one line per memory, in the form `- [Title](file.md)` followed by a short hook, no content beyond that, and no line for a file that is gone. Fix or remove dangling `[[links]]`.
 
 Finish with one line per store: what was updated, merged, promoted and deleted, and where the backup is.

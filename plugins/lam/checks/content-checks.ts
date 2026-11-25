@@ -70,7 +70,7 @@ const DOWNGRADES_BY_EXTENSION: Readonly<Record<string, readonly LabelledPattern[
   ],
 }
 
-const SHELL_DELETE = /\b(git\s+rm|rm|Remove-Item|ri|del|erase)\b([^&|;\r\n]*)/gi
+const SHELL_DELETE = /(?:^|[;&|(\r\n]\s*|\b(?:sudo|xargs)\s+)(git\s+rm|rm|Remove-Item|ri|del|erase)\b([^&|;\r\n]*)/gim
 
 export const secrets: Check = {
   name: 'secrets',
@@ -111,8 +111,8 @@ export const testDeletion: Check = {
       if (deleted.size === 0) return null
       return `This command deletes what looks like test code (${[...deleted].join(', ')}). If a test was failing, the working assumption is that the production code is wrong, not the test. Deleting, skipping, or renaming a failing test to make the suite green is reward hacking; surface the failure instead. If the test is genuinely obsolete because the feature it covered was removed, say so explicitly before proceeding.`
     }
-    if (tool === 'Edit' && looksLikeTestFile(filePath) && !isBlank(oldText) && isBlank(newText)) {
-      return 'This edit removes test code by replacing it with empty content. If the test was failing, the working assumption is that the production code is wrong, not the test. Deleting test bodies to make the suite green is reward hacking; surface the failure instead. If the test is genuinely obsolete, say so explicitly before proceeding.'
+    if (isEditOrWrite(tool) && looksLikeTestFile(filePath) && !isBlank(oldText) && isBlank(newText)) {
+      return 'This change removes test code by replacing it with empty content. If the test was failing, the working assumption is that the production code is wrong, not the test. Deleting test bodies to make the suite green is reward hacking; surface the failure instead. If the test is genuinely obsolete, say so explicitly before proceeding.'
     }
     return null
   },
