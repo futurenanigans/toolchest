@@ -3,7 +3,7 @@ name: file-decomposition
 description: Splits a large file into well-bounded modules. Presents a decomposition plan first, then executes step by step with characterization tests before each move. Use only when the user explicitly asks to "decompose this file", "split this file into modules", or "break up this large file". Files under 300 lines rarely benefit.
 argument-hint: '"path/to/large-file.ext"'
 disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(git status *), Bash(git mv *), Bash(git add *), Bash(git commit *)
+allowed-tools: Read, Glob, Grep, Edit, Write, Bash
 ---
 
 `--auto` is not applicable: decomposition requires interactive plan approval and sequential extraction steps that depend on each other. If present, abort with that explanation.

@@ -2,7 +2,7 @@
 name: mutation-testing
 description: Configures, runs and analyzes mutation testing in bounded chunks, then closes the test gaps the surviving mutants show. Splits a codebase into chunks sized to a time budget, pairs each with the tests that reach it, keeps a resumable plan, groups survivors into behaviours a test should pin, and verifies each fix by rerunning the mutants it targets. Use when the user asks to "run mutation testing", "set up cargo-mutants or Stryker", "check the tests with mutants", "work through the surviving mutants", or "how good are these tests". Supports Rust, C# and TypeScript or JavaScript.
 argument-hint: "[--plan] [--chunk <n>|next] [--diff <base>] [--address [1,3]] [--auto] [path]"
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
 Follow `${CLAUDE_SKILL_DIR}/../../references/audit-procedure.md` for the report format, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/mutation-report.md`. Mutation flag: `--address`. Tool commands, configuration keys and output layouts per stack are in `${CLAUDE_SKILL_DIR}/references/tools.md`; read it before the first command and do not write flags from memory.
@@ -25,7 +25,7 @@ One invocation runs one chunk. Whole-repository runs are never the default; a us
 
 1. Identify the stack and the tool from `references/tools.md`. Check the tool is installed and say how to install it when it is not; do not install without asking.
 2. Run the unmutated tests once in the configuration the tool will use and record the wall time. A baseline that fails or flakes stops everything: mutation results over a red or flaky suite mean nothing.
-3. Write the tool's configuration file with the choices this skill depends on: the test command limited to the fast pool, modest concurrency (two jobs unless the machine is known to be large), output under a directory git ignores, thresholds that never break, and timeouts derived from the baseline.
+3. Write the tool's configuration file with the choices this skill depends on: the test command limited to the fast pool (the project's tests that finish in seconds and run on every change, excluding slow integration, end-to-end and load suites), modest concurrency (two jobs unless the machine is known to be large), output under a directory git ignores, thresholds that never break, and timeouts derived from the baseline.
 4. Exclude arid code in that configuration, each entry with its reason: logging and message text, `Debug` and `Display` plumbing, generated code, CLI argument glue, test support code. Mutants there are almost all equivalent or uninteresting, and they cost the same as useful ones.
 
 ## Plan: chunks sized to a budget

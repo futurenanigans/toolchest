@@ -2,7 +2,7 @@
 name: dead-code
 description: Finds dead code in the current code on disk and optionally removes it. Inventories the roots first (entry points, framework discovery, public API), treats every candidate as alive until a named source shows no root reaches it, and removes proven findings with the build and the surviving tests held to the baseline. Use when the user asks to "find dead code", "remove unused code", "clear out dead code", "what can we delete", or "prune unused dependencies". Never reviews a git diff.
 argument-hint: "[--auto] [--remove [1,3]] [--context <path>] [path]"
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
 Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/dead-code-report.md`. Mutation flag: `--remove`.

@@ -2,7 +2,7 @@
 name: codebase-health
 description: Assesses maintainability of the current code on disk at the level of units and their collaborators (coupling, cohesion, testability, complexity), and separates strategic (multi-file, root-cause) findings from tactical ones. Use when the user asks for a "health check", "code quality assessment", "how maintainable is this", or "what's the state of this codebase". Leaves architectural layout to architecture-scan and repeated patterns to pattern-discovery. Never reviews a git diff. Optionally addresses the findings.
 argument-hint: "[--auto] [--improve [1,3]] [--context <path>] [path]"
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash(git status *), Bash(git rev-parse *), Bash(git add *), Bash(git commit *)
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
 Follow `${CLAUDE_SKILL_DIR}/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`. Report path: `.claude/state/health-report.md`. Mutation flag: `--improve`.

@@ -2,7 +2,7 @@
 name: architecture-scan
 description: Identifies the architectural organization the current code on disk is converging toward (N-Layer, Clean Architecture, Vertical Slice, Feature Folders, and so on), names inconsistencies and boundary violations, and optionally reorganizes toward consistency. Use when the user asks "what architecture is this", "how is this codebase organized", "align the scattered code", or "check structural consistency". Never imposes a pattern and never reviews a git diff.
 argument-hint: "[--auto] [--reorganize [1,3]] [path]"
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash(git status *), Bash(git rev-parse *), Bash(git add *), Bash(git commit *), Bash(git mv *)
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
 Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, the mutation pre-flight, and `--auto`. Report path: `.claude/state/structure-report.md`, which the `code-organization` rule also reads for file placement. Mutation flag: `--reorganize`. Extra git command: `git mv`, to preserve history when relocating files.

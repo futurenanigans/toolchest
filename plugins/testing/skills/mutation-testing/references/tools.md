@@ -11,7 +11,7 @@ Configuration lives in `.cargo/mutants.toml`. Command-line scalars override it a
 | Files to mutate or skip | `-f <glob>`, `-e <glob>` | `examine_globs`, `exclude_globs` |
 | Mutants by name | `-F <regex>`, `-E <regex>` | `examine_re`, `exclude_re` |
 | One package | `-p <package>` | |
-| Tests to run for every mutant | `--test-package <package>`, `--test-workspace` | |
+| Tests to run for every mutant | `--test-package <package>`, `--test-workspace=true` (or `false` for only the mutated package's tests) | |
 | Test runner | `--test-tool nextest` | `test_tool = "nextest"` |
 | Jobs | `-j 2` | |
 | Timeouts | `--timeout <secs>`, `--timeout-multiplier <n>`, `--minimum-test-timeout <secs>` | `timeout_multiplier` |
@@ -70,7 +70,7 @@ Run `npx stryker run`. Configuration is `stryker.config.json`.
 | Timeouts | `timeoutMS` (default 5000), `timeoutFactor` (default 1.5) |
 | Mutating the working tree | `inPlace` |
 | Thresholds | `thresholds`: `{ high: 80, low: 60, break: null }`; keep `break` at `null` |
-| Reports | `reporters`: `json`, `html`, `clear-text`, `progress`; defaults `reports/mutation/mutation.json` and `reports/mutation.html` |
+| Reports | `reporters`: `json`, `html`, `clear-text`, `progress`; defaults `reports/mutation/mutation.json` and `reports/mutation/mutation.html` |
 
 Chunking: a `mutate` glob or line range per chunk. With a test runner Stryker has a plugin for, `perTest` coverage pairs tests to mutants on its own. With the `command` runner (Bun, or any runner without a plugin) Stryker cannot see coverage, so every mutant reruns the whole command: the chunk's test command must name only the case files that reach the mutated source, and cost is mutants times that command's run time.
 

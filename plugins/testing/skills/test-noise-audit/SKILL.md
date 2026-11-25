@@ -3,7 +3,7 @@ name: test-noise-audit
 description: Classifies existing passing tests as noise or valuable (noise being any test whose removal would not reduce confidence in the codebase), writes a report, and deletes the noise tests. Use only when the user explicitly asks to "audit the tests for noise", "remove useless tests", "prune the test suite", or "find tests that don't catch anything".
 argument-hint: "[--auto] [path]"
 disable-model-invocation: true
-allowed-tools: Read, Glob, Grep, Edit, Write, Bash(git status *), Bash(git rev-parse *), Bash(git add *), Bash(git commit *), Bash(git rm *)
+allowed-tools: Read, Glob, Grep, Edit, Write, Bash, Agent
 ---
 
 Deep audit of existing tests only: no gap analysis, no new test writing. The goal is a smaller, more honest suite by removing tests that cannot catch real regressions.

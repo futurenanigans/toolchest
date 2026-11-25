@@ -2,7 +2,7 @@
 name: bug-hunt
 description: Hunts correctness defects in the current code on disk. Treats tests and prose (comments, docstrings, names) as claims to verify, establishes intent from hard oracles only (type contracts, invariants, caller expectations, domain rules, compiler and analyzer output), and reproduces defects where cheap. Use when the user asks to "find bugs", "hunt for defects", "audit this code for correctness", or "what's broken here", with no diff to anchor on. Never reviews a git diff. Optionally fixes findings.
 argument-hint: "[--auto] [--fix [1,3]] [--context <path>] [path]"
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
 Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/bug-report.md`. Mutation flag: `--fix`.

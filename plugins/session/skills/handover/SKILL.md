@@ -4,7 +4,6 @@ description: Produces a goal-anchored handover brief that lets a fresh Claude Co
 when_to_use: Only when the user explicitly asks for a "handover", "handoff", "brief for a fresh session", or "something to paste after /clear". Not for commit messages, PR descriptions, or session summaries.
 disable-model-invocation: true
 argument-hint: "<next goal for the fresh session (required)>"
-arguments: [goal]
 effort: high
 allowed-tools: Read, Glob, Grep, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git rev-parse:*), Bash(git stash list:*), Write(/.claude/handover/*), Edit(/.claude/handover/*), Edit(/.gitignore), AskUserQuestion
 ---
@@ -15,7 +14,7 @@ Produce a brief that lets a fresh session make progress on ONE stated goal. The 
 
 ## Inputs captured up front
 
-- **Goal (user-supplied):** $goal
+- **Goal (user-supplied):** $ARGUMENTS
 - **Branch:** !`git branch --show-current 2>/dev/null || echo "(not a git repo)"`
 - **HEAD:** !`git rev-parse --short HEAD 2>/dev/null || echo "(none)"`
 - **Working tree:** !`git status --short 2>/dev/null || echo "(not a git repo)"`
@@ -91,7 +90,7 @@ Before writing, confirm every line of this list:
 
 Then:
 
-1. Write the brief to `.claude/handover/latest.md` (create the directory; add `.claude/handover/` to `.gitignore` if not ignored).
+1. Write the brief to `.claude/handover/<YYYYMMDD-HHMMSS>.md` and copy it to `.claude/handover/latest.md`, so earlier briefs survive (create the directory; add `.claude/handover/` to `.gitignore` if not ignored).
 2. Do not output the brief to chat. Reply with exactly one line: the command the user runs after `/clear`:
 
 ```
