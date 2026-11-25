@@ -37,7 +37,7 @@ rules:
   - patterns:
     - metavariable-regex:
         metavariable: "$FUNC"
-        regex: "(SerializeObject|HtmlAttributeEncode|HtmlEncode|HtmlFormUrlEncode|UrlEncode|UrlPathEncode|XmlAttributeEncode|XmlEncode|Encode)"
+        regex: "(SerializeObject|JavaScriptStringEncode|HtmlAttributeEncode|HtmlEncode|HtmlFormUrlEncode|UrlEncode|UrlPathEncode|XmlAttributeEncode|XmlEncode|Encode)"
     - pattern: "$CLASS.$FUNC(...)"
   pattern-propagators:
   - pattern: "(StringBuilder $OUT).Append($IN)"

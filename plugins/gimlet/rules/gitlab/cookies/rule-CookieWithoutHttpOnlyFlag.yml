@@ -6,14 +6,13 @@ rules:
 - id: "csharp_cookies_rule-CookieWithoutHttpOnlyFlag"
   languages:
   - "csharp"
-  mode: "taint"
-  pattern-sources:
-  - pattern: |
+  patterns:
+  - pattern: "var $COOKIE = new HttpCookie(...);"
+  - pattern-not: "var $COOKIE = new HttpCookie(...) {..., HttpOnly = true, ...};"
+  - pattern-not-inside: |
       var $COOKIE = new HttpCookie(...);
-  pattern-sinks:
-  - pattern: "$COOKIE"
-  pattern-sanitizers:
-  - pattern: "$COOKIE.HttpOnly = true;"
+      ...
+      $COOKIE.HttpOnly = true;
   message: |
     The `HttpOnly` attribute when set to `true` protects the cookie value from being accessed by
     client side JavaScript such

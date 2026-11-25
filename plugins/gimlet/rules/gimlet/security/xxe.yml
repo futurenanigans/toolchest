@@ -1,0 +1,54 @@
+rules:
+- id: gimlet.security.xxe-xmldocument-resolver-csharp
+  message: |
+    XmlDocument.XmlResolver set to XmlUrlResolver (or any non-null
+    resolver) enables external DTD fetching. Set XmlResolver = null
+    on the XmlDocument before calling Load / LoadXml with untrusted
+    input to disable external entity resolution.
+  severity: ERROR
+  languages:
+  - csharp
+  pattern: $DOC.XmlResolver = new XmlUrlResolver(...)
+  metadata:
+    category: security
+    cwe: CWE-611
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: high
+    source: MSFT — XmlDocument.XmlResolver security remarks
+- id: gimlet.security.xxe-dtd-parsing-csharp
+  message: |
+    XmlReaderSettings with DtdProcessing.Parse lets the parser expand
+    external entities when reading XML. On untrusted input this is an
+    XXE vector — use DtdProcessing.Prohibit (or the Ignore default on
+    .NET 4.5.2+).
+  severity: ERROR
+  languages:
+  - csharp
+  pattern: |
+    new XmlReaderSettings { ..., DtdProcessing = DtdProcessing.Parse, ... }
+  metadata:
+    category: security
+    cwe: CWE-611
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: high
+    source: OWASP XXE Prevention Cheat Sheet — .NET
+- id: gimlet.security.xxe-xmltextreader-prohibit-missing-csharp
+  message: |
+    XmlTextReader exposes DtdProcessing directly — leaving it at the
+    Parse/default value allows DTD expansion. Set DtdProcessing =
+    DtdProcessing.Prohibit on the reader before reading untrusted XML,
+    or migrate to XmlReader.Create with hardened XmlReaderSettings.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern: |
+    new XmlTextReader($X)
+  metadata:
+    category: security
+    cwe: CWE-611
+    owasp:
+    - A05:2021 — Security Misconfiguration
+    confidence: low
+    source: OWASP XXE Prevention Cheat Sheet — .NET legacy parsers

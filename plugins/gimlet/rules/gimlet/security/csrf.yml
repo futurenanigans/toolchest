@@ -1,0 +1,46 @@
+rules:
+- id: gimlet.security.csrf-missing-antiforgery-csharp
+  message: |
+    $METHOD is a state-changing MVC action without CSRF protection.
+    Browsers can submit cross-origin POST/PUT/DELETE via forms or
+    fetch without preflight, so this action is reachable via CSRF.
+    Apply `[ValidateAntiForgeryToken]` (or a class-level
+    `[AutoValidateAntiforgeryToken]`), or restrict the content-type
+    via `[Consumes("application/json")]` to force a preflight.
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern: |
+      [$HTTPMETHOD]
+      public $TR $METHOD(...) { ... }
+  - pattern-not: |
+      [$HTTPMETHOD]
+      [ValidateAntiForgeryToken]
+      public $TR $METHOD(...) { ... }
+  - pattern-not: |
+      [ValidateAntiForgeryToken]
+      [$HTTPMETHOD]
+      public $TR $METHOD(...) { ... }
+  - pattern-not: |
+      [$HTTPMETHOD]
+      [Consumes(...)]
+      public $TR $METHOD(...) { ... }
+  - pattern-not: |
+      [Consumes(...)]
+      [$HTTPMETHOD]
+      public $TR $METHOD(...) { ... }
+  - pattern-not: |
+      [$HTTPMETHOD]
+      [IgnoreAntiforgeryToken]
+      public $TR $METHOD(...) { ... }
+  - metavariable-regex:
+      metavariable: $HTTPMETHOD
+      regex: ^Http(Post|Put|Delete|Patch)$
+  metadata:
+    category: security
+    cwe: CWE-352
+    owasp:
+    - A01:2021 — Broken Access Control
+    confidence: low
+    source: OWASP CSRF Prevention Cheat Sheet — ASP.NET

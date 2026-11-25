@@ -1,0 +1,17 @@
+@model PostViewModel
+
+<article>
+    <h1>@Model.Title</h1>
+
+    <!-- ruleid: gimlet.security.razor-html-raw -->
+    <div>@Html.Raw(Model.Body)</div>
+
+    <!-- ruleid: gimlet.security.razor-html-raw -->
+    <footer>@Html.Raw(Model.AuthorBio)</footer>
+
+    <!-- ok: gimlet.security.razor-html-raw -->
+    <p>@Model.Summary</p>
+
+    <!-- ok: gimlet.security.razor-html-raw -->
+    <span>@Html.Encode(Model.Body)</span>
+</article>

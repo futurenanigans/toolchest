@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ruleid: gimlet.security.glimpse-diagnostics-present -->
+    <PackageReference Include="Glimpse.AspNet" Version="1.9.4" />
+
+    <!-- ruleid: gimlet.security.rhino-mocks-in-production -->
+    <PackageReference Include="RhinoMocks" Version="3.6.1" />
+
+    <!-- ruleid: gimlet.security.moq-sponsor-link -->
+    <PackageReference Include="Moq" Version="4.20.70" />
+
+    <!-- ok: gimlet.security.moq-sponsor-link -->
+    <PackageReference Include="Moq" Version="4.18.4" />
+
+    <!-- ok: gimlet.security.glimpse-diagnostics-present, gimlet.security.rhino-mocks-in-production -->
+    <PackageReference Include="Serilog" Version="3.1.1" />
+  </ItemGroup>
+</Project>

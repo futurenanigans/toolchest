@@ -1,0 +1,69 @@
+rules:
+- id: gimlet.security.mass-assignment-mvc5-csharp
+  message: |
+    UpdateModel / TryUpdateModel invoked without an includeProperties
+    allow-list binds every form value into the model — an attacker
+    can set properties the form never exposed (IsAdmin, AccountId,
+    Price). Pass a properties allow-list: `UpdateModel(model, new[]
+    { "Name", "Email" })`, or bind to a purpose-built DTO that only
+    carries user-editable fields.
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: UpdateModel($M)
+    - pattern: TryUpdateModel($M)
+    - pattern: $CTRL.UpdateModel($M)
+    - pattern: $CTRL.TryUpdateModel($M)
+  - pattern-not: UpdateModel($M, new[] { ... })
+  - pattern-not: TryUpdateModel($M, new[] { ... })
+  - pattern-not: UpdateModel($M, new string[] { ... })
+  - pattern-not: TryUpdateModel($M, new string[] { ... })
+  - pattern-not: $CTRL.UpdateModel($M, new[] { ... })
+  - pattern-not: $CTRL.TryUpdateModel($M, new[] { ... })
+  metadata:
+    category: security
+    cwe: CWE-915
+    owasp:
+    - A04:2021 — Insecure Design
+    confidence: low
+    source: OWASP Mass Assignment Cheat Sheet
+- id: gimlet.security.mass-assignment-core-dbcontext-csharp
+  message: |
+    DbContext.Update / Add invoked directly on a value derived from
+    the request body rewrites every mapped column — including
+    fields the user shouldn't control (IsAdmin, TenantId, audit
+    timestamps). Map the inbound DTO into a loaded entity
+    explicitly, or use an AutoMapper profile that ignores sensitive
+    properties.
+  severity: WARNING
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - pattern: $DB.Update($X)
+  - pattern: $DB.UpdateRange($X)
+  - pattern: $DB.Set<$T>().Update($X)
+  - pattern: $DB.Entry($X).State = EntityState.Modified
+  pattern-sanitizers:
+  - pattern: $MAPPER.Map($X)
+  - pattern: $MAPPER.Map<$T>($X)
+  metadata:
+    category: security
+    cwe: CWE-915
+    owasp:
+    - A04:2021 — Insecure Design
+    confidence: low
+    source: OWASP Mass Assignment Cheat Sheet

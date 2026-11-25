@@ -5,7 +5,7 @@ description: Run opengrep with Gimlet's bundled C#/.NET rules and triage the fin
 
 # Running Gimlet
 
-Gimlet is a wrapper around opengrep. Run it as `bash "${CLAUDE_SKILL_DIR}/../../bin/gimlet"`, which works whether or not the plugin's `bin/` is on PATH and whether or not the install kept the executable bit. The commands below shorten that to `gimlet`. The first scan downloads the latest opengrep release if none is installed. `gimlet update` moves to a newer release, and `gimlet install --version vX.Y.Z` pins one. Downloads are verified with cosign when cosign is on PATH; `--require-signature` refuses to install without it.
+Gimlet is a wrapper around opengrep. Run it as `bash "${CLAUDE_SKILL_DIR}/../../bin/gimlet"`, which works whether or not the plugin's `bin/` is on PATH and whether or not the install kept the executable bit. The commands below shorten that to `gimlet`. The first scan installs the opengrep release pinned in `config/defaults.env`, checked against its pinned SHA-256. `gimlet update` installs the latest release and `gimlet install --version vX.Y.Z` a specific one; both refuse to install without cosign on PATH to verify the signature. Run them only when asked to update opengrep.
 
 Pick the narrowest scan that answers the question:
 
@@ -19,7 +19,7 @@ Pick the narrowest scan that answers the question:
 
 `--baseline` reports only findings absent at that git ref, so pre-existing findings stay out of a review of new code. Opengrep picks the files to scan from the diff between the ref and the index, then scans their working-tree content. A file whose only changes are unstaged is skipped and reported as zero findings. Run `git add` on the files to review before a baseline scan.
 
-Results go to `.gimlet/results.json` in the working directory (`--sarif` adds `results.sarif`). Add `.gimlet/` to the repository's `.gitignore`. The scan prints findings grouped by file and rule; the JSON holds the full message, matched lines, and rule metadata (`.results[].extra.metadata` carries CWE and OWASP tags).
+The scan writes nothing into the repository. Results go to `results.json` (and `results.sarif` with `--sarif`) in a per-repository directory under the plugin data directory; the scan's last line names the file. The scan prints findings grouped by file and rule; the JSON holds the full message, matched lines, and rule metadata (`.results[].extra.metadata` carries CWE and OWASP tags).
 
 ## Triage
 
@@ -31,12 +31,12 @@ Treat every finding as a claim to verify against the code. The rules are syntact
 
 Severity reads ERROR as likely exploitable, WARNING as a weakness worth fixing, INFO as a code-quality or review pointer. Order work by severity, then by how directly user input reaches the line.
 
-Rules whose ids start with `merk.quality.` are code-quality checks (broad catches, swallowed errors, magic URLs). In a repository that already runs Awl, they overlap Awl's exception and literal rules; prefer Awl's verdict where both fire.
+Rules whose ids start with `gimlet.quality.` or `gimlet.architecture.` are code-quality checks (broad catches, swallowed errors, magic URLs, controllers using a DbContext). They overlap awl's rules, so a scan skips them in a repository with `.awl/awl.json` and says so; `--quality` runs them anyway.
 
 Known false-positive patterns:
 
 - `csharp_injection_rule-CommandInjection` fires on every `Process.Start` and `ProcessStartInfo` with a non-literal argument. A tool that launches its own child process with arguments it builds itself is not injectable; check whether any part of the file name or arguments comes from a request, config value an attacker controls, or file content.
-- `merk.quality.catch-general-exception-csharp` is expected at process boundaries (program entry, hook entrypoints, top-level request handlers).
+- `gimlet.quality.catch-general-exception-csharp` is expected at process boundaries (program entry, hook entrypoints, top-level request handlers).
 
 ## Errors in the result
 
@@ -46,4 +46,4 @@ Exit status above 1 from opengrep is a failure of the scan itself; Gimlet stops 
 
 ## Rules
 
-Rule files are YAML under `rules/` and `rules-audit/`, one directory per source; grep them by id. The sources and licences are in `rules/*/LICENSE`. `gimlet test` runs opengrep's rule tests against the fixtures next to each rule file. To add a rule, put the YAML beside a fixture of the same base name annotated with `// ruleid: <id>` and `// ok: <id>` lines, then run `gimlet test`.
+Rule files are YAML under `rules/` and `rules-audit/`, one directory per source; grep them by id. `rules/gimlet` is this project's own (MIT); the other directories carry their source's MIT `LICENSE`. `gimlet test` runs opengrep's rule tests against the fixtures next to each rule file. To add a rule, put the YAML beside a fixture of the same base name annotated with `// ruleid: <id>` and `// ok: <id>` lines, then run `gimlet test`.

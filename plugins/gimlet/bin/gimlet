@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gimlet: installs a pinned-or-latest opengrep release and runs it with the bundled C#/.NET rules.
+# gimlet: installs a verified opengrep release and runs it with the bundled C#/.NET rules.
 set -euo pipefail
 
 GIMLET_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -8,9 +8,10 @@ source "$GIMLET_ROOT/config/defaults.env"
 
 DATA_DIR="${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/gimlet}"
 TOOLS_DIR="$DATA_DIR/opengrep"
-CURRENT_LINK="$TOOLS_DIR/current"
+CURRENT_FILE="$TOOLS_DIR/current"
 RULES_DIR="$GIMLET_ROOT/rules"
 AUDIT_RULES_DIR="$GIMLET_ROOT/rules-audit"
+AWL_CONFIG=".awl/awl.json"
 
 die() { echo "gimlet: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "required tool '$1' is not installed"; }
@@ -19,14 +20,16 @@ usage() {
   cat <<EOF
 usage: gimlet <command> [options]
 
-  install [--version TAG] [--require-signature]
-                         download an opengrep release (default: latest) into $TOOLS_DIR
-  update                 install the latest release if it is newer than the current one
-  version                print the installed opengrep version and its path
+  install [--version TAG]
+                         install opengrep $GIMLET_OPENGREP_PINNED_TAG (checked against its pinned SHA-256),
+                         or another release TAG (requires cosign to verify its signature)
+  update                 install the latest opengrep release (requires cosign)
+  version                print the opengrep version in use and its path
   scan [options] [PATH...]
                          scan PATHs (default: .) with the bundled rules
       --baseline REF     report only findings introduced since git REF
       --audit            also run the audit rules (entrypoint inventory; noisy by design)
+      --quality          run the quality and architecture rules even where awl is enabled
       --sarif            also write SARIF next to the JSON results
       --rules DIR        use DIR instead of the bundled rules (repeatable)
   test                   run opengrep's rule tests over the bundled rules and fixtures
@@ -37,16 +40,34 @@ curl_get() {
   curl --fail --silent --show-error --location --max-time "$GIMLET_HTTP_TIMEOUT_SECONDS" "$@"
 }
 
+is_windows() {
+  case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 0 ;; *) return 1 ;; esac
+}
+
+exe_name() {
+  if is_windows; then echo opengrep.exe; else echo opengrep; fi
+}
+
 asset_name() {
   local os arch
   os="$(uname -s)"; arch="$(uname -m)"
   case "$os/$arch" in
-    Linux/x86_64)          echo opengrep_linux_x86 ;;
+    Linux/x86_64)              echo opengrep_linux_x86 ;;
     Linux/aarch64|Linux/arm64) echo opengrep_linux_aarch64 ;;
-    Darwin/arm64)          echo opengrep_osx_arm64 ;;
-    Darwin/x86_64)         echo opengrep_osx_x86 ;;
-    *) die "no opengrep release asset for $os/$arch (Windows: use opengrep's install.ps1)" ;;
+    Darwin/arm64)              echo opengrep_osx_arm64 ;;
+    Darwin/x86_64)             echo opengrep_osx_x86 ;;
+    MINGW*/x86_64|MSYS*/x86_64|CYGWIN*/x86_64) echo opengrep_windows_x86.zip ;;
+    *) die "no opengrep release asset for $os/$arch" ;;
   esac
+}
+
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1
+}
+
+pinned_sha256() {
+  local key="GIMLET_SHA256_${1//./_}"
+  echo "${!key:-}"
 }
 
 latest_tag() {
@@ -56,94 +77,135 @@ latest_tag() {
   echo "${url##*/releases/tag/}"
 }
 
-installed_tag() {
-  [[ -L "$CURRENT_LINK" ]] && basename "$(readlink "$CURRENT_LINK")" || true
+current_tag() {
+  [[ -f "$CURRENT_FILE" ]] && cat "$CURRENT_FILE" || true
 }
 
-opengrep_bin() {
-  local bin="$CURRENT_LINK/opengrep"
-  if [[ ! -x "$bin" ]]; then
-    echo "gimlet: opengrep not installed; installing the latest release" >&2
-    cmd_install >&2
+unpack_zip() {
+  local zip="$1" dest="$2"
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -q -o "$zip" -d "$dest"
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    powershell.exe -NoProfile -NonInteractive -Command \
+      "Expand-Archive -Force -LiteralPath '$(cygpath -w "$zip")' -DestinationPath '$(cygpath -w "$dest")'"
+  else
+    die "cannot unpack $zip: neither unzip nor powershell.exe is available"
   fi
-  echo "$bin"
 }
 
+verify_signature() {
+  local file="$1" url="$2" dir="$3"
+  curl_get -o "$dir/asset.sig" "$url.sig" || die "download failed: $url.sig"
+  curl_get -o "$dir/asset.cert" "$url.cert" || die "download failed: $url.cert"
+  cosign verify-blob \
+    --signature "$dir/asset.sig" --certificate "$dir/asset.cert" \
+    --certificate-identity-regexp "$GIMLET_COSIGN_IDENTITY_REGEXP" \
+    --certificate-oidc-issuer "$GIMLET_COSIGN_OIDC_ISSUER" \
+    "$file" >/dev/null || die "cosign signature verification failed for $url"
+}
+
+# Runs in a subshell so the EXIT trap removes the download directory when it returns.
 cmd_install() (
   need curl
-  local tag="" require_sig=0
+  local tag="$GIMLET_OPENGREP_PINNED_TAG"
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --version) tag="${2:?--version needs a tag}"; shift 2 ;;
-      --require-signature) require_sig=1; shift ;;
       *) die "install: unknown option $1" ;;
     esac
   done
-  [[ -n "$tag" ]] || tag="$(latest_tag)"
 
-  local asset dest tmp url
-  asset="$(asset_name)"
+  local asset exe dest tmp url expected actual
+  asset="$(asset_name)"; exe="$(exe_name)"
   dest="$TOOLS_DIR/$tag"
-  if [[ -x "$dest/opengrep" ]]; then
-    ln -sfn "$dest" "$CURRENT_LINK"
-    echo "opengrep $tag already installed at $dest/opengrep"
+  if [[ -x "$dest/$exe" ]]; then
+    echo "$tag" > "$CURRENT_FILE"
+    echo "opengrep $tag already installed at $dest/$exe"
     return
   fi
 
   mkdir -p "$TOOLS_DIR"
   tmp="$(mktemp -d "$TOOLS_DIR/.download.XXXXXX")"
-  # cmd_install runs in a subshell (see its definition), so EXIT fires when it returns.
   trap 'rm -rf "$tmp"' EXIT
+  if [[ "$tag" != "$GIMLET_OPENGREP_PINNED_TAG" ]] && ! command -v cosign >/dev/null 2>&1; then
+    die "opengrep $tag is not the pinned release ($GIMLET_OPENGREP_PINNED_TAG); install cosign (https://github.com/sigstore/cosign) to verify it, or run 'gimlet install' for the pinned release"
+  fi
   url="$GIMLET_GITHUB_DOWNLOAD/$GIMLET_OPENGREP_REPO/releases/download/$tag/$asset"
   echo "downloading $url"
-  curl_get -o "$tmp/opengrep" "$url"
+  curl_get -o "$tmp/$asset" "$url" || die "download failed: $url"
 
-  if command -v cosign >/dev/null 2>&1; then
-    curl_get -o "$tmp/opengrep.sig" "$url.sig"
-    curl_get -o "$tmp/opengrep.cert" "$url.cert"
-    cosign verify-blob \
-      --signature "$tmp/opengrep.sig" --certificate "$tmp/opengrep.cert" \
-      --certificate-identity-regexp "$GIMLET_COSIGN_IDENTITY_REGEXP" \
-      --certificate-oidc-issuer "$GIMLET_COSIGN_OIDC_ISSUER" \
-      "$tmp/opengrep" >/dev/null || die "cosign signature verification failed for $asset $tag"
-    echo "signature verified with cosign"
-  elif [[ $require_sig -eq 1 ]]; then
-    die "--require-signature given but cosign is not installed (https://github.com/sigstore/cosign)"
+  if [[ "$tag" == "$GIMLET_OPENGREP_PINNED_TAG" ]]; then
+    expected="$(pinned_sha256 "$asset")"
+    [[ -n "$expected" ]] || die "no pinned SHA-256 for $asset in config/defaults.env"
+    actual="$(sha256_of "$tmp/$asset")"
+    [[ "$actual" == "$expected" ]] || die "SHA-256 mismatch for $asset $tag: expected $expected, got $actual"
+    echo "SHA-256 matches the pinned value"
   else
-    echo "warning: cosign not installed; installing $tag without signature verification" >&2
+    verify_signature "$tmp/$asset" "$url" "$tmp"
+    echo "signature verified with cosign"
   fi
 
-  chmod +x "$tmp/opengrep"
-  "$tmp/opengrep" --version >/dev/null || die "downloaded opengrep does not run on this machine"
-  mkdir -p "$dest"
-  mv "$tmp/opengrep" "$dest/opengrep"
-  ln -sfn "$dest" "$CURRENT_LINK"
-  echo "installed opengrep $tag at $dest/opengrep"
+  mkdir -p "$tmp/unpacked"
+  if [[ "$asset" == *.zip ]]; then
+    unpack_zip "$tmp/$asset" "$tmp/unpacked" || die "could not unpack $asset"
+  else
+    mv "$tmp/$asset" "$tmp/unpacked/$exe"
+  fi
+  chmod +x "$tmp/unpacked/$exe"
+  "$tmp/unpacked/$exe" --version >/dev/null || die "downloaded opengrep does not run on this machine"
+  rm -rf "$dest"
+  mv "$tmp/unpacked" "$dest"
+  echo "$tag" > "$CURRENT_FILE"
+  echo "installed opengrep $tag at $dest/$exe"
 )
 
 cmd_update() {
   local latest current
-  latest="$(latest_tag)"; current="$(installed_tag)"
+  latest="$(latest_tag)"; current="$(current_tag)"
   if [[ "$latest" == "$current" ]]; then
     echo "opengrep $current is the latest release"
   else
     echo "updating opengrep ${current:-<none>} -> $latest"
-    cmd_install --version "$latest" "$@"
+    cmd_install --version "$latest"
   fi
 }
 
 cmd_version() {
-  local tag; tag="$(installed_tag)"
+  local tag; tag="$(current_tag)"
   [[ -n "$tag" ]] || die "opengrep not installed; run: gimlet install"
-  echo "opengrep $tag ($CURRENT_LINK/opengrep)"
+  echo "opengrep $tag ($TOOLS_DIR/$tag/$(exe_name))"
+}
+
+# Installs the pinned release when none is usable. Called directly, never inside $(...), where
+# bash drops errexit and a failed install would fall through to running a missing binary.
+ensure_opengrep() {
+  local tag
+  tag="$(current_tag)"
+  if [[ -z "$tag" || ! -x "$TOOLS_DIR/$tag/$(exe_name)" ]]; then
+    echo "gimlet: opengrep not installed; installing the pinned release" >&2
+    cmd_install >&2
+  fi
+}
+
+opengrep_bin() {
+  echo "$TOOLS_DIR/$(current_tag)/$(exe_name)"
+}
+
+# Results live in the plugin data directory, keyed by the scanned repository, so a scan never
+# writes into the repository it reads.
+results_dir() {
+  local root
+  root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  echo "${GIMLET_RESULTS_DIR:-$DATA_DIR/results/$(basename "$root")-$(printf '%s' "$root" | cksum | cut -d' ' -f1)}"
 }
 
 cmd_scan() {
-  local baseline="" audit=0 sarif=0 configs=() paths=()
+  local baseline="" audit=0 quality=0 sarif=0 configs=() paths=()
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --baseline) baseline="${2:?--baseline needs a git ref}"; shift 2 ;;
       --audit) audit=1; shift ;;
+      --quality) quality=1; shift ;;
       --sarif) sarif=1; shift ;;
       --rules) configs+=(--config "${2:?--rules needs a directory}"); shift 2 ;;
       --) shift; paths+=("$@"); break ;;
@@ -151,16 +213,27 @@ cmd_scan() {
       *) paths+=("$1"); shift ;;
     esac
   done
-  [[ ${#configs[@]} -gt 0 ]] || configs=(--config "$RULES_DIR")
+  if [[ ${#configs[@]} -eq 0 ]]; then
+    local root
+    root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    if [[ $quality -eq 0 && -f "$root/$AWL_CONFIG" ]]; then
+      echo "awl is enabled here ($AWL_CONFIG); skipping gimlet's quality and architecture rules, which awl covers (--quality runs them)" >&2
+      configs=(--config "$RULES_DIR/gitlab" --config "$RULES_DIR/gimlet/security")
+    else
+      configs=(--config "$RULES_DIR")
+    fi
+  fi
   [[ $audit -eq 1 ]] && configs+=(--config "$AUDIT_RULES_DIR")
   [[ ${#paths[@]} -gt 0 ]] || paths=(.)
 
-  local og out args
+  local og dir out args
+  ensure_opengrep
   og="$(opengrep_bin)"
-  mkdir -p "$GIMLET_RESULTS_DIR"
-  out="$GIMLET_RESULTS_DIR/results.json"
+  dir="$(results_dir)"
+  mkdir -p "$dir"
+  out="$dir/results.json"
   args=(scan "${configs[@]}" --no-rewrite-rule-ids --json-output="$out" --max-lines-per-finding=3)
-  [[ $sarif -eq 1 ]] && args+=(--sarif-output "$GIMLET_RESULTS_DIR/results.sarif")
+  [[ $sarif -eq 1 ]] && args+=(--sarif-output "$dir/results.sarif")
   [[ -n "$baseline" ]] && args+=(--baseline-commit "$baseline")
 
   # Exit status 1 means findings were reported; anything higher is an opengrep failure.
@@ -171,7 +244,9 @@ cmd_scan() {
 }
 
 cmd_test() {
-  local og rc=0; og="$(opengrep_bin)"
+  local og rc=0
+  ensure_opengrep
+  og="$(opengrep_bin)"
   "$og" scan --test "$RULES_DIR" || rc=$?
   "$og" scan --test "$AUDIT_RULES_DIR" || rc=$?
   return $rc
@@ -181,7 +256,7 @@ main() {
   local cmd="${1:-}"; shift || true
   case "$cmd" in
     install) cmd_install "$@" ;;
-    update) cmd_update "$@" ;;
+    update) cmd_update ;;
     version) cmd_version ;;
     scan) cmd_scan "$@" ;;
     test) cmd_test ;;

@@ -1,0 +1,76 @@
+rules:
+- id: gimlet.security.command-injection-csharp
+  message: |
+    Process launch reached by a value derived from the HTTP request.
+    An attacker can inject shell metacharacters. Fix by using
+    `ProcessStartInfo` with `ArgumentList` (each arg as its own
+    element — no shell parsing), and leave `UseShellExecute = false`.
+    Never concatenate request values into `Arguments` or the
+    command-line string passed to `Process.Start`.
+  severity: ERROR
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - pattern: $REQ.Query[...]
+  - pattern: $REQ.Form[...]
+  - pattern: $REQ.Headers[...]
+  - pattern: $REQ.Cookies[...]
+  - pattern: $REQ.RouteValues[...]
+  - pattern: $REQ.QueryString[...]
+  - pattern: $REQ.Params[...]
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - pattern: Process.Start($X)
+  - pattern: Process.Start($X, $Y)
+  - pattern: Process.Start(new ProcessStartInfo($X))
+  - pattern: Process.Start(new ProcessStartInfo($X, $Y))
+  - pattern: |
+      new ProcessStartInfo { ..., Arguments = $X, ... }
+  - pattern: |
+      $PSI.Arguments = $X;
+  pattern-sanitizers:
+  - pattern: Regex.Replace($X, ...)
+  - pattern: $ENC.Escape($X)
+  metadata:
+    category: security
+    cwe: CWE-78
+    owasp:
+    - A03:2021 — Injection
+    confidence: high
+    source: CWE-78 — OS Command Injection (taint-tracked)
+- id: gimlet.security.command-injection-processstartinfo-useshell
+  message: |
+    ProcessStartInfo.UseShellExecute = true routes the command through
+    the OS shell parser. Set UseShellExecute = false and use
+    ArgumentList so arguments bypass shell parsing.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern: |
+    new ProcessStartInfo { ..., UseShellExecute = true, ... }
+  metadata:
+    category: security
+    cwe: CWE-78
+    owasp:
+    - A03:2021 — Injection
+    confidence: low
+    source: .NET docs — ProcessStartInfo.UseShellExecute

@@ -1,0 +1,64 @@
+rules:
+- id: gimlet.security.validate-input-false-csharp
+  message: |
+    [ValidateInput(false)] disables ASP.NET request validation for
+    this action — any `<script>` or attribute payload in query/form
+    values is accepted verbatim. Unless every downstream use HTML-
+    encodes the value (Razor `@` does this by default; `@Html.Raw`
+    does not), the endpoint is XSS-shaped. Remove the attribute or
+    pair it with explicit encoding on every render path.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-regex: \[\s*(System\.Web\.Mvc\.)?ValidateInput\s*\(\s*false\s*\)\s*\]
+  metadata:
+    category: security
+    cwe: CWE-20
+    owasp:
+    - A03:2021 — Injection
+    confidence: medium
+    source: Microsoft docs — ValidateInputAttribute
+- id: gimlet.security.request-unvalidated-csharp
+  message: |
+    Request.Unvalidated bypasses ASP.NET request validation on a
+    specific access — the returned value may contain script markup.
+    Either validate/encode at every use site, or reshape the
+    endpoint to not need unvalidated input (e.g., accept a typed
+    model and rely on Razor auto-encoding).
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: Request.Unvalidated[$X]
+    - pattern: Request.Unvalidated.Form[$X]
+    - pattern: Request.Unvalidated.QueryString[$X]
+    - pattern: HttpContext.Request.Unvalidated[$X]
+    - pattern: HttpContext.Request.Unvalidated.Form[$X]
+    - pattern: HttpContext.Request.Unvalidated.QueryString[$X]
+  metadata:
+    category: security
+    cwe: CWE-20
+    owasp:
+    - A03:2021 — Injection
+    confidence: high
+    source: Microsoft docs — UnvalidatedRequestValues
+- id: gimlet.security.allow-html-attribute-csharp
+  message: |
+    [AllowHtml] on a model property disables request validation for
+    that property, admitting `<script>` and attribute payloads. Only
+    apply to fields that flow through a sanitizing pipeline (HtmlAgility
+    pack, AntiXSS, or server-side DOMPurify) before being rendered.
+    If the field is free-text user bio or similar, consider storing
+    it encoded and decoding only at render time.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-regex: \[\s*(System\.Web\.Mvc\.)?AllowHtml\s*\]
+  metadata:
+    category: security
+    cwe: CWE-20
+    owasp:
+    - A03:2021 — Injection
+    confidence: medium
+    source: Microsoft docs — AllowHtmlAttribute

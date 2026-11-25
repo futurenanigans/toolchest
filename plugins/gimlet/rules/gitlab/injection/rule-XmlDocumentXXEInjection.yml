@@ -6,20 +6,29 @@ rules:
 - id: "csharp_injection_rule-XmlDocumentXXEInjection"
   languages:
   - "csharp"
-  mode: "taint"
-  pattern-sinks:
-  - patterns:
-    - pattern-not-inside: |
-        (XmlDocument $DOC).XmlResolver = null;
+  patterns:
+  - pattern-either:
+    - pattern-inside: |
+        var $DOC = new XmlDocument(...);
         ...
-    - pattern-either:
-      - pattern: "(XmlDocument $DOC).Load(...);"
-      - pattern: "(XmlDocument $DOC).LoadXml(...);"
-  pattern-sources:
-  - pattern: "var $DOC = new System.Xml.XmlDocument(...);"
-  - patterns:
-    - pattern: "var $DOC = new System.Xml.XmlDocument {...};"
-    - pattern-not: "var $DOC = new System.Xml.XmlDocument {...,XmlResolver = null,...};"
+    - pattern-inside: |
+        var $DOC = new System.Xml.XmlDocument(...);
+        ...
+    - pattern-inside: |
+        var $DOC = new XmlDocument {...};
+        ...
+    - pattern-inside: |
+        var $DOC = new System.Xml.XmlDocument {...};
+        ...
+  - pattern-either:
+    - pattern: "$DOC.Load(...);"
+    - pattern: "$DOC.LoadXml(...);"
+  - pattern-not-inside: |
+      $DOC.XmlResolver = null;
+      ...
+  - pattern-not-inside: |
+      var $DOC = new $TYPE {..., XmlResolver = null, ...};
+      ...
   message: |
     External XML entities are a feature of XML parsers that allow documents to contain references
     to

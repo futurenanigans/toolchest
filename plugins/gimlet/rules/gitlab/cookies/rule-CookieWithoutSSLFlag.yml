@@ -6,14 +6,13 @@ rules:
 - id: "csharp_cookies_rule-CookieWithoutSSLFlag"
   languages:
   - "csharp"
-  mode: "taint"
-  pattern-sources:
-  - pattern: |
+  patterns:
+  - pattern: "var $COOKIE = new HttpCookie(...);"
+  - pattern-not: "var $COOKIE = new HttpCookie(...) {..., Secure = true, ...};"
+  - pattern-not-inside: |
       var $COOKIE = new HttpCookie(...);
-  pattern-sinks:
-  - pattern: "$COOKIE"
-  pattern-sanitizers:
-  - pattern: "$COOKIE.Secure = true;"
+      ...
+      $COOKIE.Secure = true;
   message: |
     The `Secure` attribute when set to `true` protects the cookie value from being being
     transmitted over clear text
