@@ -25,6 +25,15 @@
       "description": "Local Agent Monitor: advisory checks on edits and deletions with per-check correction counts, a status line, a /guard-stats pane, and a git fetch at session start"
     },
     {
+      "name": "loom",
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/futurenanigans/loom-dist/releases/download/v0.1.0-alpha.1/loom-plugin-0.1.0-alpha.1.zip",
+        "sha256": "9be98ff1efdb89741f8f7a226b763c80661de0fd2f21fa85693890345ec59316"
+      },
+      "description": "TypeScript, JavaScript and Vue analysis on every edit (alpha, linux-x64 only). Carries its own Bun runtime and engine"
+    },
+    {
       "name": "memory",
       "source": "./plugins/memory",
       "description": "Consolidate Claude memory files"
