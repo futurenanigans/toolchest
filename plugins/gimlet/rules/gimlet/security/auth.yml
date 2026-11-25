@@ -59,6 +59,10 @@ rules:
       new TokenValidationParameters { ..., ValidateIssuerSigningKey = false, ... }
   - pattern: |
       new TokenValidationParameters { ..., ValidateIssuer = false, ..., ValidateAudience = false, ... }
+  - pattern: |
+      $OPTS.RequireSignedTokens = false;
+  - pattern: |
+      $OPTS.ValidateIssuerSigningKey = false;
   metadata:
     category: security
     cwe: CWE-287

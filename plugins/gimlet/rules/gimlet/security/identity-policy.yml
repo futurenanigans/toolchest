@@ -1,0 +1,73 @@
+rules:
+- id: gimlet.security.identity-lockout-disabled-csharp
+  message: |
+    Account lockout is turned off for this sign-in path, so an attacker
+    can guess passwords without limit. Pass lockoutOnFailure: true to
+    PasswordSignInAsync and CheckPasswordSignInAsync, and keep
+    Lockout.AllowedForNewUsers set to true.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: "$SIM.PasswordSignInAsync(..., lockoutOnFailure: false)"
+  - pattern: $SIM.PasswordSignInAsync($U, $P, $PERSIST, false)
+  - pattern: "$SIM.CheckPasswordSignInAsync(..., lockoutOnFailure: false)"
+  - pattern: $SIM.CheckPasswordSignInAsync($U, $P, false)
+  - pattern: $O.Lockout.AllowedForNewUsers = false
+  metadata:
+    category: security
+    cwe: CWE-307
+    owasp:
+    - "A07:2025 Authentication Failures"
+    confidence: high
+- id: gimlet.security.identity-lockout-threshold-csharp
+  message: |
+    Lockout.MaxFailedAccessAttempts is set above 10, which gives an
+    attacker many password guesses per lockout window. Set it to 10 or
+    fewer; the ASP.NET Core Identity default is 5.
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern: $O.Lockout.MaxFailedAccessAttempts = $N
+  - metavariable-comparison:
+      metavariable: $N
+      comparison: $N > 10
+  metadata:
+    category: security
+    cwe: CWE-307
+    owasp:
+    - "A07:2025 Authentication Failures"
+    confidence: high
+- id: gimlet.security.identity-weak-password-policy-csharp
+  message: |
+    The Identity password policy is weak: either the minimum length is
+    below 8, or every character class requirement is turned off in the
+    same configuration. Require at least 8 characters (NIST SP 800-63B
+    recommends allowing much longer passwords), and if complexity rules
+    are dropped, raise RequiredLength to 12 or more instead.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-either:
+  - patterns:
+    - pattern: $O.Password.RequiredLength = $N
+    - metavariable-comparison:
+        metavariable: $N
+        comparison: $N < 8
+  - patterns:
+    - pattern: $O.Password.RequireDigit = false;
+    - pattern-inside: |
+        $X => { ... $O.Password.RequireNonAlphanumeric = false; ... }
+    - pattern-inside: |
+        $X => { ... $O.Password.RequireUppercase = false; ... }
+    - pattern-inside: |
+        $X => { ... $O.Password.RequireLowercase = false; ... }
+    - pattern-not-inside: |
+        $X => { ... $O.Password.RequiredLength = $LEN; ... }
+  metadata:
+    category: security
+    cwe: CWE-521
+    owasp:
+    - "A07:2025 Authentication Failures"
+    confidence: medium

@@ -1,0 +1,72 @@
+rules:
+- id: gimlet.security.fail-open-catch-csharp
+  message: |
+    A catch block in a validation or authorization method reports
+    success. Any exception, including one an attacker can provoke,
+    turns the check into a pass. Fail closed: return false or a
+    failure result from the catch, or rethrow, and log the exception.
+  severity: ERROR
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern-inside: |
+        $T $M(...) { ... }
+    - pattern-inside: |
+        async $T $M(...) { ... }
+  - metavariable-regex:
+      metavariable: $M
+      regex: ^(Validate|Authorize|Verify|IsValid|Check)
+  - pattern-either:
+    - pattern: |
+        try { ... } catch { ... return $R; ... }
+    - pattern: |
+        try { ... } catch ($E) { ... return $R; ... }
+    - pattern: |
+        try { ... } catch ($E $V) { ... return $R; ... }
+  - metavariable-pattern:
+      metavariable: $R
+      pattern-either:
+      - pattern: 'true'
+      - pattern: AuthorizationResult.Success()
+      - pattern: ValidationResult.Success
+  - focus-metavariable: $R
+  metadata:
+    category: security
+    cwe: CWE-636
+    owasp:
+    - "A10:2025 Mishandling of Exceptional Conditions"
+    confidence: medium
+    source: CWE-636 Not Failing Securely
+- id: gimlet.security.exception-detail-in-problem-csharp
+  message: |
+    Exception text (Message, StackTrace or ToString()) is placed in
+    ProblemDetails.Detail and sent to the client. It can reveal
+    internal paths, queries and library versions. Log the exception
+    server side and return a generic detail, or restrict this to a
+    branch guarded by IsDevelopment().
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: '$P.Detail = $EX.Message'
+    - pattern: '$P.Detail = $EX.StackTrace'
+    - pattern: '$P.Detail = $EX.ToString()'
+    - pattern: 'new ProblemDetails { ..., Detail = $EX.Message, ... }'
+    - pattern: 'new ProblemDetails { ..., Detail = $EX.StackTrace, ... }'
+    - pattern: 'new ProblemDetails { ..., Detail = $EX.ToString(), ... }'
+    - pattern: 'new ValidationProblemDetails { ..., Detail = $EX.Message, ... }'
+    - pattern: 'Results.Problem(..., detail: $EX.Message, ...)'
+    - pattern: 'Problem(..., detail: $EX.Message, ...)'
+    - pattern: 'Problem($EX.Message, ...)'
+    - pattern: 'Problem($EX.ToString(), ...)'
+  - pattern-not-inside: |
+      if (<... $E.IsDevelopment() ...>) { ... }
+  metadata:
+    category: security
+    cwe: CWE-209
+    owasp:
+    - "A10:2025 Mishandling of Exceptional Conditions"
+    confidence: medium
+    source: CWE-209 Generation of Error Message Containing Sensitive Information

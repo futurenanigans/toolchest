@@ -1,0 +1,56 @@
+rules:
+- id: gimlet.security.pbkdf2-default-iterations-csharp
+  message: |
+    Rfc2898DeriveBytes is constructed without an iteration count and hash
+    algorithm, so it falls back to 1000 iterations of HMAC-SHA1, which is far
+    too cheap to resist offline password guessing. Use the static
+    Rfc2898DeriveBytes.Pbkdf2 with HashAlgorithmName.SHA256 and at least
+    600000 iterations, or a dedicated password hasher such as
+    PasswordHasher from ASP.NET Core Identity.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: new Rfc2898DeriveBytes($PASSWORD, $SALT)
+  - pattern: new Rfc2898DeriveBytes($PASSWORD, $SALT, $ITERATIONS)
+  metadata:
+    category: security
+    cwe: CWE-916
+    owasp:
+    - A04:2025 Cryptographic Failures
+    confidence: high
+    source: OWASP Password Storage Cheat Sheet, PBKDF2
+- id: gimlet.security.pbkdf2-low-iterations-csharp
+  message: |
+    PBKDF2 is called with a literal iteration count below the OWASP minimum
+    (600000 for HMAC-SHA256, 210000 for HMAC-SHA512). A low count makes
+    offline guessing of leaked password hashes cheap. Raise the iteration
+    count to at least the OWASP minimum for the chosen hash, and store the
+    count with each hash so it can be raised later.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-either:
+  - patterns:
+    - pattern-either:
+      - pattern: new Rfc2898DeriveBytes($P, $S, $N, HashAlgorithmName.SHA256)
+      - pattern: Rfc2898DeriveBytes.Pbkdf2($P, $S, $N, HashAlgorithmName.SHA256, $LEN)
+      - pattern: Rfc2898DeriveBytes.Pbkdf2($P, $S, $DEST, $N, HashAlgorithmName.SHA256)
+    - metavariable-comparison:
+        metavariable: $N
+        comparison: $N < 600000
+  - patterns:
+    - pattern-either:
+      - pattern: new Rfc2898DeriveBytes($P, $S, $N, HashAlgorithmName.SHA512)
+      - pattern: Rfc2898DeriveBytes.Pbkdf2($P, $S, $N, HashAlgorithmName.SHA512, $LEN)
+      - pattern: Rfc2898DeriveBytes.Pbkdf2($P, $S, $DEST, $N, HashAlgorithmName.SHA512)
+    - metavariable-comparison:
+        metavariable: $N
+        comparison: $N < 210000
+  metadata:
+    category: security
+    cwe: CWE-916
+    owasp:
+    - A04:2025 Cryptographic Failures
+    confidence: high
+    source: OWASP Password Storage Cheat Sheet, PBKDF2

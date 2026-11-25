@@ -1,0 +1,55 @@
+rules:
+- id: gimlet.security.cleartext-metadata-csharp
+  message: |
+    RequireHttpsMetadata = false lets the JwtBearer or OpenIdConnect handler
+    fetch the authority's discovery document and signing keys over plain
+    HTTP. A network attacker can substitute their own signing keys and
+    issue tokens the application accepts. Leave RequireHttpsMetadata at its
+    default of true, and only relax it inside an env.IsDevelopment() check.
+  severity: ERROR
+  languages:
+  - csharp
+  patterns:
+  - pattern: $OPTIONS.RequireHttpsMetadata = false
+  - pattern-not-inside: |
+      if (<... $ENV.IsDevelopment() ...>) { ... }
+  - pattern-not-inside: |
+      $OPTIONS.RequireHttpsMetadata = !$ENV.IsDevelopment()
+  metadata:
+    category: security
+    cwe: CWE-319
+    owasp:
+    - A04:2025 Cryptographic Failures
+    confidence: high
+    source: Microsoft docs, JwtBearerOptions.RequireHttpsMetadata
+- id: gimlet.security.cleartext-http-endpoint-csharp
+  message: |
+    An http:// URL is used for an outbound request. Traffic to it, including
+    credentials, tokens and response data, travels in cleartext and can be
+    read or altered by anyone on the network path. Use an https:// URL, and
+    keep endpoint addresses in configuration so each environment can set
+    its own.
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: new Uri("$URL", ...)
+    - pattern: $CLIENT.BaseAddress = new Uri("$URL", ...)
+    - pattern: $CLIENT.GetAsync("$URL", ...)
+    - pattern: $CLIENT.PostAsync("$URL", ...)
+    - pattern: $CLIENT.PutAsync("$URL", ...)
+    - pattern: $CLIENT.DeleteAsync("$URL", ...)
+    - pattern: $CLIENT.GetStringAsync("$URL", ...)
+    - pattern: $CLIENT.GetFromJsonAsync<$T>("$URL", ...)
+    - pattern: $CLIENT.PostAsJsonAsync("$URL", ...)
+  - metavariable-regex:
+      metavariable: $URL
+      regex: ^http://(?!(localhost|127\.0\.0\.1|\[::1\]|\*|\+|0\.0\.0\.0)([:/]|$))
+  metadata:
+    category: security
+    cwe: CWE-319
+    owasp:
+    - A04:2025 Cryptographic Failures
+    confidence: medium
+    source: OWASP Transport Layer Security Cheat Sheet

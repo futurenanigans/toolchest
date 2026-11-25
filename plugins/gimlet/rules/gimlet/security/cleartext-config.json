@@ -1,0 +1,18 @@
+{
+  "Partner": {
+    // ruleid: gimlet.security.appsettings-http-endpoint
+    "BaseUrl": "http://api.partner.example.com/",
+    // ruleid: gimlet.security.appsettings-http-endpoint
+    "TokenEndpoint": "http://login.partner.example.com/connect/token",
+    // ruleid: gimlet.security.appsettings-http-endpoint
+    "WebhookUri": "http://10.0.4.12:8080/hooks"
+  },
+  "Local": {
+    // ok: gimlet.security.appsettings-http-endpoint
+    "HealthUrl": "http://localhost:5000/health",
+    // ok: gimlet.security.appsettings-http-endpoint
+    "MetricsEndpoint": "http://127.0.0.1:9090/metrics",
+    // ok: gimlet.security.appsettings-http-endpoint
+    "BillingUrl": "https://billing.example.com/"
+  }
+}

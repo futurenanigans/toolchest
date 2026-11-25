@@ -1,0 +1,20 @@
+rules:
+- id: gimlet.security.appsettings-http-endpoint
+  message: |
+    A *Url or *Endpoint key in appsettings*.json points at an http:// address
+    other than localhost. Requests to it travel in cleartext and can be read
+    or altered by anyone on the network path. Use an https:// URL.
+  severity: WARNING
+  languages:
+  - generic
+  paths:
+    include:
+    - appsettings*.json
+  pattern-regex: '"\w*(Url|URL|Uri|Endpoint)"\s*:\s*"http://(?!(localhost|127\.0\.0\.1|\[::1\]|\*|\+|0\.0\.0\.0)([:/"]))[^"]*"'
+  metadata:
+    category: security
+    cwe: CWE-319
+    owasp:
+    - A04:2025 Cryptographic Failures
+    confidence: medium
+    source: OWASP Transport Layer Security Cheat Sheet

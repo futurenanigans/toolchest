@@ -1,0 +1,57 @@
+rules:
+- id: gimlet.security.upload-filename-path-csharp
+  message: |
+    The client-supplied IFormFile.FileName is used to build a storage path.
+    The name can contain directory separators, ".." segments or an absolute
+    path, and its extension is chosen by the uploader. Store the file under a
+    server-generated name such as Path.GetRandomFileName(), or take
+    Path.GetFileName of the upload and check its extension against an
+    allow-list before using it.
+  severity: ERROR
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., IFormFile $F, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] IFormFile $F, ...) {...}
+      - pattern-inside: |
+          foreach (var $F in $FILES) {...}
+      - pattern-inside: |
+          foreach (IFormFile $F in $FILES) {...}
+      - pattern-inside: (..., IFormFile $F, ...) => {...}
+    - pattern: $F.FileName
+  - pattern: $REQ.Form.Files[...].FileName
+  pattern-sinks:
+  - pattern: Path.Combine(...)
+  - pattern: File.Create($X, ...)
+  - pattern: File.OpenWrite($X)
+  - pattern: System.IO.File.Create($X, ...)
+  - pattern: System.IO.File.OpenWrite($X)
+  - pattern: new FileStream($X, ...)
+  pattern-sanitizers:
+  - patterns:
+    - pattern-inside: |
+        if (<... $ALLOW.Contains($EXT, ...) ...>) {...}
+    - pattern: $EXT
+  - patterns:
+    - pattern-inside: |
+        if (!<... $ALLOW.Contains($EXT, ...) ...>) { ... }
+        ...
+    - pattern: $EXT
+  - patterns:
+    - pattern-inside: |
+        if (<... $ALLOW.Contains(Path.GetExtension($N), ...) ...>) {...}
+    - pattern: $N
+  - patterns:
+    - pattern-inside: |
+        if (!<... $ALLOW.Contains(Path.GetExtension($N), ...) ...>) { ... }
+        ...
+    - pattern: $N
+  metadata:
+    category: security
+    cwe: CWE-22
+    owasp:
+    - A01:2025 Broken Access Control
+    confidence: medium

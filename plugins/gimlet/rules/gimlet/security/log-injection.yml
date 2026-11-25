@@ -1,0 +1,94 @@
+rules:
+- id: gimlet.security.log-injection-csharp
+  message: |
+    A value from the HTTP request is concatenated or interpolated into
+    a log message template. An attacker can forge log lines with
+    newlines or inject template placeholders. Keep the template
+    constant and pass the value as a structured argument, for example
+    _logger.LogInformation("User {Name} signed in", name).
+  severity: WARNING
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - patterns:
+    - pattern-either:
+      - pattern: $REQ.Query[...]
+      - pattern: $REQ.Form[...]
+      - pattern: $REQ.Headers[...]
+      - pattern: $REQ.Cookies[...]
+      - pattern: $REQ.RouteValues[...]
+    - metavariable-regex:
+        metavariable: $REQ
+        regex: ^(req|request|httpRequest|Request|HttpRequest|_req|context|ctx)$
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - patterns:
+    - pattern-either:
+      - pattern: $LOG.$METHOD($MSG, ...)
+      - pattern: $LOG.$METHOD($EX, $MSG, ...)
+      - pattern: $LOG.$METHOD($EVT, $EX, $MSG, ...)
+    - metavariable-regex:
+        metavariable: $METHOD
+        regex: ^(Log(Trace|Debug|Information|Warning|Error|Critical)|Verbose|Debug|Information|Warning|Error|Fatal|Trace|Info|Warn)$
+    - metavariable-pattern:
+        metavariable: $MSG
+        pattern-either:
+        - pattern: $A + $B
+        - pattern: $"..."
+        - pattern: string.Format(...)
+    - focus-metavariable: $MSG
+  metadata:
+    category: security
+    cwe: CWE-117
+    owasp:
+    - "A09:2025 Security Logging and Alerting Failures"
+    confidence: high
+    source: CWE-117 Improper Output Neutralization for Logs
+- id: gimlet.security.log-template-not-constant-csharp
+  message: |
+    The log message template is built at runtime by concatenation,
+    interpolation or string.Format. This defeats structured logging,
+    allocates on every call and lets any embedded data be read as
+    template placeholders or forged log lines. Use a constant template
+    with named placeholders and pass values as arguments, or define the
+    message once with LoggerMessage.Define.
+  severity: INFO
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: $LOG.$METHOD($MSG, ...)
+    - pattern: $LOG.$METHOD($EX, $MSG, ...)
+    - pattern: $LOG.$METHOD($EVT, $EX, $MSG, ...)
+  - metavariable-regex:
+      metavariable: $LOG
+      regex: ^(_?[lL]ogger|_?[lL]og|Log|logger|_logger|log)$
+  - metavariable-regex:
+      metavariable: $METHOD
+      regex: ^(Log(Trace|Debug|Information|Warning|Error|Critical)|Verbose|Debug|Information|Warning|Error|Fatal|Trace|Info|Warn)$
+  - metavariable-pattern:
+      metavariable: $MSG
+      pattern-either:
+      - pattern: $A + $B
+      - pattern: $"..."
+      - pattern: string.Format(...)
+  - focus-metavariable: $MSG
+  metadata:
+    category: security
+    cwe: CWE-117
+    owasp:
+    - "A09:2025 Security Logging and Alerting Failures"
+    confidence: medium
+    source: Microsoft docs, Logging in .NET, log message template

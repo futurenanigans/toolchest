@@ -1,0 +1,19 @@
+rules:
+- id: gimlet.security.jwt-symmetric-key-literal-csharp
+  message: |
+    The JWT signing key is a string literal compiled into the assembly.
+    Anyone with the source or the binary can forge tokens. Load the key
+    from configuration backed by a secret store such as Azure Key Vault,
+    or sign with a certificate or asymmetric key.
+  severity: ERROR
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: new SymmetricSecurityKey(Encoding.$ENC.GetBytes("..."))
+  - pattern: new SymmetricSecurityKey(Convert.FromBase64String("..."))
+  metadata:
+    category: security
+    cwe: CWE-798
+    owasp:
+    - "A07:2025 Authentication Failures"
+    confidence: high

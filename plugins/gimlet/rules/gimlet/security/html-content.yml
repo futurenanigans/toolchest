@@ -1,0 +1,54 @@
+rules:
+- id: gimlet.security.htmlstring-tainted-csharp
+  message: |
+    HTTP request data is wrapped in HtmlString or written raw into an
+    IHtmlContent builder, which renders it without encoding and allows XSS.
+    Encode the value with HtmlEncoder.Default.Encode first, or use Append so
+    the builder encodes it.
+  severity: ERROR
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - pattern: $REQ.Query[...]
+  - pattern: $REQ.Form[...]
+  - pattern: $REQ.Headers[...]
+  - pattern: $REQ.Cookies[...]
+  - pattern: $REQ.RouteValues[...]
+  - pattern: $REQ.QueryString[...]
+  - pattern: $REQ.Params[...]
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - pattern: new HtmlString($X)
+  - pattern: $B.AppendHtml($X)
+  - pattern: $B.SetHtmlContent($X)
+  - pattern: $B.AppendHtmlLine($X)
+  - pattern: $B.InnerHtml.AppendHtml($X)
+  - pattern: $B.InnerHtml.SetHtmlContent($X)
+  pattern-sanitizers:
+  - pattern: HtmlEncoder.Default.Encode(...)
+  - pattern: $ENC.Encode(...)
+  metadata:
+    category: security
+    cwe: CWE-79
+    owasp:
+    - A05:2025 Injection
+    confidence: high

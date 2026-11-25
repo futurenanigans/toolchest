@@ -44,6 +44,16 @@ public class JwtConfigExamples
         };
     }
 
+    public void ConfigureByAssignment(TokenValidationParameters tvp)
+    {
+        // ruleid: gimlet.security.auth-jwt-skip-signature-validation-csharp
+        tvp.RequireSignedTokens = false;
+        // ruleid: gimlet.security.auth-jwt-skip-signature-validation-csharp
+        tvp.ValidateIssuerSigningKey = false;
+        // ok: gimlet.security.auth-jwt-skip-signature-validation-csharp
+        tvp.RequireSignedTokens = true;
+    }
+
     public TokenValidationParameters Safe()
     {
         // ok: gimlet.security.auth-jwt-skip-signature-validation-csharp

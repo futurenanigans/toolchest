@@ -1,0 +1,54 @@
+rules:
+- id: gimlet.security.crypto-key-literal-csharp
+  message: |
+    A cryptographic key is built from a string or byte-array literal in
+    source code. Anyone with the repository or the compiled assembly can
+    recover the key and decrypt or forge data. Load the key from a key
+    store (Azure Key Vault, AWS KMS, Data Protection) or configuration
+    backed by a secrets manager, or generate it with RandomNumberGenerator.
+  severity: ERROR
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: $ALG.Key = Encoding.$ENC.GetBytes("...")
+  - pattern: $ALG.Key = new byte[] { ... }
+  - pattern: $ALG.Key = new byte[$N] { ... }
+  - pattern: new AesGcm(new byte[] { ... }, ...)
+  - pattern: new AesGcm(Encoding.$ENC.GetBytes("..."), ...)
+  - pattern: new AesCcm(new byte[] { ... })
+  - pattern: new AesCcm(Encoding.$ENC.GetBytes("..."))
+  - pattern: new ChaCha20Poly1305(new byte[] { ... })
+  - pattern: new ChaCha20Poly1305(Encoding.$ENC.GetBytes("..."))
+  - pattern: new $HMAC(Encoding.$ENC.GetBytes("..."))
+  - pattern: new $HMAC(new byte[] { ... })
+  - pattern: new SymmetricSecurityKey(Encoding.$ENC.GetBytes("..."))
+  metadata:
+    category: security
+    cwe: CWE-321
+    owasp:
+    - A04:2025 Cryptographic Failures
+    confidence: high
+    source: OWASP Cryptographic Storage Cheat Sheet, Key Management
+- id: gimlet.security.crypto-static-iv-csharp
+  message: |
+    The cipher IV is set to a fixed byte array, so every message encrypted
+    with the same key reuses the same IV. With CBC this leaks equality of
+    plaintext prefixes, and with CTR or GCM it breaks confidentiality
+    outright. Call GenerateIV() or fill the IV with
+    RandomNumberGenerator.GetBytes for each message and store it alongside
+    the ciphertext.
+  severity: ERROR
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: $ALG.IV = new byte[$N]
+  - pattern: $ALG.IV = new byte[] { ... }
+  - pattern: $ALG.IV = new byte[$N] { ... }
+  - pattern: $ALG.IV = Encoding.$ENC.GetBytes("...")
+  metadata:
+    category: security
+    cwe: CWE-329
+    owasp:
+    - A04:2025 Cryptographic Failures
+    confidence: high
+    source: OWASP Cryptographic Storage Cheat Sheet, Cipher Modes

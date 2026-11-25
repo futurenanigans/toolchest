@@ -1,0 +1,23 @@
+rules:
+- id: gimlet.security.nuget-http-source
+  message: |
+    A NuGet package source uses plain http://, so packages and metadata are
+    downloaded without transport security and can be replaced in transit.
+    Use an https:// feed URL, or a local folder path.
+  severity: ERROR
+  languages:
+  - generic
+  paths:
+    include:
+    - nuget.config
+    - NuGet.config
+    - NuGet.Config
+    - nuget-sources.config
+  pattern-regex: <add\s[^>]*value\s*=\s*["']http://[^"']*["']
+  metadata:
+    category: security
+    cwe: CWE-494
+    owasp:
+    - A08:2025 Software or Data Integrity Failures
+    confidence: high
+    source: Microsoft docs, nuget.config reference, packageSources

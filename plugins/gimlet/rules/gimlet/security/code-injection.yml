@@ -1,0 +1,158 @@
+rules:
+- id: gimlet.security.script-code-injection-csharp
+  message: |
+    Roslyn scripting compiles and runs a script built from HTTP request data,
+    which lets a caller execute arbitrary C# on the server. Do not evaluate
+    request data as code; map the input to a fixed set of precompiled
+    operations instead.
+  severity: ERROR
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - pattern: $REQ.Query[...]
+  - pattern: $REQ.Form[...]
+  - pattern: $REQ.Headers[...]
+  - pattern: $REQ.Cookies[...]
+  - pattern: $REQ.RouteValues[...]
+  - pattern: $REQ.QueryString[...]
+  - pattern: $REQ.Params[...]
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - pattern: CSharpScript.EvaluateAsync($X, ...)
+  - pattern: CSharpScript.EvaluateAsync<$T>($X, ...)
+  - pattern: CSharpScript.RunAsync($X, ...)
+  - pattern: CSharpScript.RunAsync<$T>($X, ...)
+  - pattern: CSharpScript.Create($X, ...)
+  - pattern: CSharpScript.Create<$T>($X, ...)
+  metadata:
+    category: security
+    cwe: CWE-94
+    owasp:
+    - A05:2025 Injection
+    confidence: high
+- id: gimlet.security.unsafe-reflection-csharp
+  message: |
+    A type or assembly is resolved from HTTP request data, so a caller can load
+    and instantiate any type the process can reach. Look the name up in a fixed
+    dictionary of allowed types and use the mapped Type instead of passing the
+    request value to reflection.
+  severity: WARNING
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - pattern: $REQ.Query[...]
+  - pattern: $REQ.Form[...]
+  - pattern: $REQ.Headers[...]
+  - pattern: $REQ.Cookies[...]
+  - pattern: $REQ.RouteValues[...]
+  - pattern: $REQ.QueryString[...]
+  - pattern: $REQ.Params[...]
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - patterns:
+    - pattern: Type.GetType($X, ...)
+    - pattern-not-inside: new XmlSerializer(...)
+  - pattern: Assembly.Load($X)
+  - pattern: Assembly.LoadFrom($X)
+  - pattern: Assembly.LoadFrom($X, ...)
+  - pattern: Assembly.LoadFile($X)
+  - pattern: Assembly.LoadWithPartialName($X)
+  - pattern: Activator.CreateInstance((string $X), ...)
+  - pattern: Activator.CreateInstance($A, (string $X), ...)
+  pattern-sanitizers:
+  - pattern: $ALLOW.TryGetValue(...)
+  - patterns:
+    - pattern: $ALLOW[$K]
+    - metavariable-regex:
+        metavariable: $ALLOW
+        regex: (?i)(allow|known|permitted|registry)
+  metadata:
+    category: security
+    cwe: CWE-470
+    owasp:
+    - A05:2025 Injection
+    confidence: medium
+- id: gimlet.security.xmlserializer-type-injection-csharp
+  message: |
+    XmlSerializer is constructed for a type named by HTTP request data, so a
+    caller chooses which type is deserialized and can reach gadget types.
+    Construct the serializer from typeof(...) for the expected type.
+  severity: ERROR
+  languages:
+  - csharp
+  mode: taint
+  pattern-sources:
+  - pattern: $REQ.Query[...]
+  - pattern: $REQ.Form[...]
+  - pattern: $REQ.Headers[...]
+  - pattern: $REQ.Cookies[...]
+  - pattern: $REQ.RouteValues[...]
+  - pattern: $REQ.QueryString[...]
+  - pattern: $REQ.Params[...]
+  - patterns:
+    - pattern-either:
+      - pattern-inside: $T $M(..., [FromQuery] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromRoute] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromBody] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromForm] $PT $X, ...) {...}
+      - pattern-inside: $T $M(..., [FromHeader] $PT $X, ...) {...}
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => { ... }
+      - pattern-inside: (..., [FromQuery] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromRoute] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromBody] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromForm] $PT $X, ...) => $E
+      - pattern-inside: (..., [FromHeader] $PT $X, ...) => $E
+    - focus-metavariable: $X
+    - pattern: $X
+  pattern-sinks:
+  - patterns:
+    - pattern-inside: new XmlSerializer(Type.GetType($X, ...), ...)
+    - pattern: $X
+  metadata:
+    category: security
+    cwe: CWE-502
+    owasp:
+    - A05:2025 Injection
+    confidence: high

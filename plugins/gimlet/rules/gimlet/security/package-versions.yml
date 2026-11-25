@@ -1,0 +1,22 @@
+rules:
+- id: gimlet.security.floating-package-version
+  message: |
+    A package reference uses a floating version (such as * or 1.*), so each
+    restore can pull a different, unreviewed release, including a
+    compromised one. Pin an exact version, or a bounded range, and update it
+    deliberately; enable lock files with RestorePackagesWithLockFile.
+  severity: WARNING
+  languages:
+  - generic
+  paths:
+    include:
+    - '*.csproj'
+    - Directory.Packages.props
+  pattern-regex: <Package(?:Reference|Version)\s[^>]*(?:Version|VersionOverride)\s*=\s*["'][^"']*\*[^"']*["']
+  metadata:
+    category: security
+    cwe: CWE-829
+    owasp:
+    - A08:2025 Software or Data Integrity Failures
+    confidence: high
+    source: Microsoft docs, NuGet package versioning, floating versions

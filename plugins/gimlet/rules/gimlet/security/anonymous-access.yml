@@ -1,0 +1,34 @@
+rules:
+- id: gimlet.security.allow-anonymous-state-change-csharp
+  message: |
+    $METHOD is a state-changing action marked [AllowAnonymous], so any
+    unauthenticated caller can invoke it and the controller's [Authorize]
+    no longer applies. Remove [AllowAnonymous] and require an authorization
+    policy. Only sign-in, sign-up and similar credential endpoints should
+    accept anonymous writes.
+  severity: WARNING
+  languages:
+  - csharp
+  patterns:
+  - pattern-either:
+    - pattern: |
+        [AllowAnonymous]
+        [$HTTPMETHOD]
+        $TR $METHOD(...) { ... }
+    - pattern: |
+        [AllowAnonymous]
+        [$HTTPMETHOD(...)]
+        $TR $METHOD(...) { ... }
+  - metavariable-regex:
+      metavariable: $HTTPMETHOD
+      regex: ^Http(Post|Put|Patch|Delete)$
+  - metavariable-regex:
+      metavariable: $METHOD
+      regex: (?i)^(?!.*(log_?in|log_?on|sign_?in|sign_?up|register|logout|log_?off|sign_?out|forgot_?password|reset_?password|confirm_?email|refresh_?token|token|external_?login|verify)).*$
+  - focus-metavariable: $METHOD
+  metadata:
+    category: security
+    cwe: CWE-862
+    owasp:
+    - A01:2025 Broken Access Control
+    confidence: medium

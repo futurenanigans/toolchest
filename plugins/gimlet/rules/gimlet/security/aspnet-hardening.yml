@@ -1,0 +1,63 @@
+rules:
+- id: gimlet.security.forwarded-headers-trust-all-csharp
+  message: |
+    ForwardedHeadersOptions clears both KnownNetworks and KnownProxies, so
+    X-Forwarded-For and X-Forwarded-Proto are accepted from any caller. A
+    client can then spoof its IP address and request scheme, defeating IP
+    allow lists, rate limits and HTTPS checks. Add the addresses of your
+    actual proxies to KnownProxies or KnownNetworks instead of clearing them.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: |
+      $O.KnownNetworks.Clear();
+      ...
+      $O.KnownProxies.Clear();
+  - pattern: |
+      $O.KnownProxies.Clear();
+      ...
+      $O.KnownNetworks.Clear();
+  metadata:
+    category: security
+    cwe: CWE-348
+    owasp:
+    - A02:2025 Security Misconfiguration
+    confidence: high
+    source: Microsoft docs, Configure ASP.NET Core to work with proxy servers and load balancers
+- id: gimlet.security.cookie-secure-policy-csharp
+  message: |
+    The cookie SecurePolicy is set to None or SameAsRequest, so the cookie
+    can be sent over plain HTTP where it may be intercepted. Set
+    Cookie.SecurePolicy to CookieSecurePolicy.Always for authentication,
+    session and antiforgery cookies.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern-either:
+  - pattern: $O.Cookie.SecurePolicy = CookieSecurePolicy.None
+  - pattern: $O.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest
+  metadata:
+    category: security
+    cwe: CWE-614
+    owasp:
+    - A02:2025 Security Misconfiguration
+    confidence: high
+    source: Microsoft docs, CookieBuilder.SecurePolicy
+- id: gimlet.security.antiforgery-frame-header-off-csharp
+  message: |
+    AntiforgeryOptions.SuppressXFrameOptionsHeader = true stops ASP.NET Core
+    from sending X-Frame-Options: SAMEORIGIN with antiforgery responses, which
+    leaves forms open to clickjacking. Leave it at the default (false), or
+    send an equivalent frame-ancestors Content-Security-Policy yourself.
+  severity: WARNING
+  languages:
+  - csharp
+  pattern: $O.SuppressXFrameOptionsHeader = true
+  metadata:
+    category: security
+    cwe: CWE-1021
+    owasp:
+    - A02:2025 Security Misconfiguration
+    confidence: medium
+    source: Microsoft docs, AntiforgeryOptions.SuppressXFrameOptionsHeader
