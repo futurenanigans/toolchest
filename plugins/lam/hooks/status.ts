@@ -39,8 +39,12 @@ function clockTime(epochMs: number): string {
 }
 
 async function git($: Engine, cwd: string, args: readonly string[]): Promise<string | null> {
-  const { exitCode, stdout } = await $.process.run(['git', '-C', cwd, '--no-optional-locks', ...args])
-  return exitCode === 0 ? stdout.trim() : null
+  try {
+    const { exitCode, stdout } = await $.process.run(['git', '-C', cwd, '--no-optional-locks', ...args])
+    return exitCode === 0 ? stdout.trim() : null
+  } catch {
+    return null
+  }
 }
 
 export async function fetchRemotes($: Engine, cwd: string): Promise<string | null> {

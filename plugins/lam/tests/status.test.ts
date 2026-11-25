@@ -71,3 +71,11 @@ test('context is measured against the compaction window when auto-compaction is 
   await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
   expect((await statusRow($)).text).toMatch(/ctx 13%$/)
 })
+
+test('a missing git binary leaves the session running with the directory name and no fetch section', async ($, on) => {
+  stubEngine(on, { gitMissing: true })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  const { sections } = await $.prompt.compose(COMPOSE)
+  expect(sections.map(s => s.id)).toEqual(['intro'])
+  expect((await statusRow($)).text).toContain('widget')
+})

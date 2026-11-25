@@ -52,3 +52,13 @@ test('a .NET Tests suffix is matched case-sensitively', () => {
   expect(looksLikeTestFile('src/MyApp.UnitTests/Foo.cs')).toBe(true)
   expect(looksLikeTestFile('src/Contest.cs')).toBe(false)
 })
+
+test('README guidance denied on the first edit still comes on the next one', async ($, on) => {
+  stubEngine(on, { files: { '/repo/README.md': '# Old\n' }, denyFirstCall: 'not allowed' })
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const denied = await $.tool.call({ tool: 'Edit', file_path: '/repo/README.md', old_string: '# Old', new_string: '# New' })
+  const allowed = await $.tool.call({ tool: 'Edit', file_path: '/repo/README.md', old_string: '# Old', new_string: '# New' })
+  expect(denied.deny).toBe('not allowed')
+  expect(allowed.context?.join('')).toContain('README guidance')
+})

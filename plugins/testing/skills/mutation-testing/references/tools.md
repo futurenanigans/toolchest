@@ -77,7 +77,7 @@ Chunking: a `mutate` glob or line range per chunk. With a test runner Stryker ha
 Reading survivors from the JSON report:
 
 ```sh
-jq -r '.files[] | .mutants[] | select(.status != "Killed") | "\(.mutatorName) L\(.location.start.line) -> \(.replacement)"' reports/mutation/mutation.json
+jq -r '.files | to_entries[] | .key as $file | .value.mutants[] | select(.status == "Survived" or .status == "NoCoverage") | "\($file):\(.location.start.line) \(.status) \(.mutatorName) -> \(.replacement)"' reports/mutation/mutation.json
 ```
 
 Disabling, for equivalent or arid code only: `// Stryker disable next-line <Mutator>: <reason>`.

@@ -40,7 +40,6 @@ async function checkInput($: Engine, e: ToolCallInput): Promise<CheckInput | nul
   const oldString = stringField(e, 'old_string') ?? ''
   const regionStart = tool === 'Edit' ? onDisk.indexOf(oldString) : -1
   const isFirstReadmeEdit = tool === 'Edit' && isReadme(filePath) && (await $.state.get(readmeGuided)).value !== true
-  if (isFirstReadmeEdit) await $.state.set(readmeGuided, true)
 
   return {
     tool,
@@ -100,6 +99,7 @@ export const register: Register = on => {
 
     const ran = await next(e)
     if (ran.deny !== undefined) return ran
+    if (input?.isFirstReadmeEdit) await $.state.set(readmeGuided, true)
     return { ...ran, context: [...(ran.context ?? []), advice.map(a => a.message).join('\n\n')] }
   })
 

@@ -6,7 +6,7 @@ disable-model-invocation: true
 argument-hint: "<next goal for the fresh session (required)>"
 arguments: [goal]
 effort: high
-allowed-tools: Read, Glob, Grep, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git rev-parse:*), Bash(git stash list:*), Edit(/.claude/handover/*), AskUserQuestion
+allowed-tools: Read, Glob, Grep, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git rev-parse:*), Bash(git stash list:*), Write(/.claude/handover/*), Edit(/.claude/handover/*), Edit(/.gitignore), AskUserQuestion
 ---
 
 # Handover

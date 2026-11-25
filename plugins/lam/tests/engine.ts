@@ -6,9 +6,9 @@ export const CWD = '/repo/widget'
 type On = Parameters<TestBody>[1]
 type TestEngine = Parameters<TestBody>[0]
 type GitOutput = { exitCode: number; stdout?: string; stderr?: string }
-export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; denial?: string; contextTokens?: number; contextWindow?: number; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number } }
+export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; denial?: string; denyFirstCall?: string; gitMissing?: boolean; contextTokens?: number; contextWindow?: number; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number } }
 
-export function stubEngine(on: On, { git = {}, files = {}, denial, contextTokens = 234_000, contextWindow = 1_000_000, compaction }: EngineSetup = {}): void {
+export function stubEngine(on: On, { git = {}, files = {}, denial, denyFirstCall, gitMissing = false, contextTokens = 234_000, contextWindow = 1_000_000, compaction }: EngineSetup = {}): void {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('command.register', () => ({ value: { command: 'guard-stats' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -27,6 +27,7 @@ export function stubEngine(on: On, { git = {}, files = {}, denial, contextTokens
   })
   on('clock.now', () => ({ value: Date.UTC(2026, 10, 25, 9, 30, 0) }))
   on('process.run', (_, e) => {
+    if (gitMissing) throw new Error('spawn git ENOENT')
     const key = e.argv.filter(arg => !arg.startsWith('-') && arg !== 'git' && arg !== CWD)[0] ?? ''
     const out = git[key] ?? { exitCode: 0 }
     return { value: { exitCode: out.exitCode, stdout: out.stdout ?? '', stderr: out.stderr ?? '', isStdoutTruncated: false, isStderrTruncated: false } }
@@ -34,7 +35,11 @@ export function stubEngine(on: On, { git = {}, files = {}, denial, contextTokens
   on('fs.exists', (_, e) => ({ value: e.path in files }))
   on('fs.stat', () => ({ value: { kind: 'file', size: 1, mtimeMs: 0, isLink: false } }))
   on('fs.read', (_, e) => ({ value: files[e.path] ?? '' }))
-  on('tool.call', () => (denial === undefined ? { result: {} } : { deny: denial }))
+  let toolCalls = 0
+  on('tool.call', () => {
+    const deny = toolCalls++ === 0 ? (denyFirstCall ?? denial) : denial
+    return deny === undefined ? { result: {} } : { deny }
+  })
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'engine intro', scope: 'shared' }] }))
   on('turn.complete', () => ({ text: '' }))
 }

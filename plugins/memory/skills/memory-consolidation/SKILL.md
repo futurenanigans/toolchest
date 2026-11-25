@@ -21,7 +21,7 @@ Without `--apply` the run ends at the report. With `--apply` it continues to the
 
 ## Read the store
 
-For each store, read `MEMORY.md` and every memory file in full. Record for each file its `name`, its type (`user`, `feedback`, `project` or `reference`), the `modified` date in its frontmatter, and the `[[links]]` it carries.
+For each store, read `MEMORY.md` and every memory file in full. Record for each file its `name` and `description`, its type (`metadata.type` in the frontmatter: `user`, `feedback`, `project` or `reference`), its last modification time on disk, and the `[[links]]` in its body, if any. A file missing `name`, `description` or `metadata.type` is a structural finding.
 
 Then check the store's own consistency:
 
