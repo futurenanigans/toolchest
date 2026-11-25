@@ -22,3 +22,11 @@ jobs:
           for plugin in plugins/*/; do claude plugin validate "$plugin"; done
       - name: Test lam
         run: claude plugin test plugins/lam
+      - name: Test the prose linter
+        run: node --test 'plugins/writing/bin/*.test.mjs'
+      - name: Lint the repository's Markdown
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          node plugins/writing/bin/prose-lint.mjs --format github --min-severity warning \
+            README.md claude-md/*.md plugins/*/README.md plugins/*/skills/**/*.md

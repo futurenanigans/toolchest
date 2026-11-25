@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: pr-description-file
+tags: [writing-style, pr]
+context:
+  scaffold_script: place-files.sh
+expected_outcome: |
+  PR_BODY.md describes the min-length branch: what it adds and why, in a few sentences,
+  with verification as one sentence naming what ran. It does not open with "This PR", has
+  no Summary/Changes/Testing headings or checkbox lists, and no em or en dashes.

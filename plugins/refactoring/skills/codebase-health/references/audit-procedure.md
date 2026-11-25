@@ -18,9 +18,11 @@ Scan in the main context only when the scope is a single file or a handful of fi
 
 ## Report state
 
-Each run writes a fresh scan to the skill's report path under `.claude/state/`, overwriting the previous report. With the mutation flag, scan first, then act on the fresh findings. Reusing an old report risks acting on stale findings, and re-scanning is cheap compared to changing code on a stale one.
+Each run writes a fresh scan to the skill's report path under `.claude/state/`, overwriting the previous report and its statuses. With the mutation flag, scan first, then act on the fresh findings. Reusing an old report risks acting on stale findings, and re-scanning is cheap compared to changing code on a stale one.
 
-If the user explicitly asks to skip re-scanning and act on the existing report, honor that, and state that actions are grounded in the report as written rather than in current code.
+The exception is a report with unfinished findings (any `pending`, `in_progress` or `halted`) at the skill's report path when the mutation flag is passed: the run resumes it, as "Resume" below describes, instead of re-scanning. A fresh scan would discard the record of what was already applied. Resume re-verifies each remaining finding against the code at HEAD, so the actions rest on current code. If the user asks for a fresh scan, scan and overwrite.
+
+If the user explicitly asks to skip re-scanning and act on the existing report without re-verifying, honor that, and state that actions are grounded in the report as written rather than in current code.
 
 ## Report format
 
@@ -46,6 +48,8 @@ scope: <path argument, or "." for whole project>
 ### {n}. {title}
 
 {Classification}: {value} | Severity: {High|Medium|Low} | Effort: {Small|Medium|Large}
+
+Status: pending
 
 **What:** {the problem, in one or two sentences}
 
@@ -80,11 +84,12 @@ Rules that hold across skills:
 - Severity and effort values are spelled exactly `High`, `Medium`, `Low` and `Small`, `Medium`, `Large`. Each skill defines what its levels mean.
 - Separate the header line and every labeled field with a blank line, so each renders as its own paragraph.
 - Every finding has at least one `file:line` or `path/` under Evidence.
+- Every finding has a status line. The scan writes `pending`; the mutation run updates it as "Finding status" below describes. A skill whose findings are table rows carries the status in a `Status` column.
 - Headings are sentence case. Omit an optional section entirely when it would be empty.
 
 When the report is written, reply in chat with the report path and the Summary section. Do not paste the full report.
 
-After a mutation run, reply with one line per finding acted on: its number and title, then its outcome (done, skipped with the reason, or halted with the failure). Finish with the build and test result the last commit rests on.
+After a mutation run, reply with one line per finding acted on: its number and title, then its status (done with the commit, skipped with the reason, or halted with the failure). Then give the count per status across the whole report, and finish with the build and test result the last commit rests on.
 
 ## External context (`--context <path>`)
 
@@ -99,6 +104,24 @@ Applies under the skill's mutation flag (`--fix`, `--improve`, `--formalize`, `-
 3. For each finding, dispatch a single-purpose subagent with the finding embedded in its prompt, following the skill's per-finding instructions. The prompt tells the subagent to read `${CLAUDE_SKILL_DIR}/../code-organization/SKILL.md` and `${CLAUDE_SKILL_DIR}/../inline-defect-prevention/SKILL.md` before writing code, with the paths expanded, because a subagent does not load those skills on its own.
 4. After each finding, run build and tests in the main context. Commit if passing, staging the files the finding changed and never `.claude/state/`. A failure stops further work so the user can intervene.
 
+### Finding status
+
+The main context writes each status to the report under `.claude/state/` as it happens, so a halted run or a new session can tell what was applied. The report is never committed.
+
+- `pending`: not yet acted on.
+- `in_progress`: written before the finding's subagent is dispatched.
+- `done <short sha>`: written after the finding's commit succeeds, never before.
+- `skipped: <reason>`: not acted on (leave alone, quarantined, waiting on confirmation, no longer present at HEAD).
+- `halted: <failure summary>`: the build or tests failed after the finding; work stopped there.
+
+### Resume
+
+Invoking the mutation flag when the report has unfinished findings resumes it. A cherry-pick limits the resume to those numbers.
+
+1. Run the pre-flight. A finding left `in_progress` may have a partial edit on disk: if the tree is dirty, stop, name the finding and the dirty files, and ask the user to commit, stash or discard. Do not finish or revert a partial edit on a guess.
+2. Re-verify each remaining finding against the code on disk at HEAD, `in_progress` first, then `halted`, then `pending`. The report's `commit` may be older than HEAD. A finding the code no longer shows becomes `skipped: no longer present at <short sha>`; this covers an `in_progress` finding whose commit landed before its status was written. A finding whose evidence moved is updated in place.
+3. Collect a fresh test baseline and continue from step 3 above with the findings that remain.
+
 ## `--auto`
 
-Scan, then dispatch every actionable finding in single-purpose subagents without user review, following the global subagent orchestration rules (parallel agents edit, the orchestrator verifies, no worktrees here, halt on failure). Specific to audits: group findings by the files they touch, so findings on disjoint files form one parallel batch and findings sharing a file run in sequence, and commit once per passing batch.
+Scan, then dispatch every actionable finding in single-purpose subagents without user review, following the global subagent orchestration rules (parallel agents edit, the orchestrator verifies, no worktrees here, halt on failure). Specific to audits: group findings by the files they touch, so findings on disjoint files form one parallel batch and findings sharing a file run in sequence, and commit once per passing batch. Statuses follow "Finding status" per batch: every finding in the batch is set `in_progress` before dispatch, `done` with the batch's commit after it succeeds, and `halted` on failure. A resumed `--auto` run re-verifies as "Resume" describes and rebuilds the batches from what remains.

@@ -48,5 +48,6 @@ After the report is written (under `--auto`, or after user confirmation otherwis
 - Remove orphaned fields, imports, helper methods, and setup or teardown code left behind.
 - Run the full test suite; every remaining test must still pass.
 - Commit the removal with a message stating the noise count and category breakdown.
+- Record statuses in the report's `Status` column as the audit procedure's "Finding status" describes, treating the removal as one batch: `in_progress` before deleting, `done <short sha>` after the commit succeeds.
 
-If the suite fails after deletions, something classified as noise was load-bearing. Stop, restore the deleted code, and re-examine the report before retrying.
+If the suite fails after deletions, something classified as noise was load-bearing. Stop, restore the deleted code, mark the batch `halted` with the failure, and re-examine the report before retrying.

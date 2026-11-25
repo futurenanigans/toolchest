@@ -14,6 +14,13 @@ What it asks for:
 - Commit and PR bodies that explain why in a few sentences, without a "This PR" opener or a Summary/Changes/Testing scaffold.
 - A why that names a property of the code (an invariant, a failure mode, a limit) instead of where the request came from.
 
+The plugin also runs the mechanical part of these rules. A PostToolUse hook checks each file Claude writes or edits for em-dashes and en-dashes and tells Claude which lines to fix; it never blocks the edit. `bin/prose-lint.mjs` (Node 22, no dependencies) lints Markdown files, or a commit or PR body with `--stdin --scope commit`, against the rules in `rules.json`, skipping fenced code, inline code and front matter. It prints `--format text` or `--format github` annotations, filters with `--min-severity`, and exits 1 only on an error-severity hit, so vocabulary hits never fail a run. In a repository, `.writing/allow.txt` lists rule ids or words to drop and `.writing/stoplist.txt` adds words to warn on, one per line.
+
+```sh
+node plugins/writing/bin/prose-lint.mjs --min-severity warning README.md docs/*.md
+git log -1 --format=%B | node plugins/writing/bin/prose-lint.mjs --stdin --scope commit
+```
+
 It also carries a vocabulary warning list and limits on editing prose someone else wrote. Allowed text is changed only when it is false or breaks the rules, and only in code the task already reaches. A requested sweep is the exception.
 
 ## The comments skill

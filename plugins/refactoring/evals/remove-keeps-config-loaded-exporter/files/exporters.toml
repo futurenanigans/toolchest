@@ -1,0 +1,3 @@
+# Exporters the CLI loads at startup, as module:function names.
+[exporters]
+csv = "shipper.exporters:export_csv"

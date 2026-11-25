@@ -97,7 +97,7 @@ Each finding's subagent:
 3. Checks again inside the files it touched. A removal exposes the next layer, so repeat until nothing newly unreferenced remains.
 4. Leaves live code alone. A signature that only dead code needed is narrowed; nothing else is refactored.
 
-After each finding, the build must pass with no new warnings and every test that survives must pass as it did at baseline. A failure means something was alive: restore the finding's files, move it to Possible with the failure as the mechanism, and continue with the next finding. Each passing finding gets its own commit, under `--auto` too in place of the shared one commit per batch, so one removal can be reverted alone.
+After each finding, the build must pass with no new warnings and every test that survives must pass as it did at baseline. A failure means something was alive: restore the finding's files, move it to Possible with the failure as the mechanism, set its status to `skipped: alive, <failure>` in place of `halted`, and continue with the next finding. Each passing finding gets its own commit, under `--auto` too in place of the shared one commit per batch, so one removal can be reverted alone; its status records that commit.
 
 ## `--auto`
 

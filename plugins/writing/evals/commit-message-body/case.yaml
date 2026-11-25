@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: commit-message-body
+tags: [writing-style, commit]
+context:
+  scaffold_script: place-files.sh
+expected_outcome: |
+  The staged change adds --min-length to tally. The commit subject says what changed; a
+  body, if any, says why in plain prose. The message does not open with "This PR",
+  "This commit" or "This change", has no Summary/Changes/Testing scaffold or checkboxes,
+  no em or en dashes, and does not walk the diff line by line.

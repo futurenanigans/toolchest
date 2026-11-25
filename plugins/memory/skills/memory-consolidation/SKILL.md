@@ -21,10 +21,11 @@ Without `--apply` the run ends at the report. With `--apply` it continues to the
 
 ## Read the store
 
-For each store, read `MEMORY.md` and every memory file in full. Record for each file its `name` and `description`, its type (`metadata.type` in the frontmatter: `user`, `feedback`, `project` or `reference`), its last modification time on disk, and the `[[links]]` in its body, if any. A file missing `name`, `description` or `metadata.type` is a structural finding.
+For each store, read `MEMORY.md` and every memory file in full. `.MEMORY.md.prev` and the `memory-backup-*.tgz` archives are this skill's own copies; skip them. Record for each file its `name` and `description`, its type (`metadata.type` in the frontmatter: `user`, `feedback`, `project` or `reference`), its last modification time on disk, and the `[[links]]` in its body, if any. A file missing `name`, `description` or `metadata.type` is a structural finding.
 
 Then check the store's own consistency:
 
+- `MEMORY.md` fits what loads at session start: the first 200 lines or 25KB, whichever comes first (Claude Code memory docs). Report its line count and bytes; an index past either limit is a finding, because lines beyond it never reach the model;
 - every file has an index line, and every index line names a file that exists;
 - no index line carries memory content beyond its one-line hook;
 - every `[[link]]` names a memory that exists, or is listed as a dangling link;
@@ -34,7 +35,7 @@ Then check the store's own consistency:
 
 A memory is judged against what is true now, never against how recent it is. Age alone is not a reason to delete; a two-year-old preference is as binding as the day it was stated.
 
-1. **Check what it names.** A file, command, flag, configuration key, branch or tool named in the memory is looked up on disk. What no longer exists makes the memory stale in that part.
+1. **Check what it names.** A file, command, flag, configuration key, branch or tool named in the memory is looked up on disk. What no longer exists makes the memory stale in that part. Classify each reference's scope first: a path under `~`, an absolute path outside the project, a URL, or something in another repository cannot be checked from this project, so it is unverified, never stale.
 2. **Check its dates.** A memory with an end date (a discount, a deadline, a temporary constraint) is compared with today. Past the date, the memory has either expired or turned into its follow-up action; say which.
 3. **Check it against the standing instructions.** Read the global `CLAUDE.md`, the project's `CLAUDE.md` or `AGENTS.md`, and any rule or skill covering the same ground. A memory those files already state is a duplicate. A memory they contradict is a conflict for the user to settle, never something to resolve silently.
 4. **Check it against its neighbours.** Two memories that say the same thing, or one that supersedes another, are a merge. Check sibling stores too when a project has several (a parent directory and its repositories), since the same fact is often saved in each.
@@ -72,6 +73,6 @@ Do not list the **Keep** memories. Their count is enough.
 2. Confirm before changing anything, in one question that lists them all: every **Delete**, every **Promote** (it edits instruction files other sessions load), and every **Update** or **Merge** that touches a `feedback` memory or a caution. What the user declines stays as it is.
 3. Apply every **Update** and **Merge** the user did not decline. A merged memory keeps the survivor's file name, carries every still-true detail of both, and the absorbed file is removed.
 4. Apply each confirmed **Delete**. For a **Promote**, write the rule into its destination in that file's own style, then delete the memory. A fact that lives in two places drifts.
-5. Rewrite `MEMORY.md` to match the files: one line per memory, in the form `- [Title](file.md)` followed by a short hook, no content beyond that, and no line for a file that is gone. Fix or remove dangling `[[links]]`.
+5. Copy `MEMORY.md` to `.MEMORY.md.prev` in the same directory, then rewrite `MEMORY.md` to match the files: one line per memory, in the form `- [Title](file.md)` followed by a short hook, no content beyond that, and no line for a file that is gone. Fix or remove dangling `[[links]]`. If the index would still exceed 200 lines or 25KB, shorten hooks first, then propose merges; never drop an index line for a file that stays.
 
 Finish with one line per store: what was updated, merged, promoted and deleted, and where the backup is.

@@ -94,8 +94,8 @@ After each finding, rerun only that finding's mutants with the tool's narrowest 
 
 Never clear a survivor by skipping it. A skip attribute, a disable comment or a new exclusion is allowed only for a mutant classified as equivalent or arid, with the reason beside it.
 
-When every finding in a chunk is addressed, mark the plan row `addressed` with the rerun's counts.
+Finding statuses and resuming an unfinished report follow the audit procedure's Mutation section; re-verifying a remaining finding means checking its mutated lines are still in the code at HEAD. When every finding in a chunk is `done` or `skipped`, mark the plan row `addressed` with the rerun's counts.
 
 ## `--auto`
 
-Runs `--chunk next`, then addresses its findings, then stops. It does not continue to the following chunk; each chunk is a separate invocation so its cost is a separate decision.
+Runs `--chunk next`, then addresses its findings, then stops. If the current report still has unfinished findings, it resumes those instead and does not start a chunk. It does not continue to the following chunk; each chunk is a separate invocation so its cost is a separate decision.

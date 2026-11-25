@@ -23,7 +23,7 @@ Setup runs the unmodified tests once to get a baseline time, and stops if they f
 
 The plan lives in `.claude/state/mutation-plan.md` and the latest report in `.claude/state/mutation-report.md`. Survivors are rerun against the wider fast pool before they count, then grouped by behaviour, so several mutants in one function usually become one finding. Equivalent and arid mutants are listed as dismissed with a reason. The score is recorded once and never compared to a target.
 
-Under `--address`, the working tree outside `.claude/state/` must be clean. A subagent writes one test per finding at the unit's public surface, the finding's mutants are rerun to confirm they die, the build and tests run, and each passing finding is committed. Survivors are never cleared by adding a skip.
+Under `--address`, the working tree outside `.claude/state/` must be clean. A subagent writes one test per finding at the unit's public surface, the finding's mutants are rerun to confirm they die, the build and tests run, and each passing finding is committed. Each finding's status (`pending`, `in_progress`, `done` with its commit, `skipped`, `halted`) is kept in the report, so running `--address` again after a halt resumes with the findings still open, re-checked against the current code. Survivors are never cleared by adding a skip.
 
 The skill is on demand only. It never becomes a pre-commit step, a CI gate or part of the default test command.
 

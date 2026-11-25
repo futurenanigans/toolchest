@@ -1,0 +1,8 @@
+[project]
+name = "tally"
+version = "0.3.0"
+description = "Count word frequencies in text files"
+requires-python = ">=3.11"
+
+[project.scripts]
+tally = "tally.cli:main"

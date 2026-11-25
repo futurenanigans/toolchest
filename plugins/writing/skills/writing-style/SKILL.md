@@ -22,17 +22,18 @@ This skill is what artifacts need on top of the always-on response rules, and it
 
 No em-dashes, not one, in a file created or edited: comments, docstrings, Markdown, commit bodies, PR descriptions. Use a period, a colon, a semicolon, or parentheses, and prefer two shorter sentences. Cut en-dashes too: an en-dash used as a connector and a parenthetical dash pair are the same habit in a different coat. A hyphen in a compound word is fine; a numeric range takes "to". Accepting slightly worse English is the right trade.
 
-Nothing checks this at write time, so grep every file the change touched before reporting the work done. The check is silent: a clean result gets no mention in the completion report, the same as every other rule in this skill. Speak only when a file does not match these rules, and then say what is off and offer to clean it up. Pre-existing violations in lines the change did not touch get the same treatment: name them and offer, never fix uninvited.
+A PostToolUse hook in this plugin reports dash lines in each file Claude writes or edits, as advice it never blocks on. That covers only Claude's own edits, so before reporting the work done run `node ${CLAUDE_SKILL_DIR}/../../bin/prose-lint.mjs <files>` over every Markdown file the change touched, and pipe commit and PR bodies through it with `--stdin --scope commit`. For code files, grep the touched files for dashes. The check is silent: a clean result gets no mention in the completion report, the same as every other rule in this skill. Speak only when a file does not match these rules, and then say what is off and offer to clean it up. Pre-existing violations in lines the change did not touch get the same treatment: name them and offer, never fix uninvited.
 
 ## Greppable checks
 
-These rules in this skill are mechanical enough to grep alongside the dash check, over the same files, with the same silence on a clean result:
+These rules are mechanical, and `prose-lint.mjs` runs them alongside the dash check, over the same files, with the same silence on a clean result. Its rules live in `${CLAUDE_SKILL_DIR}/../../rules.json`; it masks fenced code, inline code and front matter, and exits 1 only on an error-severity rule. A project can drop a rule id or vocabulary word by listing it in `.writing/allow.txt`, and add its own warning words in `.writing/stoplist.txt`. For comments and docstrings in code, grep for the same patterns:
 
 - Provenance offered as a why, in comments and docstrings: `as requested`, `per the requirements`, `to fix the (failing )?test`, `ticket \d+`, `from the review`, `we discussed`.
 - Change history and block markers in comments: a comment starting with `Added`, `Removed`, `Changed`, `Updated`, `Fixed`, or an `end if` / `end of` marker.
 - Markdown structure: emoji anywhere in a heading or bullet, a `---` rule used as a separator, a heading in Title Case, a bullet opening with a bold phrase and a colon.
 - Commit and PR bodies: a body starting `This PR`, `This commit`, `This change`, or a `## Summary` / `## Changes` / `## Testing` scaffold with `- [ ]` checkboxes.
-- The vocabulary warning list below, as a word-boundary alternation. A hit here is a prompt to reread the sentence, never a violation on its own.
+- Leaked chat output: citation markup such as `oaicite` or `contentReference`, zero-width characters, `I hope this helps` and similar reply leftovers, and sentences opening with Moreover, Furthermore or Additionally.
+- The vocabulary warning list below, reported at info severity. A hit here is a prompt to reread the sentence, never a violation on its own.
 
 The sentence-shape rules above are not reliably greppable and stay a reading pass.
 
@@ -50,7 +51,7 @@ A README or doc page written by a model is recognisable before a sentence is rea
 
 - Headings are sentence case, contain no emoji, and exist only where a reader would jump to them. A page under about 300 words has no headings.
 - No `---` separators. A blank line separates sections.
-- A bullet is one or two sentences. A bullet that opens with a bold phrase and a colon is a heading in disguise; either the list is a table, or it is prose.
+- A bullet is one or two sentences. A bullet that opens with a bold phrase and a colon is a heading in disguise; either the list is a table, or it is prose. Instruction files a model reads (`SKILL.md`, `CLAUDE.md`) are exempt: a labelled bullet there is a terse directive, and the linter skips them for this rule.
 - No boilerplate sections. "Overview", "Key features", "Getting started", "Contributing", "License" appear only when they hold something a reader of this project needs and cannot get from the code or the package manifest. An "Overview" that restates the project name and one adjective is deleted.
 - No closing summary, no "In summary", no "Happy coding".
 - Length is a budget, the same as a comment. A doc page says what the reader needs to act and stops. Do not add a page when a paragraph in an existing one will do.

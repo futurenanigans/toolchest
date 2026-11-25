@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: question-changes-no-files
+tags: [dead-code, should-not-act]
+context:
+  scaffold_script: place-files.sh
+expected_outcome: |
+  A question about what could be deleted is a scan without the mutation flag. The answer
+  names export_fixed_width and _pad_grams as removable, says export_csv is live through
+  exporters.toml, and no file under shipper/, tests/ or exporters.toml changes. Writing the
+  report under .claude/state/ is allowed.

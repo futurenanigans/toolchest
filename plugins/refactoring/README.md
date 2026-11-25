@@ -35,7 +35,7 @@ Every audit follows one shared procedure, kept in `skills/codebase-health/refere
 
 The scan reads the current files only. It never uses `git diff`, `git log`, `git show` or `git blame` to decide what a finding is. Git is used for `rev-parse` (to record the commit in the report), `status` (the pre-flight check), and `add` and `commit` under a mutation flag, plus `git mv` in `architecture-scan` and `git restore` in `dead-code` to undo a failed removal.
 
-A general-purpose subagent runs the scan so the reading stays out of your main context. It writes the report and returns only the path and the summary, which is what you see in chat. For a single file or a handful of files the scan runs in the main context instead. Each run overwrites the previous report, and a mutation run always scans fresh first unless you explicitly ask to act on the existing report.
+A general-purpose subagent runs the scan so the reading stays out of your main context. It writes the report and returns only the path and the summary, which is what you see in chat. For a single file or a handful of files the scan runs in the main context instead. Each run overwrites the previous report, and a mutation run scans fresh first unless the report has unfinished findings to resume or you explicitly ask to act on the existing report.
 
 Each report opens with a summary naming the finding to act on first, then numbers its findings, each with severity, effort and `file:line` evidence.
 
@@ -47,8 +47,9 @@ Add the mutation flag to act on all findings, or pass numbers such as `--fix [1,
 2. Claude records the test baseline. Every test passing now must still pass afterwards.
 3. Each finding goes to its own subagent, which is told to read the plugin's two convention skills before writing code.
 4. After each finding, Claude runs the build and tests. A pass is committed, staging only that finding's files and never `.claude/state/`. A failure stops the run so you can step in.
+5. Claude records each finding's status in the report (`pending`, `in_progress`, `done` with its commit, `skipped`, `halted`). The report stays under `.claude/state/` and is never committed. Running the mutation flag again while findings are unfinished resumes: Claude re-checks each remaining finding against the current code, drops those already gone, and continues. The final reply gives the count per status.
 
-With `--auto`, Claude skips your review of the report and dispatches every actionable finding. Findings on disjoint files run as a parallel batch, findings that share a file run in sequence, and each passing batch gets one commit.
+With `--auto`, Claude skips your review of the report and dispatches every actionable finding. Findings on disjoint files run as a parallel batch, findings that share a file run in sequence, and each passing batch gets one commit and records its status the same way.
 
 ## Agents
 
@@ -70,3 +71,7 @@ The plugin ships two skills that apply while writing code in any language.
 | `inline-defect-prevention` | Defect shapes to catch while writing: data loss paths, unvalidated input at trust boundaries, swallowed errors, resource leaks, race-prone sequences and defensive cruft. Obvious fixes are made silently; design choices are flagged for you. |
 
 Claude loads each from its description before writing code or placing files, or you can run `/refactoring:code-organization` and `/refactoring:inline-defect-prevention` directly. The audit skills also name their paths in subagent prompts, since a subagent does not load them on its own.
+
+## Evals
+
+`evals/` holds cases for `dead-code` in the `claude plugin eval` format. A small Python CLI loads one exporter by name from `exporters.toml` and has a second exporter nothing reaches; the cases check that a scan without `--remove` reports the dead one and changes no file, that `--remove` deletes it and its helper while keeping the config-loaded one, and that a published library's public function survives `--remove` while a private dead helper goes. Fixtures come from `place-files.sh` scaffolds, so run them with `claude plugin eval plugins/refactoring --scaffold` from the repo root; each run is a real agent session and costs money.

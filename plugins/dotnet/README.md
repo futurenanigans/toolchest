@@ -44,3 +44,7 @@ License restrictions are checked before any update:
 | FluentAssertions | Banned in all versions (license moved to commercial, Xceed) | Shouldly |
 
 A banned package is left at its current version and flagged in the report. If the skill finds another license change during a run, it reports the row to add to the table; it does not edit the skill itself.
+
+## Evals
+
+`evals/` holds cases for `nuget-package-update` in the `claude plugin eval` format: an outdated package that gets updated and committed, FluentAssertions left at its version and flagged, a Humanizer.Core update that breaks a test and must be reverted and left uncommitted, and a `packages.config` solution the skill must decline. Each case builds its fixture from a `place-files.sh` scaffold that also creates the git repository the graders read, so pass `--scaffold`. The three SDK-style cases need network access to nuget.org. Run them from the repo root with `claude plugin eval plugins/dotnet --scaffold`, adding `--case <name>` for one case; each run is a real agent session and costs money.
