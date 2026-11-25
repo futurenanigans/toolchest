@@ -19,6 +19,6 @@ Prefer the newer convention when both work. An existing project's consistent con
 - **Async**: no `std::sync::Mutex` guard held across `.await`, blocking work in `spawn_blocking`, a timeout on every network call.
 - **Comments**: the writing plugin's `comments` rule governs. A file opens with a `//!` module doc and items carry no `///`, except the `# Safety` section clippy requires on a public `unsafe fn`; where Mortise runs, its finding is the rule.
 
-Before reporting Rust work done, run `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings` and `cargo test`, unless the project names its own commands.
+Before reporting Rust work done, run `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings` and `cargo test`, unless the project names its own commands. Keep every change `cargo fmt --all` makes, including in files the task did not touch; a workspace that is not rustfmt-clean gets formatted, not reverted to keep the diff narrow.
 
 The `modern-rust` skill holds the full reference (the old-versus-modern table, workspace layout, lint tables, API design). Load it when scaffolding a crate or workspace, or when a convention here needs detail.

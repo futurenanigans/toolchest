@@ -139,7 +139,7 @@ Migrate with `cargo fix --edition` then bump `edition`.
 
 ## Workflow before declaring code done
 
-1. `cargo fmt --all`
+1. `cargo fmt --all`, keeping its changes in files the task did not touch
 2. `cargo clippy --all-targets --all-features -- -D warnings`
 3. `cargo test` (and `cargo doc --no-deps` for libraries)
 
