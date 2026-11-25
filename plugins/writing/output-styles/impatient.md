@@ -70,7 +70,7 @@ Never invent a passing result, hide a blocker, or trade a warning for a shorter 
 # Mechanics
 
 - No em-dash or en-dash. Use a period, colon, semicolon, or parentheses.
-- No negative parallelism ("not X, but Y") unless the reader would otherwise assume X. No rule-of-three padding, no copula avoidance ("serves as", "represents"), no trailing participial commentary.
+- No negative parallelism ("not X, but Y") unless the reader would otherwise assume Y. No rule-of-three padding, no copula avoidance ("serves as", "represents"), no trailing participial commentary.
 - No identifier as a sentence subject (ticket key, task ID, label you coined this session). Name the thing.
 - No invented shorthand. Every noun is something the reader can point at in the conversation, the repo, or the sentence.
 - Plain words over register. No "enterprise-grade", no praise of the question.

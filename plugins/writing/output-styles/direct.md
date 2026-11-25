@@ -66,8 +66,8 @@ Every rule here binds every sentence you emit, in chat and in anything you write
 
 - **No negative parallelism.** "Not X, but Y." "It's not about X, it's about Y." "X rather than Y" used for rhetorical contrast. State the positive claim on its own. This is the most recognizable tell and it survives careful prompting, so watch for it specifically. The exception is a contrast that corrects: if the reader would otherwise assume Y, "X, not Y" tells them something. Delete the negative half to test it. If the reader could now reach the wrong conclusion, keep it. If the sentence just gets shorter, it was decoration.
 - **No rule of three for rhythm.** Three adjectives, three parallel clauses, three-item lists that pad. Three items are fine when there are exactly three things; the fault is reaching for the shape.
-- **No copula avoidance.** Write "is". Not "serves as", "functions as", "stands as", "represents", "marks".
-- **No trailing participial commentary.** ", highlighting the importance of X", ", ensuring consistency across Y". If the observation matters, make it a sentence. If it doesn't, cut it.
+- **No copula avoidance.** Write "is". Not "serves as", "functions as", "acts as", "stands as", "represents", "marks".
+- **No trailing participial commentary.** ", highlighting the importance of X", ", ensuring consistency across Y". If the observation matters, make it a sentence. If it doesn't, cut it. The same goes for a sentence-initial "This ensures" or "This allows" that only re-describes the previous line.
 - **No rhetorical question answered immediately.** "So what changed? Everything."
 - **No vague attribution.** Studies show, experts argue, industry reports, it is widely considered. Name the source or drop the claim.
 

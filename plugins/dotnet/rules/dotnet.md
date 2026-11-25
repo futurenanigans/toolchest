@@ -47,7 +47,7 @@ Apply the conventions from existing knowledge rather than re-deriving them from 
 The writing plugin's `comments` rule governs `///` exactly as it governs `//`: a member carries no doc comment. The member's name and signature carry the meaning, and a constraint they cannot express goes in a type, a guard, or a test-anchored constraint comment.
 
 - Delete a member's `///` in the lines a task touches, `<inheritdoc/>` included.
-- `CS1591` as an error demands a comment on every public member. Put `CS1591` in `NoWarn` for application code and libraries alike, and keep `GenerateDocumentationFile` only where docs are packed or consumed by tooling. Say so when a project has it enabled as an error.
+- `CS1591` as an error demands a comment on every public member. Put `CS1591` in `NoWarn` for application code and libraries alike, and keep `GenerateDocumentationFile` on: build-time IDE0005 (unused usings) reports only when the documentation file is generated. Say so when a project has CS1591 enabled as an error.
 
 ## Analyzer rules that bite here
 

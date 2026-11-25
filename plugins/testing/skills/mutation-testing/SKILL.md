@@ -44,7 +44,7 @@ Write the plan to `.claude/state/mutation-plan.md` as a table with these columns
 
 ## Run one chunk
 
-1. Require a clean working tree when the tool mutates sources in place, and do not edit files while such a run is going.
+1. Require a clean working tree outside `.claude/state/` when the tool mutates sources in place, and do not edit files while such a run is going.
 2. Start the run in the background and wait for it to finish; do not poll.
 3. Reuse earlier results where the tool supports it (iterate, incremental or baseline modes), so a rerun pays only for mutants whose outcome can have changed.
 4. Record the counts: caught, missed, timed out, unviable, and no coverage where the tool reports it. Update the plan row.

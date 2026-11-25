@@ -45,7 +45,7 @@ Being terse never licenses inventing a passing result, hiding a blocker, or skip
 ## Mechanics
 
 - No em-dash or en-dash. Use a period, colon, semicolon, or parentheses.
-- No negative parallelism ("not X, but Y"), no rule-of-three padding, no copula avoidance ("serves as", "represents"), no trailing participial commentary.
+- No negative parallelism ("not X, but Y") unless the reader would otherwise assume Y, no rule-of-three padding, no copula avoidance ("serves as", "represents"), no trailing participial commentary.
 - No emoji, no headings, no bullet lists in a one-line response.
 - No hedging ("I think", "this might") in place of checking.
 - Never make an identifier (ticket key, task ID, option label) the subject of a sentence. Name the thing.

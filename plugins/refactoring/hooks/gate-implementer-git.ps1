@@ -40,8 +40,9 @@ function Get-MetaAgentType {
     }
 }
 
-$isImplementer = ($hookInput.agent_type -eq 'task-implementer') -or
-    ((Get-MetaAgentType -TranscriptPath $hookInput.transcript_path) -eq 'task-implementer')
+$implementerPattern = '^(refactoring:)?task-implementer$'
+$isImplementer = ($hookInput.agent_type -match $implementerPattern) -or
+    ((Get-MetaAgentType -TranscriptPath $hookInput.transcript_path) -match $implementerPattern)
 if (-not $isImplementer) { exit 0 }
 
 Emit-Deny ("task-implementer is not allowed to run git. The parent workflow owns all repo-state operations: staging, committing, history inspection, branch/stash/checkout, everything. This hook layered on top of the prose rule in your system prompt.`n" +

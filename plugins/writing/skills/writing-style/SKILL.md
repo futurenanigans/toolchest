@@ -20,7 +20,7 @@ This skill is what artifacts need on top of the always-on response rules, and it
 
 ## Punctuation in anything written to disk
 
-No em-dashes, not one, in a file created or edited: comments, docstrings, Markdown, commit bodies, PR descriptions. Use a period, a colon, a semicolon, or parentheses, and prefer two shorter sentences. Cut other dashes hard too: an en-dash used as a connector and a parenthetical dash pair are the same habit in a different coat. Accepting slightly worse English is the right trade.
+No em-dashes, not one, in a file created or edited: comments, docstrings, Markdown, commit bodies, PR descriptions. Use a period, a colon, a semicolon, or parentheses, and prefer two shorter sentences. Cut en-dashes too: an en-dash used as a connector and a parenthetical dash pair are the same habit in a different coat. A hyphen in a compound word is fine; a numeric range takes "to". Accepting slightly worse English is the right trade.
 
 Nothing checks this at write time, so grep every file the change touched before reporting the work done. The check is silent: a clean result gets no mention in the completion report, the same as every other rule in this skill. Speak only when a file does not match these rules, and then say what is off and offer to clean it up. Pre-existing violations in lines the change did not touch get the same treatment: name them and offer, never fix uninvited.
 

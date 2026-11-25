@@ -12,7 +12,7 @@ Parse `$ARGUMENTS` for `--auto` (remove all noise tests without per-finding revi
 
 ## Pre-flight
 
-Require a clean working tree. If dirty, stop and ask the user to commit or stash first.
+Require a clean working tree outside `.claude/state/`. If dirty, stop and ask the user to commit or stash first.
 
 ## Audit
 
