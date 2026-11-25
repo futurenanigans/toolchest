@@ -1,9 +1,0 @@
-{
-  "name": "awl",
-  "description": "Roslyn semantic analysis on every edit, enabled per repository by .awl/awl.json at the repository root",
-  "version": "0.1.0-alpha.1",
-  "author": {
-    "name": "Awl"
-  },
-  "types": "./types/index.d.ts"
-}

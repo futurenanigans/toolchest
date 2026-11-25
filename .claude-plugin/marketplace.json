@@ -7,8 +7,12 @@
   "plugins": [
     {
       "name": "awl",
-      "source": "./plugins/awl",
-      "description": "Roslyn semantic analysis on every C# edit (alpha). Needs the awl .NET tool; install steps at github.com/futurenanigans/awl-dist"
+      "source": {
+        "source": "archive",
+        "url": "https://github.com/futurenanigans/awl-dist/releases/download/v0.1.0-alpha.2/awl-plugin-0.1.0-alpha.2.zip",
+        "sha256": "090f5cfffdbb1697ceff234cd4252035ca06f51145a586338044223aa5c10a40"
+      },
+      "description": "Roslyn semantic analysis on every C# edit (alpha). Carries awl.dll and runs it with dotnet; needs the .NET 10 runtime"
     },
     {
       "name": "dotnet",
