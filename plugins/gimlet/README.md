@@ -9,7 +9,7 @@ bin/gimlet update                        # move to the latest opengrep release
 bin/gimlet test                          # rule tests against their fixtures
 ```
 
-Needs `bash`, `curl`, `jq` and `python3` with PyYAML. Linux and macOS only; opengrep ships Windows as a zip that this script does not unpack.
+Needs `bash`, `curl`, `jq`, and `git` for baseline scans. Linux and macOS only; opengrep ships Windows as a zip that this script does not unpack.
 
 Install with `/plugin install gimlet@toolchest`. Add `.gimlet/` to the `.gitignore` of a repository you scan; results land there.
 

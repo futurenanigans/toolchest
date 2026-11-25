@@ -46,4 +46,4 @@ Exit status above 1 from opengrep is a failure of the scan itself; Gimlet stops 
 
 ## Rules
 
-`gimlet rules` lists every rule id with its severity and file. The sources and licences are in `rules/*/LICENSE`. `gimlet test` runs opengrep's rule tests against the fixtures next to each rule file. To add a rule, put the YAML beside a fixture of the same base name annotated with `// ruleid: <id>` and `// ok: <id>` lines, then run `gimlet test`.
+Rule files are YAML under `rules/` and `rules-audit/`, one directory per source; grep them by id. The sources and licences are in `rules/*/LICENSE`. `gimlet test` runs opengrep's rule tests against the fixtures next to each rule file. To add a rule, put the YAML beside a fixture of the same base name annotated with `// ruleid: <id>` and `// ok: <id>` lines, then run `gimlet test`.

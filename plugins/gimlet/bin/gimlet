@@ -30,7 +30,6 @@ usage: gimlet <command> [options]
       --sarif            also write SARIF next to the JSON results
       --rules DIR        use DIR instead of the bundled rules (repeatable)
   summary [FILE]         print the summary of a results file (default: $GIMLET_RESULTS_DIR/results.json)
-  rules                  list bundled rule ids with severity and source
   test                   run opengrep's rule tests over the bundled rules and fixtures
 EOF
 }
@@ -119,7 +118,6 @@ cmd_install() (
   "$tmp/opengrep" --version >/dev/null || die "downloaded opengrep does not run on this machine"
   mkdir -p "$dest"
   mv "$tmp/opengrep" "$dest/opengrep"
-  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$dest/opengrep"; else shasum -a 256 "$dest/opengrep"; fi > "$dest/opengrep.sha256"
   ln -sfn "$dest" "$CURRENT_LINK"
   echo "installed opengrep $tag at $dest/opengrep"
 )
@@ -163,7 +161,7 @@ cmd_scan() {
   og="$(opengrep_bin)"
   mkdir -p "$GIMLET_RESULTS_DIR"
   out="$GIMLET_RESULTS_DIR/results.json"
-  args=(scan "${configs[@]}" --json --output "$out" --quiet)
+  args=(scan "${configs[@]}" --no-rewrite-rule-ids --json --output "$out" --quiet)
   [[ $sarif -eq 1 ]] && args+=(--sarif-output "$GIMLET_RESULTS_DIR/results.sarif")
   [[ -n "$baseline" ]] && args+=(--baseline-commit "$baseline")
 
@@ -174,29 +172,13 @@ cmd_scan() {
   cmd_summary "$out"
 }
 
-# JSON array of every bundled rule id. opengrep prefixes check_id with the rule file's directory
-# path (dots for slashes), so the summary maps each check_id back to the bundled id it ends with.
-rule_ids_json() {
-  need python3
-  python3 -I - "$RULES_DIR" "$AUDIT_RULES_DIR" <<'PY'
-import json, pathlib, sys, yaml
-ids = [r["id"]
-       for root in map(pathlib.Path, sys.argv[1:])
-       for f in [*root.rglob("*.yml"), *root.rglob("*.yaml")]
-       for r in (yaml.safe_load(f.read_text()) or {}).get("rules", [])]
-print(json.dumps(ids))
-PY
-}
-
 cmd_summary() {
   need jq
   local file="${1:-$GIMLET_RESULTS_DIR/results.json}"
   [[ -f "$file" ]] || die "no results file at $file; run: gimlet scan"
-  jq -r --argjson ids "$(rule_ids_json)" '
+  jq -r '
     def sev: {"ERROR":0,"WARNING":1,"INFO":2}[.extra.severity] // 3;
-    .results |= map(.check_id as $c
-      | .check_id = ([$ids[] | . as $i | select($c == $i or ($c | endswith("." + $i)))] | max_by(length) // $c))
-    | (.results | length) as $n
+    (.results | length) as $n
     | "\($n) finding(s) in \([.results[].path] | unique | length) file(s); \(.errors | length) error(s); results: \(input_filename)",
       (if $n > 0 then
         "",
@@ -210,17 +192,6 @@ cmd_summary() {
        else empty end),
       (if (.errors | length) > 0 then "", "errors:", (.errors[] | "  \(.level // "error")\t\((.type | if type == "array" then .[0] else . end) // "error")\t\(.message // "" | gsub("\n *"; " ") | .[0:200])") else empty end)
   ' "$file"
-}
-
-cmd_rules() {
-  need python3
-  python3 -I - "$RULES_DIR" "$AUDIT_RULES_DIR" <<'PY'
-import pathlib, sys, yaml
-for root in map(pathlib.Path, sys.argv[1:]):
-    for f in sorted([*root.rglob("*.yml"), *root.rglob("*.yaml")]):
-        for r in (yaml.safe_load(f.read_text()) or {}).get("rules", []):
-            print(f"{r.get('severity','?'):8} {r['id']}\t{f.relative_to(root.parent)}")
-PY
 }
 
 cmd_test() {
@@ -238,7 +209,6 @@ main() {
     version) cmd_version ;;
     scan) cmd_scan "$@" ;;
     summary) cmd_summary "$@" ;;
-    rules) cmd_rules ;;
     test) cmd_test ;;
     ""|-h|--help|help) usage ;;
     *) usage >&2; exit 2 ;;
