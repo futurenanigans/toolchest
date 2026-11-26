@@ -22,7 +22,7 @@
     {
       "name": "gimlet",
       "source": "./plugins/gimlet",
-      "description": "Opengrep runner with a bundled C#/.NET security and quality ruleset, and a skill for running scans and triaging findings. Downloads opengrep on first use; needs curl"
+      "description": "Opengrep runner with a bundled C#/.NET security ruleset, and a skill for running scans and triaging findings. Downloads opengrep on first use; needs curl"
     },
     {
       "name": "lam",

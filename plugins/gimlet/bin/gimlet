@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gimlet: installs a verified opengrep release and runs it with the bundled C#/.NET rules.
+# gimlet: installs a verified opengrep release and runs it with the bundled C#/.NET security rules.
 set -euo pipefail
 
 GIMLET_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -11,7 +11,6 @@ TOOLS_DIR="$DATA_DIR/opengrep"
 CURRENT_FILE="$TOOLS_DIR/current"
 RULES_DIR="$GIMLET_ROOT/rules"
 AUDIT_RULES_DIR="$GIMLET_ROOT/rules-audit"
-AWL_CONFIG=".awl/awl.json"
 
 die() { echo "gimlet: $*" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "required tool '$1' is not installed"; }
@@ -29,7 +28,6 @@ usage: gimlet <command> [options]
                          scan PATHs (default: .) with the bundled rules
       --baseline REF     report only findings introduced since git REF
       --audit            also run the audit rules (entrypoint inventory; noisy by design)
-      --quality          run the quality and architecture rules even where awl is enabled
       --sarif            also write SARIF next to the JSON results
       --rules DIR        use DIR instead of the bundled rules (repeatable)
   test                   run opengrep's rule tests over the bundled rules and fixtures
@@ -200,12 +198,11 @@ results_dir() {
 }
 
 cmd_scan() {
-  local baseline="" audit=0 quality=0 sarif=0 configs=() paths=()
+  local baseline="" audit=0 sarif=0 configs=() paths=()
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --baseline) baseline="${2:?--baseline needs a git ref}"; shift 2 ;;
       --audit) audit=1; shift ;;
-      --quality) quality=1; shift ;;
       --sarif) sarif=1; shift ;;
       --rules) configs+=(--config "${2:?--rules needs a directory}"); shift 2 ;;
       --) shift; paths+=("$@"); break ;;
@@ -213,16 +210,7 @@ cmd_scan() {
       *) paths+=("$1"); shift ;;
     esac
   done
-  if [[ ${#configs[@]} -eq 0 ]]; then
-    local root
-    root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-    if [[ $quality -eq 0 && -f "$root/$AWL_CONFIG" ]]; then
-      echo "awl is enabled here ($AWL_CONFIG); skipping gimlet's quality and architecture rules, which awl covers (--quality runs them)" >&2
-      configs=(--config "$RULES_DIR/gitlab" --config "$RULES_DIR/gimlet/security")
-    else
-      configs=(--config "$RULES_DIR")
-    fi
-  fi
+  [[ ${#configs[@]} -gt 0 ]] || configs=(--config "$RULES_DIR")
   [[ $audit -eq 1 ]] && configs+=(--config "$AUDIT_RULES_DIR")
   [[ ${#paths[@]} -gt 0 ]] || paths=(.)
 

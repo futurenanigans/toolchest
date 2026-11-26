@@ -1,6 +1,6 @@
 ---
 name: gimlet
-description: Run opengrep with Gimlet's bundled C#/.NET rules and triage the findings. Use when asked to scan C#, ASP.NET, Razor, web.config or appsettings files for security or quality issues, to check a branch or diff for newly introduced findings, to install or update opengrep, or to interpret a Gimlet or opengrep result.
+description: Run opengrep with Gimlet's bundled C#/.NET rules and triage the findings. Use when asked to scan C#, ASP.NET, Razor, web.config or appsettings files for security issues, to check a branch or diff for newly introduced findings, to install or update opengrep, or to interpret a Gimlet or opengrep result.
 ---
 
 # Running Gimlet
@@ -29,14 +29,11 @@ Treat every finding as a claim to verify against the code. The rules are syntact
 - **False positive**: name the fact that disproves it (the argument is a constant, the value is validated earlier, the code is test-only). Report it with that fact; do not edit the rule to hide it.
 - **Needs context**: the answer depends on deployment or configuration the code does not show. Say what would decide it.
 
-Severity reads ERROR as likely exploitable, WARNING as a weakness worth fixing, INFO as a code-quality or review pointer. Order work by severity, then by how directly user input reaches the line.
-
-Rules whose ids start with `gimlet.quality.` or `gimlet.architecture.` are code-quality checks (broad catches, swallowed errors, magic URLs, controllers using a DbContext). They overlap awl's rules, so a scan skips them in a repository with `.awl/awl.json` and says so; `--quality` runs them anyway.
+Severity reads ERROR as likely exploitable, WARNING as a weakness worth fixing, INFO as a review pointer. Order work by severity, then by how directly user input reaches the line.
 
 Known false-positive patterns:
 
 - `csharp_injection_rule-CommandInjection` fires on every `Process.Start` and `ProcessStartInfo` with a non-literal argument. A tool that launches its own child process with arguments it builds itself is not injectable; check whether any part of the file name or arguments comes from a request, config value an attacker controls, or file content.
-- `gimlet.quality.catch-general-exception-csharp` is expected at process boundaries (program entry, hook entrypoints, top-level request handlers).
 
 ## Errors in the result
 
