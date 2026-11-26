@@ -54,6 +54,11 @@
       "description": "Modern Rust reference"
     },
     {
+      "name": "review",
+      "source": "./plugins/review",
+      "description": "Pull request review with verified findings and coverage accounting"
+    },
+    {
       "name": "session",
       "source": "./plugins/session",
       "description": "Hand over and resume work across sessions"

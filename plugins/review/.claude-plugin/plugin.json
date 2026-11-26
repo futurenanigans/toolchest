@@ -1,0 +1,4 @@
+{
+  "name": "review",
+  "description": "Pull request review: resolves the diff against its merge base, builds context, verifies every finding against the code and reports coverage, without ever writing to the PR"
+}
