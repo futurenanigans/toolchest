@@ -33,8 +33,8 @@
       "name": "loom",
       "source": {
         "source": "archive",
-        "url": "https://github.com/futurenanigans/loom-dist/releases/download/v0.1.0-alpha.4/loom-plugin-0.1.0-alpha.4.zip",
-        "sha256": "ab6c85a7936659ddacc6579e59b33bb91dc58c20349efe562555434849c2d129"
+        "url": "https://github.com/futurenanigans/loom-dist/releases/download/v0.1.0-alpha.5/loom-plugin-0.1.0-alpha.5.zip",
+        "sha256": "5eb96ebc5155642920d13c0e9eb0504752fbe316c06991835791446315edbb3d"
       },
       "description": "TypeScript, JavaScript and Vue analysis on every edit (alpha, linux-x64 and windows-x64). Runs on the machine's Bun and carries its engine; needs Bun on PATH"
     },
