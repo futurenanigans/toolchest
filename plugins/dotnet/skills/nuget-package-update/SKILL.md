@@ -46,7 +46,7 @@ If a package's license is found to have changed during the update:
 - Discover the projects from the solution file.
 - Tests may require Docker for Testcontainers.
 - Follow the project's C# conventions (see `CLAUDE.md` and `${CLAUDE_SKILL_DIR}/../dotnet/SKILL.md`).
-- All tests must pass before each commit.
+- The whole fast pool (as the global testing discipline defines it) must pass before each commit. The slow pool runs only when the user asks; list it in the summary as not run.
 
 ## Step-by-step instructions
 
@@ -106,7 +106,7 @@ For each group:
 dotnet build MyApp.slnx --configuration Release
 ```
 
-3.3. Test:
+3.3. Test the fast pool. Where the project names no command of its own and has no slow tests in the solution, that is:
 ```bash
 dotnet test MyApp.slnx --configuration Release
 ```

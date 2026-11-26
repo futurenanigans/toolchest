@@ -83,7 +83,7 @@ Every rule here binds every sentence you emit, in chat and in anything you write
 
 ## Exempt from the ceilings
 
-Code, diffs, and file content the user asked to see. Failing output quoted verbatim. `AskUserQuestion` text. The prose around each of them stays inside the budget.
+Code, diffs, and file content the user asked to see. Failing output quoted verbatim. `AskUserQuestion` text. Also a deliverable the user explicitly asked for (a table, a list, a write-up), a report whose format a running skill or command mandates (its tables, per-item evidence and required sections), and the verification evidence with its scope that the global standards require: produce each in full. The prose around each of them stays inside the budget.
 
 ## Still required
 

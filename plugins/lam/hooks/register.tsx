@@ -6,8 +6,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface as Engine, PluginOptions, Register, ToolCallInput } from 'claude-code'
 
 import type { LamCounts, StatusSegment } from '../types'
-import { type CheckInput, CORRECTING_CHECKS, DELEGATIONS, adviseAll, isReadme } from '../checks'
-import { fileExtension } from '../checks/text'
+import { type CheckInput, CORRECTING_CHECKS, adviseAll, isReadme } from '../checks'
 import { fetchRemotes, statusSegments } from './status'
 
 const PANE = 'guard-stats'
@@ -61,19 +60,6 @@ async function refreshStatus($: Engine, options: PluginOptions): Promise<void> {
   await update($, status, () => segments)
 }
 
-async function delegatedChecks($: Engine, filePath: string | undefined): Promise<ReadonlySet<string>> {
-  if (filePath === undefined) return new Set()
-  const extension = fileExtension(filePath)
-  const repo = await $.session.repo()
-  if (repo === null) return new Set()
-  const skipped = new Set<string>()
-  for (const { marker, extensions, checks } of DELEGATIONS) {
-    if (!extensions.has(extension) || !(await $.fs.exists(`${repo.root}/${marker}`))) continue
-    for (const check of checks) skipped.add(check)
-  }
-  return skipped
-}
-
 export const register: Register = (on, options) => {
   let fetchOutcome: Promise<string | null> = Promise.resolve(null)
   let fetched: { outcome: string | null } | undefined = { outcome: null }
@@ -111,7 +97,7 @@ export const register: Register = (on, options) => {
 
   on('tool.call', async ($, e, next) => {
     const input = await checkInput($, e)
-    const advice = input === null ? [] : adviseAll(input, await delegatedChecks($, input.filePath))
+    const advice = input === null ? [] : adviseAll(input)
     if (advice.length === 0) return next(e)
 
     const ran = await next(e)

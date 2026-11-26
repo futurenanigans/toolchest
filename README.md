@@ -6,6 +6,25 @@ Each plugin lives under `plugins/` with its own README. Conventions that apply t
 
 The global standards are not a plugin. [`claude-md/CLAUDE.md`](claude-md/CLAUDE.md) is the user-level `CLAUDE.md` these plugins assume; copy it to `~/.claude/CLAUDE.md`. Its convention skills section maps each of those skills to the plugin that ships it.
 
+## Requirements
+
+CI validates every plugin and runs the tests with Claude Code 2.1.332; that is the tested version. What each plugin needs on `PATH`:
+
+| Plugin | Needs |
+| :- | :- |
+| `awl` | the .NET 10 runtime |
+| `dotnet` | the .NET SDK and `git`; Docker if the tests use Testcontainers |
+| `gimlet` | `bash`, `curl` and `git`; `cosign` for `gimlet update` |
+| `loom` | `bun`, on linux-x64 (glibc) or windows-x64 |
+| `refactoring` | PowerShell 7 (`pwsh`) for the hook that keeps `task-implementer` off git |
+| `rust` | a Rust toolchain with edition 2024 (1.85, or 1.88 for let-chains) |
+| `testing` | cargo-mutants, Stryker.NET or StrykerJS for the stack being mutated |
+| `writing` | Node 22 for the dash hook and `prose-lint.mjs` |
+
+`lam`, `memory` and `session` need nothing beyond Claude Code.
+
+The two analyzers are opt-in per repository. Awl does nothing until the repository has `.awl/awl.json` naming a target; `/awl:awl-enable` writes it. Loom selects its rules from `.loom/loom.json`; `/loom:working-with-loom` covers configuring it.
+
 ## Plugins
 
 | Plugin | What it does |

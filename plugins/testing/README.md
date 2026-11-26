@@ -6,7 +6,7 @@ Two skills that measure how much a test suite really protects, and one skill for
 
 Mutation testing changes one expression at a time and reruns the tests. A mutant that no test fails on marks behaviour the suite does not check. This skill runs that in chunks small enough to finish, keeps a plan you can resume across sessions, and then writes the tests the survivors call for.
 
-Run it as `/testing:mutation-testing`, or ask Claude to "run mutation testing" or "work through the surviving mutants". Claude may also pick it up on its own, since model invocation is not disabled. The argument hint is `[--plan] [--chunk <n>|next] [--diff <base>] [--address [1,3]] [--auto] [path]`.
+Run it as `/testing:mutation-testing`. Only you can start it; model invocation is disabled, because a bare invocation writes tool configuration or runs a chunk. A general question about test quality goes to `test-quality` instead. The argument hint is `[--plan] [--chunk <n>|next] [--diff <base>] [--address [1,3]] [--auto] [path]`.
 
 | Flag | What happens |
 | --- | --- |
@@ -31,7 +31,7 @@ The skill is on demand only. It never becomes a pre-commit step, a CI gate or pa
 
 Classifies passing tests as valuable or noise, where noise means removing the test would not reduce confidence in the code. It then deletes the noise. Only you can start it, with `/testing:test-noise-audit [--auto] [path]`; model invocation is disabled.
 
-It needs a clean working tree. The audit runs in a subagent and writes `.claude/state/test-noise-report.md`, with per-file tables and a list of failing, skipped or flaky tests it did not audit. Without `--auto` you review the findings and confirm before anything is removed. Then it deletes the tests and any helpers they orphan, runs the full suite, and commits with the noise count by category. If the suite fails, it restores the deleted code and stops.
+It needs a clean working tree. The audit runs in a subagent and writes `.claude/state/test-noise-report.md`, with per-file tables and a list of failing, skipped or flaky tests it did not audit. Without `--auto` you review the findings and confirm before anything is removed. Then it deletes the tests and any helpers they orphan, runs the fast test pool the global `CLAUDE.md` defines, and commits with the noise count by category. If the suite fails, it restores the deleted code and stops.
 
 ## The test-quality skill
 

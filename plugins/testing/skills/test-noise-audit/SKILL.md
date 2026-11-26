@@ -46,7 +46,7 @@ After the report is written (under `--auto`, or after user confirmation otherwis
 
 - Delete the test methods listed in the Findings tables. If every test in a class or file is noise, delete the class or file. The deletion may draw a test-deletion advisory; answer it with the finding's evidence (why the test is noise) instead of retrying.
 - Remove orphaned fields, imports, helper methods, and setup or teardown code left behind.
-- Run the full test suite; every remaining test must still pass.
+- Run the whole fast pool (as the global testing discipline defines it); every remaining test must still pass. Slow tests that cover the deleted code's area are listed for the user to run, never run as a gate.
 - Commit the removal with a message stating the noise count and category breakdown.
 - Record statuses in the report's `Status` column as the audit procedure's "Finding status" describes, treating the removal as one batch: `in_progress` before deleting, `done <short sha>` after the commit succeeds.
 

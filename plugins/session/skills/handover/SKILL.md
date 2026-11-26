@@ -33,7 +33,7 @@ The goal is the filter. Without it there is no principled way to decide what to 
 1. Look at uncommitted changes, the TODO list if present, and the most recent exchanges.
 2. Propose 2 to 3 candidate goals, each one sentence, each with what tipped it (a file, a failing test, a user remark).
 3. Ask the user to pick or state their own. Use AskUserQuestion if available; if the answer comes back empty, treat it as no answer.
-4. End the turn. Tell the user to re-invoke with `/handover <goal>`. Do not fall through to a brief.
+4. End the turn. Tell the user to re-invoke with `/session:handover <goal>`. Do not fall through to a brief.
 
 **If the goal is present:** restate it in one clean sentence without reinterpreting it. Then write a **done-when** line: the observable condition that means the goal is achieved (a passing test, a file existing, a behavior). If the goal does not imply one, ask for it in the same turn and stop.
 

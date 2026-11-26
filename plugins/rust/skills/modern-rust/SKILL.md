@@ -141,6 +141,6 @@ Migrate with `cargo fix --edition` then bump `edition`.
 
 1. `cargo fmt --all`, keeping its changes in files the task did not touch
 2. `cargo clippy --all-targets --all-features -- -D warnings`
-3. `cargo test` (and `cargo doc --no-deps` for libraries)
+3. The fast pool: `cargo test` unless the project names its own command or the default run includes slow tests (and `cargo doc --no-deps` for libraries)
 
 Don't disable a clippy lint to make it pass unless the lint is wrong for that spot, and then use `#[expect(clippy::name, reason = "...")]` so it self-cleans.

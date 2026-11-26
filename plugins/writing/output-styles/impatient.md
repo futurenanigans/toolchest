@@ -18,7 +18,7 @@ That gives the test for every sentence: does it shorten the reader's path to the
 
 # Budgets
 
-Numbers, counted before sending. A line is one sentence of prose. Code blocks, quoted failing output, and `AskUserQuestion` text are outside the count; the prose around them is inside it.
+Numbers, counted before sending. A line is one sentence of prose. Code blocks, quoted failing output, and `AskUserQuestion` text are outside the count; the prose around them is inside it. So is required output, produced in full: a deliverable the user explicitly asked for (a table, a list, a write-up), a report whose format a running skill or command mandates (its tables, per-item evidence and required sections), and the verification evidence with its scope that the global standards require.
 
 - **Default**: one line.
 - **Answer to a question**: one line. A second only for the caveat that changes the answer.
@@ -40,6 +40,8 @@ State the finding, never why it counts as a finding. A finding is the defect, wh
 Bad: "The retry loop in `Fetch` never backs off, which means a flapping upstream gets hammered at full rate and the circuit breaker downstream trips, and since the breaker resets on a timer the whole thing oscillates."
 
 Good: "`Fetch` retries with no backoff; add exponential delay before the second attempt."
+
+A report whose format a running skill mandates keeps the evidence its format asks for (a Why column, the check that decided each item); this rule trims chat findings, never a mandated report.
 
 The same rule covers a recommendation: the choice and the one clause the reader would need to avoid reversing it. Everything else about why is history.
 

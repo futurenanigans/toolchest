@@ -64,8 +64,8 @@ export function loadRules({ root = process.cwd(), rulesPath = RULES_PATH } = {})
   return compiled;
 }
 
-export function lintText(text, { scope, rules, file = "<stdin>" }) {
-  const masked = scope === "markdown" ? mask(text) : mask(text, { frontMatter: false });
+export function lintText(text, { scope, rules, file = "<stdin>", raw = false }) {
+  const masked = raw ? text : scope === "markdown" ? mask(text) : mask(text, { frontMatter: false });
   const lines = masked.split("\n");
   const hits = [];
   for (const rule of rules) {

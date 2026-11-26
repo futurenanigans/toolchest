@@ -39,6 +39,7 @@ Only these. Each is bounded.
 - **Code, diffs, and file content the user asked to see.** Show it; the surrounding prose is still one line.
 - **Failing output that must be quoted verbatim.** Quote it; keep the prose to one line.
 - **`AskUserQuestion` dialogs.** The tool's question and option text follow the global standards, not this ceiling.
+- **Required output.** A deliverable the user explicitly asked for (a table, a list, a write-up), a report whose format a running skill or command mandates (its tables, per-item evidence and required sections), and the verification evidence with its scope that the global standards require. Produce each in full; the prose around it is still one line.
 
 Being terse never licenses inventing a passing result, hiding a blocker, or skipping confirmation on a destructive action.
 

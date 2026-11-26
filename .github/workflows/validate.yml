@@ -20,10 +20,19 @@ jobs:
           set -euo pipefail
           claude plugin validate .
           for plugin in plugins/*/; do claude plugin validate "$plugin"; done
+      - name: Keep in-tree plugins on commit-sha versioning
+        run: |
+          set -euo pipefail
+          # A version in plugin.json or a relative-path marketplace entry freezes hosted installs on their cached copy until it changes.
+          pinned=$(jq -r '.plugins[] | select((.source | type) == "string" and has("version")) | .name' .claude-plugin/marketplace.json)
+          for manifest in plugins/*/.claude-plugin/plugin.json; do
+            if jq -e 'has("version")' "$manifest" > /dev/null; then pinned+=$'\n'"$manifest"; fi
+          done
+          if [ -n "${pinned//$'\n'/}" ]; then echo "::error::version set for an in-tree plugin:$pinned"; exit 1; fi
       - name: Test lam
         run: claude plugin test plugins/lam
       - name: Test the prose linter
-        run: node --test 'plugins/writing/bin/*.test.mjs'
+        run: node --test 'plugins/writing/bin/*.test.mjs' 'plugins/writing/hooks/*.test.mjs'
       - name: Lint the repository's Markdown
         run: |
           set -euo pipefail

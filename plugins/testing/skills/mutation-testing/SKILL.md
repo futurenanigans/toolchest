@@ -1,6 +1,7 @@
 ---
 name: mutation-testing
-description: Configures, runs and analyzes mutation testing in bounded chunks, then closes the test gaps the surviving mutants show. Splits a codebase into chunks sized to a time budget, pairs each with the tests that reach it, keeps a resumable plan, groups survivors into behaviours a test should pin, and verifies each fix by rerunning the mutants it targets. Use when the user asks to "run mutation testing", "set up cargo-mutants or Stryker", "check the tests with mutants", "work through the surviving mutants", or "how good are these tests". Supports Rust, C# and TypeScript or JavaScript.
+description: Configures, runs and analyzes mutation testing in bounded chunks, then closes the test gaps the surviving mutants show. Splits a codebase into chunks sized to a time budget, pairs each with the tests that reach it, keeps a resumable plan, groups survivors into behaviours a test should pin, and verifies each fix by rerunning the mutants it targets. Use when the user asks to "run mutation testing", "set up cargo-mutants or Stryker", "check the tests with mutants", or "work through the surviving mutants". Supports Rust, C# and TypeScript or JavaScript.
+disable-model-invocation: true
 argument-hint: "[--plan] [--chunk <n>|next] [--diff <base>] [--address [1,3]] [--auto] [path]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---

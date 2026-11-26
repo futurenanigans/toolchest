@@ -9,8 +9,8 @@ Only you can start it; model invocation is disabled. Run `/memory:memory-consoli
 | Argument | Scope or effect |
 | --- | --- |
 | none | The current project's memory directory |
-| a project path | That project's store under `~/.claude/projects/` |
-| `--all` | Every `~/.claude/projects/*/memory/` that holds a file, one store at a time |
+| a project path | That project's store under `$CLAUDE_CONFIG_DIR/projects/`, or `~/.claude/projects/` when the variable is unset |
+| `--all` | Every `<projects root>/*/memory/` that holds a file, one store at a time, plus any store an `autoMemoryDirectory` setting moves |
 | `--apply` | Continue from the report to the changes |
 
 Without `--apply` the run only reports. Nothing on disk changes.

@@ -14,8 +14,10 @@ Memory files are claims with a timestamp. Each one loads into future sessions th
 ## Scope
 
 - No argument: the memory directory of the current project, as named in this session's instructions.
-- A project path: that project's store under `~/.claude/projects/`.
-- `--all`: every `~/.claude/projects/*/memory/` directory that holds at least one file. Work through them one store at a time and report per store.
+- A project path: that project's store under the projects root.
+- `--all`: every `<projects root>/*/memory/` directory that holds at least one file. Work through them one store at a time and report per store.
+
+The projects root is `$CLAUDE_CONFIG_DIR/projects/` when that variable is set, and `~/.claude/projects/` otherwise. Before using it, read `autoMemoryDirectory` from the user, project, local and policy settings files: a store that setting moves lives outside the projects root, so add that directory for the project it applies to, and say in the report which configured directories a project path or `--all` could not reach.
 
 Without `--apply` the run ends at the report. With `--apply` it continues to the changes, asking first for anything in the confirmation list below.
 

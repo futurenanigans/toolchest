@@ -137,24 +137,13 @@ test('catch-all handlers that discard the exception are still flagged', async ($
   }
 })
 
-test('C# checks awl covers are skipped when the repo has an awl config, and others still run', async ($, on) => {
-  stubEngine(on, { files: { [`${CWD}/.awl/awl.json`]: '{}' } })
+test('an awl or loom config leaves every lam check running, because the marker does not confirm the analyzer covers the rule', async ($, on) => {
+  stubEngine(on, { files: { [`${CWD}/.awl/awl.json`]: '{}', [`${CWD}/.loom/loom.json`]: '{}' } })
   await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
 
-  const covered = await $.tool.call({ tool: 'Write', file_path: `${CWD}/A.cs`, content: 'var a = xs.First(); try { Run(); } catch { } dynamic d = 1;' })
-  const secret = await $.tool.call({ tool: 'Write', file_path: `${CWD}/B.cs`, content: 'var key = "AKIAABCDEFGHIJKLMNOP";' })
-  const script = await $.tool.call({ tool: 'Write', file_path: `${CWD}/c.ts`, content: 'const x = y as any' })
-  expect(covered.context).toBeUndefined()
-  expect(secret.context?.join('')).toContain('real credential')
-  expect(script.context?.join('')).toContain('escape hatch')
-})
-
-test('script checks loom covers, skip markers included, are skipped when the repo has a loom config', async ($, on) => {
-  stubEngine(on, { files: { [`${CWD}/.loom/loom.json`]: '{}' } })
-  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
-
-  const skipped = await $.tool.call({ tool: 'Write', file_path: `${CWD}/a.test.ts`, content: 'it.skip("x", () => { const v = y as any })' })
   const csharp = await $.tool.call({ tool: 'Write', file_path: `${CWD}/A.cs`, content: 'var a = xs.First();' })
-  expect(skipped.context).toBeUndefined()
+  const script = await $.tool.call({ tool: 'Write', file_path: `${CWD}/a.test.ts`, content: 'it.skip("x", () => { const v = y as any })' })
   expect(csharp.context?.join('')).toContain('takes one element from a collection')
+  expect(script.context?.join('')).toContain('skips or disables a test')
+  expect(script.context?.join('')).toContain('escape hatch')
 })

@@ -6,7 +6,7 @@ Local Agent Monitor. It watches the edits and shell commands Claude Code makes, 
 
 Every Edit and Write call, and every Bash or PowerShell call, runs through seven checks. A check that fires attaches its message to the tool result as context for the model. The call itself always goes ahead: lam never blocks or rewrites anything. If another hook or the permission system denies the call, lam leaves the denial alone, adds no advice and counts nothing.
 
-When the awl or loom plugin is configured for the repository, lam leaves the checks those analyzers already cover to them. For a C# file in a repository with `.awl/awl.json` at its root, `collection-first`, `swallowed-catch` and `type-downgrade` are skipped. For a TypeScript, JavaScript or Vue file in a repository with `.loom/loom.json` at its root, those three and `skip-attributes` are skipped. The other checks still run.
+All seven checks run in every repository, including one that configures the awl or loom analyzer. A `.awl/awl.json` or `.loom/loom.json` says nothing about whether that plugin is installed, whether the file is valid, or which rules it enables, so lam cannot confirm an analyzer covers a check and accepts the occasional duplicate advisory instead.
 
 Most checks fire only on what the edit adds. For an Edit, the new string is compared with the string it replaces; for a Write, with the file currently on disk. Editing a file that already contains `as any` does not trigger a warning unless the edit adds a new one.
 

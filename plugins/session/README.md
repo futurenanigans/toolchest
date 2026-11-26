@@ -32,7 +32,7 @@ The brief is not printed in chat. The reply is a single line, the command to run
 /session:continue .claude/handover/latest.md
 ```
 
-The skill runs at high effort and is limited to reading files, read-only git commands, `date`, subagents, and writing under `.claude/handover/` and to `.gitignore`.
+The skill runs at high effort. Its `allowed-tools` pre-approves reading files, read-only git commands, `date`, subagents, and writing under `.claude/handover/` and to `.gitignore`, so those run without a prompt while it works. That list grants, it does not restrict: any other tool stays available and asks for permission under your session's normal rules.
 
 ## Resuming
 

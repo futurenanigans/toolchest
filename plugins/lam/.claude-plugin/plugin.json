@@ -1,6 +1,5 @@
 {
   "name": "lam",
-  "version": "0.1.0",
   "description": "Local Agent Monitor: advisory checks on edits and deletions with per-check advisory counts, a status line, a /guard-stats pane, and a git fetch at session start",
   "types": "./types/index.d.ts",
   "userConfig": {
