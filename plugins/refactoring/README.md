@@ -57,7 +57,7 @@ With `--auto`, Claude skips your review of the report and dispatches every actio
 | --- | --- | --- |
 | `feature-architect` | Read, Grep, Glob | Turns a feature request into a blueprint: decisions, contracts, worked examples, acceptance criteria and an ordered build sequence. Never edits files. |
 | `task-implementer` | Bash, Read, Edit, Write, Grep, Glob, Skill | Builds and verifies one bounded task from its dispatch, such as a step of a build sequence or a scoped bug fix. Touches only the files it was given and reports a status: `DONE`, `DONE_WITH_FOLLOWUPS`, `DONE_WITH_CONCERNS`, `BLOCKED` or `NEEDS_CONTEXT`. Under `Verification: deferred` it skips builds and tests so parallel agents do not collide. |
-| `implementation-reviewer` | Read, Grep, Glob, Skill | Checks finished code on disk against its design or acceptance criteria, optionally on a single focus so several reviewers can run in parallel. Never edits, builds, tests or runs git. |
+| `implementation-reviewer` | Read, Grep, Glob, Skill | Checks finished code on disk against its design or acceptance criteria, optionally on a single focus so several reviewers can run in parallel. Returns a met or not-met verdict per acceptance criterion, separate from its quality findings. Never edits, builds, tests or runs git. |
 
 Both `task-implementer` and `implementation-reviewer` load the convention skills the global `CLAUDE.md` maps to their files through the Skill tool, so a dispatch need not paste those conventions in.
 

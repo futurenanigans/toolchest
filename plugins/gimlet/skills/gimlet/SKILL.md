@@ -19,7 +19,7 @@ Pick the narrowest scan that answers the question:
 
 `--baseline` reports only findings absent at that git ref, so pre-existing findings stay out of a review of new code. Opengrep picks the files to scan from the diff between the ref and the index, then scans their working-tree content. A file whose only changes are unstaged is skipped and reported as zero findings. Run `git add` on the files to review before a baseline scan.
 
-The scan writes nothing into the repository. Results go to `results.json` (and `results.sarif` with `--sarif`) in a per-repository directory under the plugin data directory; the scan's last line names the file. The scan prints findings grouped by file and rule; the JSON holds the full message, matched lines, and rule metadata (`.results[].extra.metadata` carries CWE and OWASP tags).
+The scan's first line names the opengrep version, the rule directories, the baseline and the paths; quote it in the report so the reader knows what was and was not covered, together with any partial-parse errors (see below). The scan writes nothing into the repository. Results go to `results.json` (and `results.sarif` with `--sarif`) in a per-repository directory under the plugin data directory; the scan's last line names the file. The scan prints findings grouped by file and rule; the JSON holds the full message, matched lines, and rule metadata (`.results[].extra.metadata` carries CWE and OWASP tags).
 
 ## Triage
 

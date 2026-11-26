@@ -42,5 +42,5 @@ After `/clear`, run:
 /session:continue [path]
 ```
 
-The path defaults to `.claude/handover/latest.md`. If the file does not exist, it stops and says so. Otherwise it reads the brief in full and follows its header: compare `git status` and HEAD with the fingerprint and report if the tree has moved, read the listed files, restate the goal and done-when, then take the first action. It works until done-when holds or a blocker needs you. It respects the recorded decisions and failed approaches, and treats `[recalled]` items as claims to confirm when they matter.
+The path defaults to `.claude/handover/latest.md`. If the file does not exist, it stops and says so. When the default brief was written on another branch, or at a HEAD this checkout does not contain, it lists the dated briefs with their goal, branch and HEAD and asks which to resume. A path you pass is used as given. Otherwise it reads the brief in full and follows its header: compare `git status` and HEAD with the fingerprint and report if the tree has moved, read the listed files, restate the goal and done-when, then take the first action. It works until done-when holds or a blocker needs you. It respects the recorded decisions and failed approaches, and treats `[recalled]` items as claims to confirm when they matter.
 

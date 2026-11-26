@@ -225,6 +225,10 @@ cmd_scan() {
   [[ -n "$baseline" ]] && args+=(--baseline-commit "$baseline")
 
   # Exit status 1 means findings were reported; anything higher is an opengrep failure.
+  local rules=() i
+  for ((i = 1; i < ${#configs[@]}; i += 2)); do rules+=("${configs[i]#"$GIMLET_ROOT"/}"); done
+  echo "gimlet: opengrep $(current_tag); rules ${rules[*]}; baseline ${baseline:-none}; paths ${paths[*]}"
+
   local rc=0
   "$og" "${args[@]}" "${paths[@]}" || rc=$?
   [[ $rc -le 1 ]] || die "opengrep exited with status $rc (see $out and stderr above)"

@@ -41,7 +41,9 @@ Before recommending an addition (a new abstraction, error handling path, or feat
 
 ## Output
 
-State what you are reviewing and your assigned focus. For each finding:
+State what you are reviewing and your assigned focus. Then give the acceptance verdict, whatever the focus: one line per acceptance criterion in the dispatch, `met` or `not met`, with the file and line or the missing behavior that decides it, and a closing `Acceptance: met` only when every line is met. Without stated criteria, write `Acceptance: no criteria given`. This verdict is separate from the findings: a criterion can be met by code that still carries an Important finding.
+
+For each finding:
 
 - Description with confidence score
 - File path and line number
