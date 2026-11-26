@@ -31,7 +31,7 @@ Each advice that reaches the model adds one to that check's count for the sessio
 lam draws one line under the prompt, with segments separated by ` | `:
 
 1. Model name and its cost multiplier, coloured by family: Haiku and Sonnet in green, Opus in yellow, Fable or Mythos in red. Other models show the name alone. The multipliers are plugin options (`haikuMultiplier`, `sonnetMultiplier`, `opusMultiplier`, `fableMultiplier`, defaulting to `0.3x`, `1x`, `1.7x` and `3.3x`), set in `/config`; an empty value shows the name alone.
-2. `effort:<level>` when an effort level is set: green for low, yellow for medium, bright red for high, red for xhigh and max.
+2. `effort:<level>` when an effort level is set, taken from the current model's entry under `modelSettings` (where `/effort` saves it) and otherwise from the top-level `effortLevel`: green for low, yellow for medium, bright red for high, red for xhigh and max.
 3. The repository name, taken from the remote URL, or the directory name.
 4. The branch, with `*` when the working tree has changes.
 5. Drift against the upstream: `=` when level, `+N` ahead, `-N` behind, or both. Omitted when the branch has no upstream.

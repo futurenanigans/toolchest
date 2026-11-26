@@ -105,6 +105,8 @@ function contextLimit({ window, breakdown }: SessionContextUsage): number {
   return isAutoCompactEnabled && autoCompactThreshold !== undefined ? autoCompactThreshold : rawMaxTokens
 }
 
+type EffortSettings = { effortLevel?: string; modelSettings?: Readonly<Record<string, { effortLevel?: string } | undefined>> }
+
 function modelSegment(model: string, options: PluginOptions): StatusSegment {
   const family = MODEL_FAMILIES.find(({ family }) => family.test(model))
   if (family === undefined) return { text: model }
@@ -115,11 +117,12 @@ function modelSegment(model: string, options: PluginOptions): StatusSegment {
 export async function statusSegments($: Engine, options: PluginOptions): Promise<StatusSegment[]> {
   const cwd = await $.session.cwd()
   const model = await $.session.model()
-  const settings = (await $.settings.read()) as { effortLevel?: string }
+  const settings = (await $.settings.read()) as EffortSettings
   const usage = await $.session.usage({ breakdown: 'summary' })
 
   const parts: StatusSegment[] = [modelSegment(model, options)]
-  if (settings.effortLevel) parts.push({ text: `effort:${settings.effortLevel}`, color: EFFORT_COLORS[settings.effortLevel] })
+  const effort = settings.modelSettings?.[model]?.effortLevel ?? settings.effortLevel
+  if (effort) parts.push({ text: `effort:${effort}`, color: EFFORT_COLORS[effort] })
   parts.push(...(await gitSegments($, cwd)))
   if (usage.cost) parts.push({ text: `$${usage.cost.usd.toFixed(2)}` })
   const { tokens } = usage.context

@@ -19,6 +19,20 @@ test('the status line carries model, effort, repo, dirty branch, ahead and behin
   expect(await row.colorOf('ctx 23%')).toBe('yellow')
 })
 
+test('the effort shown is the current model\'s own level over the top-level default', async ($, on) => {
+  stubEngine(on, { settings: { effortLevel: 'high', modelSettings: { 'claude-opus-5-5': { effortLevel: 'low' } } } })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  const row = await statusRow($)
+  expect(row.text).toContain(' | effort:low | ')
+  expect(await row.colorOf('effort:low')).toBe('green')
+})
+
+test('no effort segment appears when no level is set', async ($, on) => {
+  stubEngine(on, { settings: {} })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  expect((await statusRow($)).text).not.toContain('effort:')
+})
+
 test('a branch level with its upstream shows an equals sign', async ($, on) => {
   stubEngine(on, { git: {
     remote: { exitCode: 0, stdout: 'origin\n' },
