@@ -1,4 +1,4 @@
 {
   "name": "gimlet",
-  "description": "Opengrep runner with a bundled C#/.NET security ruleset, plus guidance for running scans and triaging findings"
+  "description": "C#/.NET security scan runner: opengrep rules, SDK Security analyzers, Dotnetarium taint analysis, NuGet and OSV package checks, Betterleaks secrets, and a running-API probe with Spectral, Schemathesis and ZAP, plus guidance for triaging and fixing findings"
 }

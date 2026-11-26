@@ -1,46 +1,76 @@
 ---
 name: gimlet
-description: Run opengrep with Gimlet's bundled C#/.NET rules and triage the findings. Use when asked to scan C#, ASP.NET, Razor, web.config or appsettings files for security issues, to check a branch or diff for newly introduced findings, to install or update opengrep, or to interpret a Gimlet or opengrep result.
+description: Run C#/.NET security scanners (opengrep rules, the SDK's Security analyzers, Dotnetarium taint analysis, NuGet and OSV vulnerable-package checks, Betterleaks secrets) over a repository, probe a running ASP.NET Core API (Spectral, Schemathesis, ZAP), and triage and fix the findings. Use when asked to scan C#, ASP.NET, Razor, web.config or appsettings for security issues, to check a branch or diff for new findings, to look for vulnerable packages or leaked secrets, to security-test a running API, or to interpret a gimlet result.
 ---
 
-# Running Gimlet
+# Running gimlet
 
-Gimlet is a wrapper around opengrep. Run it as `bash "${CLAUDE_SKILL_DIR}/../../bin/gimlet"`, which works whether or not the plugin's `bin/` is on PATH and whether or not the install kept the executable bit. The commands below shorten that to `gimlet`. The first scan installs the opengrep release pinned in `config/defaults.env`, checked against its pinned SHA-256. `gimlet update` installs the latest release and `gimlet install --version vX.Y.Z` a specific one; both refuse to install without cosign on PATH to verify the signature. Run them only when asked to update opengrep.
+Run it as `bash "${CLAUDE_SKILL_DIR}/../../bin/gimlet"`, which works whether or not the plugin's `bin/` is on PATH and whether or not the install kept the executable bit. The commands below shorten that to `gimlet`. Each tool installs on first use from a release pinned with its SHA-256 in `config/defaults.env`. `gimlet update` and `gimlet install --version vX.Y.Z` change only opengrep and need cosign; run them only when asked.
 
-Pick the narrowest scan that answers the question:
+Pick the narrowest command that answers the question:
 
 | Question | Command |
 |---|---|
 | What did this branch introduce? | `gimlet scan --baseline origin/main` |
-| What did the last few commits introduce? | `gimlet scan --baseline HEAD~3` |
 | Is this file or directory clean? | `gimlet scan src/Web/Controllers` |
 | Full inventory of the repository | `gimlet scan` |
-| Where are the HTTP entrypoints and ORM leak risks? | `gimlet scan --audit` |
+| Any vulnerable packages? | `gimlet scan --only packages,osv` |
+| Any leaked secrets in history? | `gimlet scan --only secrets` |
+| Where are the HTTP entrypoints and ORM leak risks? | `gimlet scan --only opengrep --audit` |
+| Does the running API hold up? | `gimlet probe --url http://localhost:5000` |
 
-`--baseline` reports only findings absent at that git ref, so pre-existing findings stay out of a review of new code. Opengrep picks the files to scan from the diff between the ref and the index, then scans their working-tree content. A file whose only changes are unstaged is skipped and reported as zero findings. Run `git add` on the files to review before a baseline scan.
+Scanners: `opengrep`, `analyzers`, `dotnetarium`, `packages`, `osv`, `secrets`. `--only` and `--skip` take comma-separated names. The dotnet scanners find a `.sln`/`.slnx` in each scan path, else the `.csproj` files under it, else the nearest project above it; `--project` overrides. They restore and build into the results directory, so the first run on a repository takes minutes. The build runs the repository's MSBuild code, the same as `dotnet build`.
 
-The scan's first line names the opengrep version, the rule directories, the baseline and the paths; quote it in the report so the reader knows what was and was not covered, together with any partial-parse errors (see below). The scan writes nothing into the repository. Results go to `results.json` (and `results.sarif` with `--sarif`) in a per-repository directory under the plugin data directory; the scan's last line names the file. The scan prints findings grouped by file and rule; the JSON holds the full message, matched lines, and rule metadata (`.results[].extra.metadata` carries CWE and OWASP tags).
+What `--baseline REF` means per scanner:
+
+- `opengrep` reports findings absent at REF, comparing REF with the index. A file whose only changes are unstaged is skipped; `git add` the files to review first.
+- `analyzers` and `dotnetarium` also analyze a `git archive` export of REF and drop findings it already had (matched on rule, file and message, so moved lines still match). If REF cannot be restored or built, the scanner is marked INCOMPLETE and reports every finding.
+- `packages` and `osv` run only when a project, props, lock or package manifest file changed since REF, and then report every vulnerable package.
+- `secrets` scans the commits in `REF..HEAD` plus the staged changes.
+
+The first line of output names the scanners, baseline and paths; quote it in the report so the reader knows what was covered. The summary gives each scanner a count and a status. INCOMPLETE, SKIPPED and FAILED each carry a reason; report every one of them, because a scanner that did not run is not a clean result for what it covers. The command exits non-zero only when a scanner failed.
+
+`findings.json` in the results directory holds every finding as `{tool, rule, severity, file, line, message}` (vulnerable-package findings add `package`); query it with `jq` instead of re-running the scan. Each scanner's raw output and log sit beside it (`opengrep.raw.json` carries CWE and OWASP metadata under `.results[].extra.metadata`, the SARIF from `dotnetarium-*.sarif` carries data-flow paths).
+
+## Probing a running API
+
+`gimlet probe` needs the API already running. Start it in the background with `dotnet run --project <web project> --urls http://127.0.0.1:<free port>` (add `--environment Development` when the OpenAPI document is mapped only there), wait until `curl --retry 60 --retry-connrefused --retry-delay 1 <url>/openapi/v1.json` answers, probe, then stop the process. It fetches the OpenAPI document from `openapi/v1.json` or `swagger/v1/swagger.json` under the URL, or from `--openapi URL|FILE`. Pass `--auth-header 'Authorization: Bearer …'` so the probes reach authenticated operations; without it they test only what an anonymous caller sees.
+
+Schemathesis and ZAP send attack traffic. Probe only a local or test instance with throwaway data; gimlet refuses a URL that is not on this machine unless `--allow-remote` is passed, and pass it only when the user says the target is theirs to test. Results go to the `probe/` subdirectory of the results directory. The run budgets come from `GIMLET_SCHEMATHESIS_MAX_SECONDS` and `GIMLET_ZAP_MAX_MINUTES`.
 
 ## Triage
 
-Treat every finding as a claim to verify against the code. The rules are syntactic pattern matches and intra-file taint; they do not resolve types across files or know what a value can hold at runtime. For each finding, open the reported line and decide one of:
+Treat every finding as a claim to verify against the code. For each one, open the reported line and decide one of:
 
-- **Real**: attacker-influenced data reaches the sink, or the insecure setting is live in a build that ships. Fix the code.
-- **False positive**: name the fact that disproves it (the argument is a constant, the value is validated earlier, the code is test-only). Report it with that fact; do not edit the rule to hide it.
+- **Real**: attacker-influenced data reaches the sink, the insecure setting is live in a build that ships, or the vulnerable package's affected API is reachable. Fix it.
+- **False positive**: name the fact that disproves it (the argument is a constant, the value is validated earlier, the code is test-only, the advisory's vulnerable function is never called). Report it with that fact; do not edit a rule or add a suppression to hide it.
 - **Needs context**: the answer depends on deployment or configuration the code does not show. Say what would decide it.
 
-Severity reads ERROR as likely exploitable, WARNING as a weakness worth fixing, INFO as a review pointer. Order work by severity, then by how directly user input reaches the line.
+Severity reads `error` as likely exploitable, `warning` as a weakness worth fixing, `note` as a review pointer. Order work by severity, then by how directly user input reaches the line.
 
-Known false-positive patterns:
+The same defect often appears under several scanners (opengrep's SQL injection rule, CA2100 and DNA0001 on one line). Report it once, naming the scanners that agree; agreement between a pattern match and a taint path is stronger evidence than either alone.
 
-- `csharp_injection_rule-CommandInjection` fires on every `Process.Start` and `ProcessStartInfo` with a non-literal argument. A tool that launches its own child process with arguments it builds itself is not injectable; check whether any part of the file name or arguments comes from a request, config value an attacker controls, or file content.
+Per scanner:
+
+- `opengrep` rules are syntactic patterns and intra-file taint; they do not resolve types across files. `csharp_injection_rule-CommandInjection` fires on every `Process.Start` with a non-literal argument; it is injectable only when part of the file name or arguments comes from a request, an attacker-controlled config value or file content.
+- `analyzers` are type-resolved, but their taint rules (CA3001 to CA3012) do not treat ASP.NET Core handler parameters as sources, so their silence on injection proves nothing. CA2100 flags any non-constant SQL text, tainted or not. Each rule's doc is at `https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/<id lowercased>`.
+- `dotnetarium` findings are taint paths from a modeled input to a sink; the SARIF `codeFlows` show the path. Its silence covers only modeled sources and sinks. Dotnetarium's rule docs are at https://github.com/dotnetarium/dotnetarium/tree/main/docs/rules.
+- `packages` and `osv` report a package version, not a reachable call. Check the advisory for the affected API before ranking it; fix by upgrading to the first patched version and re-running `gimlet scan --only packages`.
+- `secrets` findings are redacted. Treat a real credential in history as compromised even after the file is fixed: say it must be rotated, because removing it from the tree leaves it in every clone.
+- `spectral` reports document gaps (no security scheme, unbounded strings, missing 401/429 responses). Each is real only when the running API also lacks the control; check the endpoint's code.
+- `schemathesis` server errors (ST101) mean an input crashed the handler. The log holds a reproducing request; read the handler to find what the input reached.
+- `zap` findings come from requests that succeeded against the app. Path traversal, injection or XSS there is confirmed behavior, not a pattern match.
+
+## Fixing
+
+Before fixing a finding, read `${CLAUDE_SKILL_DIR}/fixing.md` and search it for the finding's rule id (opengrep ids without their `gimlet.security.` or `csharp_*_rule-` prefix). It holds one fix pattern per kind of defect, shared across the scanners that report it, and names the fixes that need the user's decision. Fix the code, then re-run the narrowest command that covers it (`gimlet scan <file> --only <scanner>`, or the single probe) and report that it no longer reports the finding. A fix that only satisfies the scanner (renaming a variable, casting to silence a type match) is not a fix.
 
 ## Errors in the result
 
-`PartialParsing` warnings mean opengrep's C# parser did not understand part of a file. Newer syntax (`required` members, `with` expressions, list patterns, some property patterns) is the usual cause. The rest of the file is still scanned, but a finding inside the unparsed region is missed. Report the files affected; do not treat a scan with parse errors as a clean bill for those lines.
+An `opengrep` INCOMPLETE status lists files where the C# parser skipped regions (`required` members, `with` expressions and list patterns are common causes). A finding inside the skipped region is missed; report the files.
 
-Exit status above 1 from opengrep is a failure of the scan itself; Gimlet stops and names the status.
+A `dotnetarium` INCOMPLETE status for degraded input means unresolved references or compiler errors; the `Input warning` lines in `dotnetarium.log` name them. An `analyzers` INCOMPLETE status means a project failed to build and was not analyzed; `analyzers.log` names the errors.
 
 ## Rules
 
-Rule files are YAML under `rules/` and `rules-audit/`, one directory per source; grep them by id. `rules/gimlet` is this project's own (MIT); the other directories carry their source's MIT `LICENSE`. `gimlet test` runs opengrep's rule tests against the fixtures next to each rule file. To add a rule, put the YAML beside a fixture of the same base name annotated with `// ruleid: <id>` and `// ok: <id>` lines, then run `gimlet test`.
+Opengrep rule files are YAML under `rules/` and `rules-audit/`, one directory per source; grep them by id. `rules/gimlet` is this project's own (MIT); the other directories carry their source's MIT `LICENSE`. A rule stays only while the compiler-based scanners do not report every match it makes on .NET 8+ code. `gimlet test` runs opengrep's rule tests against the fixtures next to each rule file. To add a rule, put the YAML beside a fixture of the same base name annotated with `// ruleid: <id>` and `// ok: <id>` lines, then run `gimlet test`.

@@ -1,0 +1,17 @@
+<Project>
+  <!-- Imported by gimlet through CustomBeforeMicrosoftCommonTargets: it runs after the project's
+       own properties, so it turns on every rule in the SDK's Security category, leaves the other
+       categories off, keeps warnings from failing the build, and writes one SARIF log per project
+       and target framework into GimletSarifDir. -->
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <RunAnalyzers>true</RunAnalyzers>
+    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
+    <AnalysisMode>None</AnalysisMode>
+    <AnalysisModeSecurity>All</AnalysisModeSecurity>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+    <MSBuildTreatWarningsAsErrors>false</MSBuildTreatWarningsAsErrors>
+    <ErrorLog>$(GimletSarifDir)/$(MSBuildProjectName)-$([MSBuild]::StableStringHash($(MSBuildProjectFullPath)))-$(TargetFramework).sarif,version=2.1</ErrorLog>
+  </PropertyGroup>
+</Project>

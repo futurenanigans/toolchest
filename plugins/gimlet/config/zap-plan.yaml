@@ -1,0 +1,29 @@
+env:
+  contexts:
+    - name: gimlet
+      urls:
+        - ${GIMLET_TARGET}
+  parameters:
+    failOnError: true
+    progressToStdout: true
+jobs:
+  - type: openapi
+    parameters:
+      apiFile: ${GIMLET_OPENAPI_FILE}
+      targetUrl: ${GIMLET_TARGET}
+      context: gimlet
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: activeScan
+    parameters:
+      context: gimlet
+      maxScanDurationInMins: ${GIMLET_ZAP_MAX_MINUTES}
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: ${GIMLET_ZAP_REPORT_DIR}
+      reportFile: zap
