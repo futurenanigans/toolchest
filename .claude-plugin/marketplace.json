@@ -9,8 +9,8 @@
       "name": "awl",
       "source": {
         "source": "archive",
-        "url": "https://github.com/futurenanigans/awl-dist/releases/download/v0.1.0-alpha.8/awl-plugin-0.1.0-alpha.8.zip",
-        "sha256": "a2a5149c0c20c2bce149ace779ca807798e9bb2fee21454b63c7e0504d726847"
+        "url": "https://github.com/futurenanigans/awl-dist/releases/download/v0.1.0-alpha.9/awl-plugin-0.1.0-alpha.9.zip",
+        "sha256": "0122741ff80231c5298cb52e6b2b3709eceacc52ec77482fd5a93cbb3d138ac1"
       },
       "description": "Roslyn semantic analysis on every C# edit (alpha). Carries awl.dll and runs it with dotnet; needs the .NET 10 SDK"
     },
