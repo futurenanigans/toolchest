@@ -62,10 +62,10 @@
       "name": "rotfeste",
       "source": {
         "source": "archive",
-        "url": "https://github.com/futurenanigans/rotfeste-dist/releases/download/v0.1.0-alpha.4/rotfeste-plugin-0.1.0-alpha.4.zip",
-        "sha256": "ed0bef80986b2bdbd58425bbb09efc0024114e5fe1185acd4db961daf4d67c28"
+        "url": "https://github.com/futurenanigans/rotfeste-dist/releases/download/v0.1.0-alpha.5/rotfeste-plugin-0.1.0-alpha.5.zip",
+        "sha256": "afff9400460f1c076c8aae62d1aba39159e69e099718bad6e91bbc29403a6936"
       },
-      "description": "Root-anchored reachability analysis for .NET (alpha): roots the compiler's entry points, the composed application's registries or a library's declared API, then reports what nothing reaches. Carries rot and runs it with dotnet; needs the .NET 10 SDK"
+      "description": "Root-anchored reachability analysis for .NET (alpha): roots the compiler's entry points, the composed application's registries or a library's declared API, then reports what nothing reaches. Carries rot.dll and runs it with dotnet; needs the .NET 10 SDK"
     },
     {
       "name": "session",
