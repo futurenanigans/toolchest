@@ -4,7 +4,13 @@ Claude Code plugin marketplace. Add it with `/plugin marketplace add futurenanig
 
 Each plugin lives under `plugins/` with its own README. Conventions that apply to some files ship as skills in the plugin they belong to, and load by their description.
 
-The global standards are not a plugin. [`claude-md/CLAUDE.md`](claude-md/CLAUDE.md) is the user-level `CLAUDE.md` these plugins assume; copy it to `~/.claude/CLAUDE.md`. Its convention skills section maps each of those skills to the plugin that ships it.
+The global standards are not a plugin, because Claude Code loads no `CLAUDE.md` from a plugin. [`claude-md/CLAUDE.md`](claude-md/CLAUDE.md) is the user-level `CLAUDE.md` these plugins assume. Import it from the marketplace's own checkout so it updates with the plugins: put this line in `~/.claude/CLAUDE.md`, with any personal rules below it,
+
+```
+@~/.claude/plugins/marketplaces/toolchest/claude-md/CLAUDE.md
+```
+
+and turn on auto-update for toolchest in `/plugin` under Marketplaces, or set `"autoUpdate": true` on its `extraKnownMarketplaces` entry in `~/.claude/settings.json`. Third-party marketplaces do not auto-update by default, and an update lands a few minutes after the first message of a session, so a change to the standards takes effect from the next session. Its convention skills section maps each of those skills to the plugin that ships it.
 
 ## Requirements
 
