@@ -2,6 +2,8 @@
 
 Claude Code plugin marketplace. Add it with `/plugin marketplace add futurenanigans/toolchest`, then install plugins from `/plugin`.
 
+This is a personal toolchest, published as is. Everything here is experimental and changes without notice. Plugins carry no version, so an auto-updating install picks up behaviour changes from the next session. The pinned analyzers are alpha releases, and the global `CLAUDE.md` is one person's taste, written for repositories where an agent writes most of the code. Trestle runs coding agents autonomously and merges their work into your branches. There is no support, roadmap or response time: issues and pull requests may be read, acted on or closed without comment, and none of them creates an obligation. Fork it if you want it to go somewhere else.
+
 Each plugin lives under `plugins/` with its own README. Conventions that apply to some files ship as skills in the plugin they belong to, and load by their description.
 
 The global standards are not a plugin, because Claude Code loads no `CLAUDE.md` from a plugin. [`claude-md/CLAUDE.md`](claude-md/CLAUDE.md) is the user-level `CLAUDE.md` these plugins assume. Import it from the marketplace's own checkout so it updates with the plugins: put this line in `~/.claude/CLAUDE.md`, with any personal rules below it,
