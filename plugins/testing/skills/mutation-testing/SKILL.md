@@ -1,6 +1,6 @@
 ---
 name: mutation-testing
-description: Configures, runs and analyzes mutation testing in bounded chunks, then closes the test gaps the surviving mutants show. Splits a codebase into chunks sized to a time budget, pairs each with the tests that reach it, keeps a resumable plan, groups survivors into behaviours a test should pin, and verifies each fix by rerunning the mutants it targets. Use when the user asks to "run mutation testing", "set up cargo-mutants or Stryker", "check the tests with mutants", or "work through the surviving mutants". Supports Rust, C# and TypeScript or JavaScript.
+description: Configures, runs and analyzes mutation testing in bounded chunks, then closes the test gaps the surviving mutants show. Splits a codebase into chunks of whole units sized to a time budget, pairs each with its unit's tests, keeps a resumable plan, groups survivors into behaviours a test should pin, then triages the findings and fixes them in batches verified by rerunning the mutants they target. Use when the user asks to "run mutation testing", "set up cargo-mutants or Stryker", "check the tests with mutants", or "work through the surviving mutants". Supports Rust, C# and TypeScript or JavaScript.
 disable-model-invocation: true
 argument-hint: "[--plan] [--chunk <n>|next] [--diff <base>] [--address [1,3]] [--auto] [path]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
@@ -31,12 +31,12 @@ One invocation runs one chunk. Whole-repository runs are never the default; a us
 
 ## Plan: chunks sized to a budget
 
-A chunk is a set of source files, the tests that reach them, and an estimate. The default budget is 15 minutes of wall time and about 100 mutants; the user can name another.
+A chunk is a unit of the codebase that owns its tests (a crate, a test project, a package or a top-level module), the fast tests that unit runs, and an estimate. The default budget is 45 minutes of wall time and about 300 mutants; the user can name another. Fewer, larger chunks cost less in total: each pays the build and the baseline once, and a chunk run against its unit's whole suite leaves far fewer survivors that only a narrow test list missed.
 
 1. List the mutants without running them, where the tool can, and count them per file.
 2. Estimate each file's cost as mutants times the time to build and run its tests, divided by the job count. Use the measured baseline, never a guess.
-3. Group files that share tests into one chunk until the budget is reached. A file too large for one chunk is split by function filter or by shards, with every shard run under identical arguments.
-4. Pair each chunk with the narrowest tests that reach it: the owning package's tests, the test project, or the case files that import the module and its main callers. Narrow tests are what make a chunk affordable.
+3. Start from whole units, and merge small units that share tests until the budget is reached. Split a unit only when it exceeds the budget on its own: by folder or module first, then by function filter or shards, with every shard run under identical arguments. Never split down to single files to meet an estimate a folder would meet.
+4. Pair each chunk with the fast tests of the unit that owns it: its whole test project, package or crate. Narrow to the case files that import the module only when the owning suite alone would push the chunk past the budget; a narrow list trades run time for survivors the triage then has to rerun.
 5. Order chunks by what a missed bug would cost: domain rules, parsers, boundary and state logic, and recently changed code first; thin adapters last.
 
 Write the plan to `.claude/state/mutation-plan.md` as a table with these columns: chunk number, scope (files or filter), tests, estimated mutants, estimated minutes, status (`pending`, `run`, `addressed`), and the last result. The plan is the resume point across sessions; update it after every run instead of rewriting it.
@@ -85,17 +85,24 @@ Use the shared report format with these fill-ins:
 
 ## Address
 
-Each finding's subagent:
+Triage every finding first, then fix them in batches. This replaces the audit procedure's one subagent, one build and one commit per finding; its pre-flight, baseline and halt-on-failure rules still apply.
 
-1. Writes or extends a test at the public surface of the unit, asserting the behaviour the finding names. The test must pass on the unmutated code and would fail on each mutant in the finding.
-2. Holds the test to `${CLAUDE_SKILL_DIR}/../test-quality/SKILL.md`. A test that mirrors the mutant (asserting an internal constant, a call count, an implementation detail) kills the mutant and pins nothing, so it is not written.
-3. Changes production code only where a finding says the code cannot be tested as it stands, and then only to add the seam.
+1. **Triage.** Read every finding in scope before writing a test.
+   - Merge findings one test would pin: the same function, the same input boundary, the same fixture.
+   - Set `skipped` with the reason on a finding whose fix costs more than it protects: a Low finding with Large effort, or one whose mutated code a pending refactor or deletion removes.
+   - Order the rest by severity, then group them into batches. A batch is the findings whose tests land in the same test file or share a fixture, up to about five findings or one unit's worth.
+   - Write a `## Triage` section to the report before dispatching: each batch with its findings, its test file and its order, then the skipped findings with their reasons.
+2. **Dispatch.** One subagent per batch. Batches on disjoint test files run in parallel; batches sharing a test file run in sequence. Production code changed for a seam belongs to the batch that needs it, and two batches needing the same production file run in sequence. For every finding in its batch, the subagent:
+   - Writes or extends a test at the public surface of the unit, asserting the behaviour the finding names. The test must pass on the unmutated code and would fail on each mutant in the finding.
+   - Holds the test to `${CLAUDE_SKILL_DIR}/../test-quality/SKILL.md`. A test that mirrors the mutant (asserting an internal constant, a call count, an implementation detail) kills the mutant and pins nothing, so it is not written.
+   - Changes production code only where a finding says the code cannot be tested as it stands, and then only to add the seam.
+3. **Verify once per round.** After a round of batches returns, rerun all their mutants in one run with the tool's filter, then the build and the fast tests once. A batch is done when every mutant in it is caught and the tests pass, and gets one commit staging its test and seam files. A mutant that still survives goes back to its batch's subagent with the mutant's diff: the test does not assert what it claims, so fix the test, never the filter. A build or test failure halts as the audit procedure describes.
 
-After each finding, rerun only that finding's mutants with the tool's narrowest filter. The finding is done when they are caught and the fast tests pass. A mutant that still survives means the test does not assert what it claims: fix the test, never the filter.
+Statuses follow the audit procedure per batch, the way its `--auto` section describes: every finding in a batch is set `in_progress` before dispatch, `done` with the batch's commit after it, and `halted` on failure. A resumed `--address` re-verifies as the audit procedure's Resume describes, re-verifying a remaining finding by checking its mutated lines are still in the code at HEAD, then rebuilds the triage and batches from what remains.
 
-Never clear a survivor by skipping it. A skip attribute, a disable comment or a new exclusion is allowed only for a mutant classified as equivalent or arid, with the reason beside it.
+Never clear a survivor by skipping it. A skip attribute, a disable comment or a new exclusion is allowed only for a mutant classified as equivalent or arid, with the reason beside it. Skipping a finding in triage leaves its mutants surviving and says so in the report.
 
-Finding statuses and resuming an unfinished report follow the audit procedure's Mutation section; re-verifying a remaining finding means checking its mutated lines are still in the code at HEAD. When every finding in a chunk is `done` or `skipped`, mark the plan row `addressed` with the rerun's counts.
+When every finding in a chunk is `done` or `skipped`, mark the plan row `addressed` with the rerun's counts.
 
 ## `--auto`
 

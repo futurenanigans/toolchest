@@ -52,7 +52,7 @@ Run `dotnet stryker` from the test project folder. Install, from memory: `dotnet
 | Thresholds | `thresholds`: `{ "high": 80, "low": 60, "break": 0 }`; keep `break` at 0 |
 | Reports | `reporter`: `json`, `html`, `cleartext`, `progress`; output under `StrykerOutput/<timestamp>/reports/` |
 
-Chunking: one test project is the natural chunk, narrowed with `mutate` globs to a folder or a few files. `coverage-analysis` at `perTest` already limits each mutant to the tests that cover it, so the pairing step is mostly choosing the test project. Use `since` for a diff chunk, and `with-baseline` to make reruns pay only for changed code. Set `concurrency` to 2 on a small machine.
+Chunking: one test project is the natural chunk, narrowed with `mutate` globs to a folder only when the project alone exceeds the budget. `coverage-analysis` at `perTest` already limits each mutant to the tests that cover it, so the pairing step is mostly choosing the test project. Use `since` for a diff chunk, and `with-baseline` to make reruns pay only for changed code. Set `concurrency` to 2 on a small machine.
 
 Disabling, for equivalent or arid code only: `// Stryker disable once <Mutator>: <reason>` for the next line, or `// Stryker disable <Mutator>: <reason>` paired with `// Stryker restore <Mutator>`.
 
