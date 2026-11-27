@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: kr-file-user-asks-local-style
+description: When the user tells Claude to follow the local style, the added method keeps K&R braces.
+tags: [smoke]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

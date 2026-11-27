@@ -13,6 +13,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
       - name: Install Claude Code
         run: npm install --global @anthropic-ai/claude-code@2.1.332
       - name: Validate the marketplace and every plugin
@@ -29,12 +32,17 @@ jobs:
             if jq -e 'has("version")' "$manifest" > /dev/null; then pinned+=$'\n'"$manifest"; fi
           done
           if [ -n "${pinned//$'\n'/}" ]; then echo "::error::version set for an in-tree plugin:$pinned"; exit 1; fi
-      - name: Test lam
-        run: claude plugin test plugins/lam
+      - name: Test the plugins' hooks
+        run: |
+          set -euo pipefail
+          for plugin in lam refactoring trestle writing; do claude plugin test "plugins/$plugin"; done
+      - name: Test trestle
+        working-directory: plugins/trestle
+        run: bun test src/__tests__
       - name: Test gimlet's rules against their fixtures
         run: bash plugins/gimlet/bin/gimlet test
       - name: Test the prose linter
-        run: node --test 'plugins/writing/bin/*.test.mjs' 'plugins/writing/hooks/*.test.mjs'
+        run: node --test 'plugins/writing/bin/*.test.mjs' 'plugins/writing/lint/*.test.mjs'
       - name: Lint the repository's Markdown
         run: |
           set -euo pipefail

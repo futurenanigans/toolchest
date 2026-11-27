@@ -173,7 +173,7 @@ cmd_probe() {
   if ! is_local_url "$TARGET" && [[ $allow_remote -eq 0 ]]; then
     die "$TARGET is not on this machine; probing sends attack traffic, so pass --allow-remote only for a target you are authorized to test"
   fi
-  need jq; need curl
+  need curl; ensure_jq
 
   local probes=("${ALL_PROBES[@]}") list_items=() t
   if [[ -n "$only" ]]; then

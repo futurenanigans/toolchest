@@ -186,6 +186,23 @@ ensure_osv() {
 
 osv_bin() { tool_bin osv-scanner "$GIMLET_OSV_TAG"; }
 
+jq_asset() {
+  case "$(platform)" in
+    linux-x64)    echo jq-linux-amd64 ;;
+    linux-arm64)  echo jq-linux-arm64 ;;
+    darwin-x64)   echo jq-macos-amd64 ;;
+    darwin-arm64) echo jq-macos-arm64 ;;
+    windows-x64)  echo jq-windows-amd64.exe ;;
+  esac
+}
+
+# A jq on PATH is used as it is; without one, the pinned release is installed and put first on PATH.
+ensure_jq() {
+  have jq && return
+  install_release_binary jq "$GIMLET_JQ_REPO" "$GIMLET_JQ_TAG" "$(jq_asset)"
+  PATH="$TOOLS_DIR/jq/$GIMLET_JQ_TAG:$PATH"
+}
+
 # --- dotnetarium (a .NET tool from nuget.org) ------------------------------------------------
 
 dotnetarium_bin() {

@@ -99,7 +99,7 @@ cmd_scan() {
       *) SCAN_PATHS+=("$1"); shift ;;
     esac
   done
-  need jq
+  ensure_jq
   [[ ${#SCAN_PATHS[@]} -gt 0 ]] || SCAN_PATHS=(.)
   local p
   for p in "${SCAN_PATHS[@]}"; do [[ -e "$p" ]] || die "scan path $p does not exist"; done

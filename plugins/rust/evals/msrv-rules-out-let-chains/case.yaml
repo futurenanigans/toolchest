@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: msrv-rules-out-let-chains
+description: In a crate pinned to edition 2021 and Rust 1.70, new code uses no let-chains and the manifest keeps its edition and rust-version.
+tags: [smoke]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

@@ -12,7 +12,7 @@
         "url": "https://github.com/futurenanigans/awl-dist/releases/download/v0.1.0-alpha.7/awl-plugin-0.1.0-alpha.7.zip",
         "sha256": "669d94df50ee593013be8230966ab8343170212f51e4b1dd677ce4bd3a6bb7b8"
       },
-      "description": "Roslyn semantic analysis on every C# edit (alpha). Carries awl.dll and runs it with dotnet; needs the .NET 10 runtime"
+      "description": "Roslyn semantic analysis on every C# edit (alpha). Carries awl.dll and runs it with dotnet; needs the .NET 10 SDK"
     },
     {
       "name": "dotnet",
@@ -22,7 +22,7 @@
     {
       "name": "gimlet",
       "source": "./plugins/gimlet",
-      "description": "C#/.NET security scan runner (opengrep rules, SDK Security analyzers, Dotnetarium, NuGet and OSV package checks, Betterleaks) and running-API probe (Spectral, Schemathesis, ZAP), with a skill for triaging and fixing findings. Downloads pinned tools on first use; needs curl and jq"
+      "description": "C#/.NET security scan runner (opengrep rules, SDK Security analyzers, Dotnetarium, NuGet and OSV package checks, Betterleaks) and running-API probe (Spectral, Schemathesis, ZAP), with a skill for triaging and fixing findings. Downloads pinned tools on first use; needs curl"
     },
     {
       "name": "lam",

@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: kr-file-added-method
+description: A method added to a file written in K&R style gets Allman braces, and the existing lines stay as they were.
+tags: [smoke]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

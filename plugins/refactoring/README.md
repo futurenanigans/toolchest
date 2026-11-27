@@ -61,7 +61,7 @@ With `--auto`, Claude skips your review of the report and dispatches every actio
 
 Both `task-implementer` and `implementation-reviewer` load the convention skills the global `CLAUDE.md` maps to their files through the Skill tool, so a dispatch need not paste those conventions in.
 
-`task-implementer` is told never to run git, and a `PreToolUse` hook enforces it. `hooks/gate-implementer-git.ps1` inspects every Bash and PowerShell command, and when the caller is `task-implementer` and the command invokes git, it denies the call and tells the agent to return `NEEDS_CONTEXT` or `BLOCKED` instead. Other agents and the main session are unaffected. The hook runs under `pwsh`, so PowerShell 7 must be on your `PATH`.
+`task-implementer` is told never to run git, and a hook enforces it. `hooks/register.ts` inspects every Bash and PowerShell command, and when the caller is `task-implementer` and the command invokes git, it denies the call and tells the agent to return `NEEDS_CONTEXT` or `BLOCKED` instead. Other agents and the main session are unaffected. The hook runs inside Claude Code, so it needs nothing else installed.
 
 ## Convention skills
 

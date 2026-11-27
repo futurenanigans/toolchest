@@ -1,5 +1,6 @@
-{
-  "rules": [
+// The writing-style rules prose-lint and the dash hook run. Each `pattern` is a regular expression source; a rule
+// with `words` matches any of them as whole words instead.
+export const RULES = [
     { "id": "em-dash", "severity": "error", "scope": "any", "pattern": "\u2014", "flags": "", "message": "Em-dash: use a period, colon, semicolon or parentheses." },
     { "id": "en-dash", "severity": "error", "scope": "any", "pattern": "\u2013", "flags": "", "message": "En-dash: use a hyphen in compounds, \"to\" in ranges, or restructure." },
     { "id": "zero-width-char", "severity": "error", "scope": "any", "pattern": "[\u200B-\u200D\uFEFF]", "flags": "", "message": "Zero-width character: delete it." },
@@ -18,5 +19,4 @@
       "it's worth noting", "note that", "please note", "importantly", "notably", "it's important to", "in order to", "simply", "just", "feel free to",
       "ensure", "enhance", "streamline", "facilitate", "empower", "elevate", "unlock", "comprehensive", "effortlessly", "deep dive", "at its core", "a wide range of", "various"
     ] }
-  ]
-}
+  ];

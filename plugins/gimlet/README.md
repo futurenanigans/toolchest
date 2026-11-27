@@ -28,7 +28,7 @@ Install with `/plugin install gimlet@toolchest`.
 | `schemathesis` | [Schemathesis](https://github.com/schemathesis/schemathesis) | Server errors and contract violations under generated input | `uv` |
 | `zap` | [ZAP](https://github.com/zaproxy/zaproxy) automation framework | Active-scan vulnerabilities such as injection and path traversal | Java 17+ |
 
-`gimlet` itself needs `bash`, `curl` and `jq`, plus `git` for baselines. It runs on Linux, macOS and Windows (Git Bash, with `unzip` or PowerShell); ZAP runs only on Linux and macOS. A scanner whose prerequisite is missing is reported as skipped.
+`gimlet` itself needs `bash` and `curl`, plus `git` for baselines. It uses the `jq` on `PATH`, or downloads a pinned one when there is none. It runs on Linux, macOS and Windows (Git Bash, with `unzip` or PowerShell); ZAP runs only on Linux and macOS. A scanner whose prerequisite is missing is reported as skipped.
 
 Every download is pinned in `config/defaults.env` with its SHA-256, and a mismatch is refused. Dotnetarium installs from its pinned `.nupkg` through a feed that holds only that file. `gimlet update` and `install --version` move opengrep to another release only after [cosign](https://github.com/sigstore/cosign) verifies its signature; the other tools change by editing their pins. npm and uv resolve Spectral's and Schemathesis's own dependencies at install time, so those two are pinned at the top level only.
 

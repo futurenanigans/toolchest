@@ -1,7 +1,6 @@
 // Local Agent Monitor. Runs the advisory checks on every Edit, Write and shell call and attaches their warnings to
-// the tool result for the model, leaving out the checks the awl or loom analyzer covers for the file, counts each
-// warning per check, keeps the status line current, draws the counts in the /guard-stats pane, and tells the model
-// how the session-start git fetch went.
+// the tool result for the model, counts each warning per check, keeps the status line current, draws the counts in
+// the /guard-stats pane, and tells the model how the session-start git fetch went.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface as Engine, PluginOptions, Register, ToolCallInput } from 'claude-code'
 

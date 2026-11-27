@@ -18,18 +18,17 @@ CI validates every plugin and runs the tests with Claude Code 2.1.332; that is t
 
 | Plugin | Needs |
 | :- | :- |
-| `awl` | the .NET 10 runtime |
+| `awl` | the .NET 10 SDK (it loads solutions through MSBuild, so the runtime alone is not enough) |
 | `dotnet` | the .NET SDK and `git`; Docker if the tests use Testcontainers |
-| `gimlet` | `bash`, `curl` and `jq`, `git` for baselines, `cosign` for `gimlet update`; each scanner or probe whose own prerequisite (`dotnet`, the .NET 10 runtime, `npm`, `uv`, Java 17+) is missing is skipped |
+| `gimlet` | `bash` and `curl`, `git` for baselines, `cosign` for `gimlet update`; each scanner or probe whose own prerequisite (`dotnet`, the .NET 10 runtime, `npm`, `uv`, Java 17+) is missing is skipped |
 | `loom` | `bun`, on linux-x64 (glibc) or windows-x64 |
-| `refactoring` | PowerShell 7 (`pwsh`) for the hook that keeps `task-implementer` off git |
 | `rotfeste` | the .NET 10 SDK (it loads projects through MSBuild, so the runtime alone is not enough) |
 | `rust` | a Rust toolchain with edition 2024 (1.85, or 1.88 for let-chains) |
 | `testing` | cargo-mutants, Stryker.NET or StrykerJS for the stack being mutated |
 | `trestle` | `bun` and `git`, plus each agent CLI it drives (`claude`, `codex`, `opencode`, `agy`, `pi`), signed in |
-| `writing` | Node 22 for the dash hook and `prose-lint.mjs` |
+| `writing` | Node 18+ or Bun to run `prose-lint.mjs` by hand or in CI; the dash hook runs inside Claude Code |
 
-`review` needs `git`, plus `gh` for GitHub PRs or `az` with the `azure-devops` extension for Azure DevOps PRs. `lam`, `memory` and `session` need nothing beyond Claude Code.
+`review` needs `git`, plus `gh` for GitHub PRs or `az` with the `azure-devops` extension for Azure DevOps PRs. `lam`, `memory`, `refactoring` and `session` need nothing beyond Claude Code.
 
 The two analyzers are opt-in per repository. Awl does nothing until the repository has `.awl/awl.json` naming a target; `/awl:awl-enable` writes it. Loom selects its rules from `.loom/loom.json`; `/loom:working-with-loom` covers configuring it.
 
@@ -37,7 +36,7 @@ The two analyzers are opt-in per repository. Awl does nothing until the reposito
 
 | Plugin | What it does |
 | :- | :- |
-| [`awl`](https://github.com/futurenanigans/awl-dist) | Roslyn semantic analysis on every C# edit. It denies an edit that breaks a rule and reports design advisories, with a skill that explains each rule and how to resolve it. Installed from a sha256-pinned awl-dist release; needs the .NET 10 runtime on PATH. |
+| [`awl`](https://github.com/futurenanigans/awl-dist) | Roslyn semantic analysis on every C# edit. It denies an edit that breaks a rule and reports design advisories, with a skill that explains each rule and how to resolve it. Installed from a sha256-pinned awl-dist release; needs the .NET 10 SDK on PATH. |
 | [`dotnet`](plugins/dotnet/README.md) | C# conventions that follow Microsoft's style over a project's local one, a skill that installs a standard `.editorconfig` and `Directory.Build.props`, and a NuGet update workflow that updates in tested groups and commits locally. |
 | [`gimlet`](plugins/gimlet/README.md) | Runs C#/.NET security scanners over a repository (opengrep with a bundled ruleset, the SDK's Security analyzers, Dotnetarium taint analysis, NuGet and OSV vulnerable-package checks, Betterleaks secrets) and probes a running API through its OpenAPI document (Spectral, Schemathesis, ZAP), merging everything into one findings file. A skill picks the scan (whole tree, a path, or only what a branch introduced) and triages the findings. Each tool it downloads is pinned to a version and installed on first use. |
 | [`lam`](plugins/lam/README.md) | Local Agent Monitor. It adds advice when an edit or command looks like a shortcut (a skipped or deleted test, a type escape hatch, a swallowed exception, a pasted credential), counts those corrections, draws a status line and fetches from git at session start. |
@@ -51,3 +50,11 @@ The two analyzers are opt-in per repository. Awl does nothing until the reposito
 | [`testing`](plugins/testing/README.md) | Mutation testing with cargo-mutants, Stryker.NET or StrykerJS in resumable chunks, closing the gaps surviving mutants show, plus an audit that removes tests that can never catch a regression. |
 | [`trestle`](plugins/trestle/README.md) | Runs `claude`, `codex`, `opencode`, `agy` or `pi` in isolated git worktrees against a contract, loops until the repository's own checks pass by exit code or structured test report, and merges a passing worktree when asked. Includes a dependency-aware task queue and a live `/trestle` pane. |
 | [`writing`](plugins/writing/README.md) | A house style for prose Claude writes to disk, a `comments` skill that limits code comments, and output styles that cap reply length. |
+
+## Evals
+
+`dotnet`, `rust` and `review` carry `claude plugin eval` smoke cases under `evals/`, tagged `smoke`. Each case runs with and without its plugin, so the score shows what the plugin changes. They call the model on your credentials, so they run on demand, never in CI. From the plugin's folder:
+
+```sh
+claude plugin eval . --tag smoke --scaffold --allow-tools Edit Write Bash --no-publish
+```
