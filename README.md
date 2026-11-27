@@ -14,7 +14,7 @@ CI validates every plugin and runs the tests with Claude Code 2.1.332; that is t
 | :- | :- |
 | `awl` | the .NET 10 runtime |
 | `dotnet` | the .NET SDK and `git`; Docker if the tests use Testcontainers |
-| `gimlet` | `bash`, `curl` and `git`; `cosign` for `gimlet update` |
+| `gimlet` | `bash`, `curl` and `jq`, `git` for baselines, `cosign` for `gimlet update`; each scanner or probe whose own prerequisite (`dotnet`, the .NET 10 runtime, `npm`, `uv`, Java 17+) is missing is skipped |
 | `loom` | `bun`, on linux-x64 (glibc) or windows-x64 |
 | `refactoring` | PowerShell 7 (`pwsh`) for the hook that keeps `task-implementer` off git |
 | `rust` | a Rust toolchain with edition 2024 (1.85, or 1.88 for let-chains) |
@@ -31,7 +31,7 @@ The two analyzers are opt-in per repository. Awl does nothing until the reposito
 | :- | :- |
 | [`awl`](https://github.com/futurenanigans/awl-dist) | Roslyn semantic analysis on every C# edit. It denies an edit that breaks a rule and reports design advisories, with a skill that explains each rule and how to resolve it. Installed from a sha256-pinned awl-dist release; needs the .NET 10 runtime on PATH. |
 | [`dotnet`](plugins/dotnet/README.md) | C# conventions that follow Microsoft's style over a project's local one, a skill that installs a standard `.editorconfig` and `Directory.Build.props`, and a NuGet update workflow that updates in tested groups and commits locally. |
-| [`gimlet`](plugins/gimlet/README.md) | Runs opengrep with a bundled C#/.NET security ruleset, on demand, with a skill for choosing a scan (whole tree, a path, or only what a branch introduced) and triaging the findings. Installs a pinned, hash-checked opengrep release on first use; needs `curl`. |
+| [`gimlet`](plugins/gimlet/README.md) | Runs C#/.NET security scanners over a repository (opengrep with a bundled ruleset, the SDK's Security analyzers, Dotnetarium taint analysis, NuGet and OSV vulnerable-package checks, Betterleaks secrets) and probes a running API through its OpenAPI document (Spectral, Schemathesis, ZAP), merging everything into one findings file. A skill picks the scan (whole tree, a path, or only what a branch introduced) and triages the findings. Each tool it downloads is pinned to a version and installed on first use. |
 | [`lam`](plugins/lam/README.md) | Local Agent Monitor. It adds advice when an edit or command looks like a shortcut (a skipped or deleted test, a type escape hatch, a swallowed exception, a pasted credential), counts those corrections, draws a status line and fetches from git at session start. |
 | [`loom`](https://github.com/futurenanigans/loom-dist) | TypeScript, JavaScript and Vue analysis on every edit, with the same deny-or-advise model as awl and a skill for reading its findings. Installed from a sha256-pinned loom-dist release carrying engines for linux-x64 (glibc) and windows-x64; needs `bun` on PATH. |
 | [`memory`](plugins/memory/README.md) | Checks Claude Code's saved memories against the repository and your instructions and reports which to keep, update, merge, promote or delete; `--apply` backs up the store and asks before changing it. |
