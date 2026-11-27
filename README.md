@@ -17,6 +17,7 @@ CI validates every plugin and runs the tests with Claude Code 2.1.332; that is t
 | `gimlet` | `bash`, `curl` and `jq`, `git` for baselines, `cosign` for `gimlet update`; each scanner or probe whose own prerequisite (`dotnet`, the .NET 10 runtime, `npm`, `uv`, Java 17+) is missing is skipped |
 | `loom` | `bun`, on linux-x64 (glibc) or windows-x64 |
 | `refactoring` | PowerShell 7 (`pwsh`) for the hook that keeps `task-implementer` off git |
+| `rotfeste` | the .NET 10 SDK (it loads projects through MSBuild, so the runtime alone is not enough) |
 | `rust` | a Rust toolchain with edition 2024 (1.85, or 1.88 for let-chains) |
 | `testing` | cargo-mutants, Stryker.NET or StrykerJS for the stack being mutated |
 | `trestle` | `bun` and `git`, plus each agent CLI it drives (`claude`, `codex`, `opencode`, `agy`, `pi`), signed in |
@@ -38,6 +39,7 @@ The two analyzers are opt-in per repository. Awl does nothing until the reposito
 | [`memory`](plugins/memory/README.md) | Checks Claude Code's saved memories against the repository and your instructions and reports which to keep, update, merge, promote or delete; `--apply` backs up the store and asks before changing it. |
 | [`refactoring`](plugins/refactoring/README.md) | Audits of the code on disk for bugs, maintainability, architecture, dead code and repeated patterns. Each writes an evidence-backed report and can fix its findings one commit at a time. |
 | [`review`](plugins/review/README.md) | Reviews a GitHub or Azure DevOps pull request, or a local branch, against its merge base, running Awl, Loom or Gimlet in diff mode where the repository opted in. Every finding is verified against the code, labelled blocking, should-fix or nit, and given a fix; the report says which files it did not review. Read-only toward the PR: replies are drafted in chat for you to post. |
+| [`rotfeste`](https://github.com/futurenanigans/rotfeste-dist) | Finds .NET code nothing reaches. `rot` composes the application the way it starts, without starting it, reads what its DI container and framework registries hold, and reports unreached declarations with the root set, the provenance of each root and the sites it cannot follow. Findings are ranked hypotheses, never a gate. Installed from a sha256-pinned rotfeste-dist release. |
 | [`rust`](plugins/rust/README.md) | A `rust` skill for modern Rust (edition 2024, workspace lints, error types, the fmt, clippy and test checks) and a `modern-rust` reference skill for scaffolding and review. |
 | [`session`](plugins/session/README.md) | `/session:handover <goal>` writes a verified brief for one goal; after `/clear`, `/session:continue` picks it up. |
 | [`testing`](plugins/testing/README.md) | Mutation testing with cargo-mutants, Stryker.NET or StrykerJS in resumable chunks, closing the gaps surviving mutants show, plus an audit that removes tests that can never catch a regression. |
