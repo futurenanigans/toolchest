@@ -71,6 +71,13 @@ Delegate when the work is large enough that a subagent saves more than its brief
 - **Worktrees are the exception, not the default.** Use one only for an agent whose task is large enough that it must run tests itself, and only when the project's tests are per-run isolated (random ports, temp directories, no shared database), the agent's files are disjoint from every other agent's so integration is a fast-forward, and the orchestrator runs the full suite once after integrating. Tests that need fixed ports or a shared database make parallel test runs unsafe under any isolation scheme; run those agents in sequence.
 - **Halt on failure.** When a subagent returns a failure (build broken, tests red, refused task, shallow output), stop dispatching dependent work and report. Let independent agents already running finish, integrate their results, then report.
 
+### Running built executables on Windows
+Microsoft Defender often blocks or quarantines a freshly built, unsigned `.exe` launched from a temp or scratchpad directory, and the failure reads like a broken build or a crashed program. On Windows, do not build a throwaway executable into a scratchpad and run it there.
+
+- Run the code through a signed host instead: `dotnet <app>.dll` or `dotnet run` for .NET, an interpreter (`node`, `bun`, `python`) for a script, the project's test runner for test code.
+- When a native executable is unavoidable, build and run it inside the current project folder, which may already have a Defender exclusion.
+- An access-denied error, a missing output file, or a process killed at launch after a fresh build is a Defender block until shown otherwise. Switch to one of the paths above instead of retrying, and name the block in the report.
+
 ## Implementation requirements
 
 ### Scope and restraint
