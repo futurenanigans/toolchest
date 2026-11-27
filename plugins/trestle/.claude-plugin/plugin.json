@@ -1,0 +1,9 @@
+{
+  "name": "trestle",
+  "description": "Runs coding agent CLIs in isolated git worktrees against contract checks, with a dependency-aware queue and a live /trestle pane",
+  "license": "MIT",
+  "author": {
+    "name": "toolchest maintainers"
+  },
+  "types": "./types/index.d.ts"
+}

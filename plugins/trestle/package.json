@@ -1,0 +1,14 @@
+{
+  "name": "trestle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-platform multi-agent CLI orchestrator plugin for Claude Code",
+  "scripts": {
+    "test": "bun test src/__tests__",
+    "test:unit": "bun test src/__tests__",
+    "test:plugin": "claude plugin test .",
+    "test:live": "bun run scripts/live_harness.ts",
+    "validate": "claude plugin validate .",
+    "typecheck": "bunx tsc --noEmit"
+  }
+}

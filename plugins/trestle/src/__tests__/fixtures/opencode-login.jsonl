@@ -1,0 +1,2 @@
+{"type":"step_start","timestamp":1791828868174,"sessionID":"ses_REDACTED","part":{"id":"prt_REDACTED","sessionID":"ses_REDACTED","messageID":"msg_REDACTED","type":"step-start","snapshot":"4b825dc642cb6eb9a060e54bf8d69288fbee4904"}}
+{"type":"error","timestamp":1791828868198,"sessionID":"ses_REDACTED","error":{"type":"provider.auth","message":"invalid x-api-key","status":401,"response":{"body":"{\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_REDACTED\"}"}}}

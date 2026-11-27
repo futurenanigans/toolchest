@@ -69,6 +69,11 @@
       "description": "Mutation testing and test noise audits"
     },
     {
+      "name": "trestle",
+      "source": "./plugins/trestle",
+      "description": "Runs coding agent CLIs in isolated git worktrees against contract checks, with a dependency-aware queue and a live /trestle pane"
+    },
+    {
       "name": "writing",
       "source": "./plugins/writing",
       "description": "House writing style and response output styles"

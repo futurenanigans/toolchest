@@ -1,0 +1,6 @@
+node_modules/
+.trestle-wt/
+.trestle/
+*.log
+roadmap.md
+bug-reports/

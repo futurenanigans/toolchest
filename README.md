@@ -19,6 +19,7 @@ CI validates every plugin and runs the tests with Claude Code 2.1.332; that is t
 | `refactoring` | PowerShell 7 (`pwsh`) for the hook that keeps `task-implementer` off git |
 | `rust` | a Rust toolchain with edition 2024 (1.85, or 1.88 for let-chains) |
 | `testing` | cargo-mutants, Stryker.NET or StrykerJS for the stack being mutated |
+| `trestle` | `bun` and `git`, plus each agent CLI it drives (`claude`, `codex`, `opencode`, `agy`, `pi`), signed in |
 | `writing` | Node 22 for the dash hook and `prose-lint.mjs` |
 
 `review` needs `git`, plus `gh` for GitHub PRs or `az` with the `azure-devops` extension for Azure DevOps PRs. `lam`, `memory` and `session` need nothing beyond Claude Code.
@@ -40,4 +41,5 @@ The two analyzers are opt-in per repository. Awl does nothing until the reposito
 | [`rust`](plugins/rust/README.md) | A `rust` skill for modern Rust (edition 2024, workspace lints, error types, the fmt, clippy and test checks) and a `modern-rust` reference skill for scaffolding and review. |
 | [`session`](plugins/session/README.md) | `/session:handover <goal>` writes a verified brief for one goal; after `/clear`, `/session:continue` picks it up. |
 | [`testing`](plugins/testing/README.md) | Mutation testing with cargo-mutants, Stryker.NET or StrykerJS in resumable chunks, closing the gaps surviving mutants show, plus an audit that removes tests that can never catch a regression. |
+| [`trestle`](plugins/trestle/README.md) | Runs `claude`, `codex`, `opencode`, `agy` or `pi` in isolated git worktrees against a contract, loops until the repository's own checks pass by exit code or structured test report, and merges a passing worktree when asked. Includes a dependency-aware task queue and a live `/trestle` pane. |
 | [`writing`](plugins/writing/README.md) | A house style for prose Claude writes to disk, a `comments` skill that limits code comments, and output styles that cap reply length. |
