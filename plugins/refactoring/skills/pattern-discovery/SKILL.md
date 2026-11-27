@@ -1,6 +1,6 @@
 ---
 name: pattern-discovery
-description: Discovers emergent patterns in the current code on disk (library reimplementations, repeated structural shapes, unnamed conventions) and optionally formalizes them by adopting a library, extracting an abstraction, documenting the convention, or leaving them alone. Use when the user asks to "find duplicated patterns", "find repeated code", "what could use a library here", "simplify recurring structures", or "surface conventions". Never reviews a git diff.
+description: Discovers emergent patterns in the current code on disk (library reimplementations, repeated structural shapes, unnamed conventions) and optionally formalizes them by adopting a library, extracting shared code, documenting the convention, or leaving them alone. Use when the user asks to "find duplicated patterns", "find repeated code", "what could use a library here", "simplify recurring structures", or "surface conventions". Never reviews a git diff.
 argument-hint: "[--auto] [--formalize [1,3]] [--context <path>] [path]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
@@ -22,7 +22,7 @@ For each candidate record the behavioral shape, every occurrence with `file:line
 
 **Pass 2, filtering.** Remove any candidate that fails these:
 
-1. **Rule of three**: skip patterns with fewer than 3 occurrences. Exception: library reimplementations, where even one occurrence is worth flagging because the library handles edge cases the reimplementation misses.
+1. **Rule of three**: skip patterns with fewer than 3 occurrences. It counts duplicated logic only; whether a component depends on a contract is an architecture question the global standards answer, and it is never judged by occurrence count. Exception: library reimplementations, where even one occurrence is worth flagging because the library handles edge cases the reimplementation misses.
 2. **Behavioral, not syntactic**: structures must share behavioral shape. Three classes taking a logger in the constructor share a DI convention. Three pieces of code that build, cache, and invalidate the same kind of resource are a pattern.
 3. **Framework-provided**: skip patterns the framework already handles correctly (routing, ORM session management, middleware pipelines). Flag only when the codebase reimplements what the framework provides.
 
@@ -33,9 +33,9 @@ Assign exactly one recommendation per finding:
 | Recommendation | When | Steering bias |
 |---|---|---|
 | **Adopt library** | A mature library does this | Prefer over Extract when a library exists |
-| **Extract abstraction** | 3+ locations, no library, duplication causes shotgun surgery | Use sparingly; only when the cost is concrete |
+| **Extract shared code** | 3+ locations, no library, duplication causes shotgun surgery | Use sparingly; only when the cost is concrete |
 | **Document convention** | Good pattern arrived at organically, undocumented | Prefer over Extract when the pattern is simple |
-| **Leave alone** | Similarity is coincidental, pattern still evolving, or cost is low | Default when uncertain; premature abstraction is worse than duplication |
+| **Leave alone** | Similarity is coincidental, pattern still evolving, or cost is low | Default when uncertain; a premature shared helper is worse than duplicated logic |
 
 **Severity.** High: shotgun surgery on routine changes (5+ locations), or a reimplementation missing edge cases the library handles. Medium: locations have already diverged subtly, or new contributors add non-matching instances. Low: pattern is real but cost is minor.
 
@@ -57,6 +57,6 @@ Use the shared report format with these fill-ins:
 Each finding's subagent works according to its recommendation:
 
 - **Adopt library**: add the package, create a wrapper or config if needed, migrate call sites one at a time, remove the reimplementation, clean up tests that tested internals of the old code.
-- **Extract abstraction**: design the minimal abstraction, create it, migrate consumers one at a time. If a consumer does not fit cleanly, leave it alone; the abstraction may be too narrow.
+- **Extract shared code**: design the minimal shared helper, create it, migrate consumers one at a time. If a consumer does not fit cleanly, leave it alone; the helper may be too narrow.
 - **Document convention**: add a concise `CLAUDE.md` entry describing the convention, when to use it, and a pointer to an exemplar.
 - **Leave alone**: skipped, per the shared procedure.

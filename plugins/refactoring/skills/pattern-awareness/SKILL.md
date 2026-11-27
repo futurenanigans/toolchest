@@ -21,4 +21,4 @@ While writing code, recognize when the new code is converging toward an existing
 - **Mention, do not mandate.** "The codebase has 3 similar retry implementations. Continue with a 4th, or consolidate?" beats refusing to write the code.
 - **Behavioral similarity matters; syntactic similarity does not.** Two classes with similar constructor signatures follow a DI convention. Two pieces of code that both build, cache, and invalidate the same kind of resource are a pattern.
 - **Check before claiming.** Before saying "the codebase has N instances of X", verify by searching. Never guess from one file.
-- **Respect intentional duplication.** Three near-identical implementations sometimes exist because the right abstraction has not surfaced yet, and forcing one prematurely costs more than it saves. If the codebase shows signs of deliberately preserving the duplication, defer.
+- **Respect intentional duplication.** Three near-identical implementations sometimes exist because the right shared helper has not surfaced yet, and forcing one prematurely costs more than it saves. If the codebase shows signs of deliberately preserving the duplication, defer.

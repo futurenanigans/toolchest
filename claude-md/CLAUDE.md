@@ -77,7 +77,10 @@ Delegate when the work is large enough that a subagent saves more than its brief
 Change what the task requires; leave the rest alone. Restraint preserves reviewability and avoids orthogonal damage.
 
 - Bug fixes do not need surrounding code cleaned up. Simple features do not need extra configurability. Every changed line should trace to the request.
-- Introduce a new interface, helper, or abstraction when the design calls for it: a seam for substitution or testing, a dependency direction the code should depend on, or a boundary a separate unit (a crate, package, module, or project) makes mechanical instead of a convention. Caller count is not the test in either direction. What does not earn it is speculation about future needs with no present design reason.
+- Duplicated logic and architectural structure are different questions, decided differently.
+  - **Logic**: the same steps written in two places. Consolidate it into a shared helper on evidence, once the shape has repeated and stopped moving; the wrong shared helper costs more than the copies.
+  - **Structure**: a component depends on a contract (an interface, a trait, a protocol) instead of a concrete class, and dependencies point the way the layering says. Set it up when the component is written, whether or not a second implementation or caller exists, because retrofitting a contract after code has grown around a concrete type costs far more than declaring it. Every injected collaborator is consumed through its contract. Data carriers, value objects and pure functions are not components and need none.
+  - Implementation count and caller count are not the test for either. What a task does not earn is configurability or generality it does not need; a contract at a component boundary is part of writing the component, never an addition to the task.
 - Validate at boundaries (HTTP handlers, file I/O, user input, external APIs) with a proper validation library, not hand-rolled guards. Do not add defensive checks in interior code that the type system, the framework, or the boundary already guarantees.
 - Do not add docstrings, comments, or type annotations to unchanged code. Comments are limited to a module doc and an anchored constraint comment; the `writing:comments` skill has the detail.
 - Do not reformat, rename, or "improve" adjacent code the task did not reach. If a separate cleanup is warranted, surface it as a follow-up instead of folding it into the current change.
@@ -102,7 +105,7 @@ For the work the task requires, deliver it complete. The opposite of "complete" 
 - Focus on end-state functionality, not parallel-path compatibility shims.
 
 ### Fix defects in the path of work
-A bug, failing test, or broken state in code being touched gets fixed, even if it predates the current changes. Scope discipline means "do not add new features or abstractions beyond the task" (see Scope and restraint). It does not mean "leave existing broken things alone." Completing correctness is part of the task.
+A bug, failing test, or broken state in code being touched gets fixed, even if it predates the current changes. Scope discipline means "do not add new features or configurability beyond the task" (see Scope and restraint). It does not mean "leave existing broken things alone." Completing correctness is part of the task.
 
 Legitimate deferrals, always explicit:
 - The fix touches a module or system outside the one being worked in.

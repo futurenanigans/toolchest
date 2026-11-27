@@ -30,7 +30,7 @@ Apply the conventions from existing knowledge rather than re-deriving them from 
 
 ## Wiring
 
-- **Dependency injection**: appropriate lifetimes. Singleton for long-lived, Scoped for request-bound, Transient for stateless.
+- **Dependency injection**: every service is registered and injected through its interface (`services.AddScoped<IOrderRepository, OrderRepository>()`, constructor parameter `IOrderRepository`), including the first and only implementation. Appropriate lifetimes: Singleton for long-lived, Scoped for request-bound, Transient for stateless.
 - **Async/await**: all I/O async, with `CancellationToken` threaded through. `ConfigureAwait(false)` on awaits in library code; application code omits it.
 - **Configuration**: strongly typed classes with the `IOptions<T>` pattern and validation. URLs, timeouts, limits, and feature flags belong in `appsettings.json`.
 - **Security**: Microsoft's cryptographic APIs (`IDataProtector`, `RandomNumberGenerator`), never hand-rolled crypto.
