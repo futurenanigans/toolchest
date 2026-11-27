@@ -1,7 +1,7 @@
 // The status line (model, effort, git, usage and the session's advisory total) and the session-start
 // `git fetch` whose outcome the model is told, so remote-tracking refs are never assumed fresh.
 import { atom, read } from 'claude-code'
-import type { EngineInterface as Engine, PluginOptions, SessionContextUsage } from 'claude-code'
+import type { EngineInterface as Engine, PluginOptions, SessionContextUsage, SessionRateLimit } from 'claude-code'
 
 import type { LamCounts, StatusSegment } from '../types'
 
@@ -21,6 +21,15 @@ const EFFORT_COLORS: Readonly<Record<string, string>> = { low: 'green', medium: 
 const CONTEXT_RED_PERCENT = 30
 const CONTEXT_RED_TOKENS = 300_000
 const CONTEXT_YELLOW_PERCENT = 20
+
+const HOUR_MS = 3_600_000
+const QUOTA_WINDOWS: readonly { kind: string; label: string; lengthMs: number }[] = [
+  { kind: 'five_hour', label: '5h', lengthMs: 5 * HOUR_MS },
+  { kind: 'seven_day', label: '7d', lengthMs: 7 * 24 * HOUR_MS },
+]
+const QUOTA_MIN_ELAPSED_FOR_PROJECTION = 0.1
+const QUOTA_RED_PERCENT = 90
+const QUOTA_YELLOW_PROJECTED_PERCENT = 90
 
 const NON_INTERACTIVE_GIT_ENV: Record<string, string> = {
   GIT_TERMINAL_PROMPT: '0',
@@ -105,7 +114,42 @@ function contextLimit({ window, breakdown }: SessionContextUsage): number {
   return isAutoCompactEnabled && autoCompactThreshold !== undefined ? autoCompactThreshold : rawMaxTokens
 }
 
-type EffortSettings = { effortLevel?: string; modelSettings?: Readonly<Record<string, { effortLevel?: string } | undefined>> }
+function shortDuration(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / 60_000))
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  if (days > 0) return `${days}d${hours}h`
+  return hours > 0 ? `${hours}h${minutes % 60}m` : `${minutes}m`
+}
+
+const usedColor = (used: number): string => (used >= QUOTA_RED_PERCENT ? 'red' : 'green')
+
+function quotaSegment(limit: SessionRateLimit, label: string, lengthMs: number, now: number): StatusSegment {
+  const used = limit.percentUsed
+  const head = `${label} ${Math.round(used)}%`
+  const resetsAt = limit.resetsAt === undefined ? Number.NaN : Date.parse(limit.resetsAt)
+  if (Number.isNaN(resetsAt) || resetsAt <= now) return { text: head, color: usedColor(used) }
+
+  const remainingMs = Math.min(resetsAt - now, lengthMs)
+  const elapsedMs = lengthMs - remainingMs
+  const resets = `resets ${shortDuration(remainingMs)}`
+  if (elapsedMs / lengthMs < QUOTA_MIN_ELAPSED_FOR_PROJECTION || used <= 0) return { text: `${head} ${resets}`, color: usedColor(used) }
+
+  const projected = (used * lengthMs) / elapsedMs
+  if (projected >= 100) {
+    const fullInMs = ((100 - used) / used) * elapsedMs
+    return { text: `${head} full in ${shortDuration(fullInMs)}, ${resets}`, color: 'red' }
+  }
+  const color = used >= QUOTA_RED_PERCENT ? 'red' : projected >= QUOTA_YELLOW_PROJECTED_PERCENT ? 'yellow' : 'green'
+  return { text: `${head} →${Math.round(projected)}% ${resets}`, color }
+}
+
+const quotaSegments = (limits: readonly SessionRateLimit[], now: number): StatusSegment[] =>
+  QUOTA_WINDOWS.flatMap(({ kind, label, lengthMs }) =>
+    limits.filter(limit => limit.kind === kind).map(limit => quotaSegment(limit, label, lengthMs, now)),
+  )
+
+type EffortSettings ={ effortLevel?: string; modelSettings?: Readonly<Record<string, { effortLevel?: string } | undefined>> }
 
 function modelSegment(model: string, options: PluginOptions): StatusSegment {
   const family = MODEL_FAMILIES.find(({ family }) => family.test(model))
@@ -125,6 +169,7 @@ export async function statusSegments($: Engine, options: PluginOptions): Promise
   if (effort) parts.push({ text: `effort:${effort}`, color: EFFORT_COLORS[effort] })
   parts.push(...(await gitSegments($, cwd)))
   if (usage.cost) parts.push({ text: `$${usage.cost.usd.toFixed(2)}` })
+  parts.push(...quotaSegments(usage.rateLimits, await $.clock.now()))
   const { tokens } = usage.context
   if (tokens !== undefined) {
     const percent = (tokens / contextLimit(usage.context)) * 100

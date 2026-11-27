@@ -37,10 +37,11 @@ lam draws one line under the prompt, with segments separated by ` | `:
 4. The branch, with `*` when the working tree has changes.
 5. Drift against the upstream: `=` when level, `+N` ahead, `-N` behind, or both. Omitted when the branch has no upstream.
 6. Session cost in dollars.
-7. `ctx N%`, measured against the auto-compaction point when one is set. Green below 20 percent, yellow from 20, red from 30 percent or from 300K tokens.
-8. `guard N` in yellow, the session's advisory total, shown once at least one counted advisory has been delivered.
+7. One segment each for the five-hour and seven-day subscription windows, when the last response reported them: the share used, then where that share lands at reset if use keeps the window's average rate so far (`5h 30% →75% resets 3h0m`). A window on course to run out first shows when instead (`5h 60% full in 1h20m, resets 3h0m`) in red. The projection appears once a tenth of the window has passed; before that the segment shows the share used and the time to reset. Green, yellow from a 90 percent projection, red from 90 percent used.
+8. `ctx N%`, measured against the auto-compaction point when one is set. Green below 20 percent, yellow from 20, red from 30 percent or from 300K tokens.
+9. `guard N` in yellow, the session's advisory total, shown once at least one counted advisory has been delivered.
 
-Outside a git repository, or on a detached HEAD, segments 3 to 5 become the directory name. The line refreshes at session start, after every turn and after each counted advisory.
+Outside a git repository, or on a detached HEAD, segments 3 to 5 become the directory name. The line refreshes at session start, after every turn, when a quota window moves a whole point, and after each counted advisory.
 
 ## Session-start fetch
 

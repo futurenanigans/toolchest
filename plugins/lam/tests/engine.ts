@@ -1,4 +1,5 @@
 // The engine beneath lam in tests: a git repository, a session, files on disk and tool answers, each settable per test.
+import type { SessionRateLimit } from 'claude-code'
 import type { TestBody } from 'claude-code/testing'
 
 export const CWD = '/repo/widget'
@@ -7,9 +8,9 @@ type On = Parameters<TestBody>[1]
 type TestEngine = Parameters<TestBody>[0]
 type GitOutput = { exitCode: number; stdout?: string; stderr?: string }
 export type ProcessRun = { argv: readonly string[]; env?: Readonly<Record<string, string>> }
-export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; env?: Record<string, string>; runs?: ProcessRun[]; fetchGate?: Promise<void>; denial?: string; denyFirstCall?: string; gitMissing?: boolean; contextTokens?: number; contextWindow?: number; settings?: Record<string, unknown>; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number } }
+export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; env?: Record<string, string>; runs?: ProcessRun[]; fetchGate?: Promise<void>; denial?: string; denyFirstCall?: string; gitMissing?: boolean; contextTokens?: number; contextWindow?: number; settings?: Record<string, unknown>; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number }; rateLimits?: SessionRateLimit[] }
 
-export function stubEngine(on: On, { git = {}, files = {}, env = {}, runs = [], fetchGate, denial, denyFirstCall, gitMissing = false, contextTokens = 234_000, contextWindow = 1_000_000, settings = { effortLevel: 'high' }, compaction }: EngineSetup = {}): void {
+export function stubEngine(on: On, { git = {}, files = {}, env = {}, runs = [], fetchGate, denial, denyFirstCall, gitMissing = false, contextTokens = 234_000, contextWindow = 1_000_000, settings = { effortLevel: 'high' }, compaction, rateLimits = [] }: EngineSetup = {}): void {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('command.register', () => ({ value: { command: 'guard-stats' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -24,7 +25,7 @@ export function stubEngine(on: On, { git = {}, files = {}, env = {}, runs = [], 
       isAutoCompactEnabled: compaction?.autoCompactThreshold !== undefined,
     }
     const context = { window: contextWindow, tokens: contextTokens, percent: Math.round((contextTokens / contextWindow) * 100), breakdown }
-    return { value: { startedAt: 0, context, rateLimits: [], cost: { usd: 1.234 } } as never }
+    return { value: { startedAt: 0, context, rateLimits, cost: { usd: 1.234 } } as never }
   })
   on('clock.now', () => ({ value: Date.UTC(2026, 10, 25, 9, 30, 0) }))
   on('env.get', (_, e) => ({ value: env[e.name] }))

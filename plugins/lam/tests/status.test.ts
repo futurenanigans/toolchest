@@ -158,3 +158,30 @@ test('a slow fetch does not hold the prompt: it says the fetch is running, and a
   expect(settled.sections.map(s => s.id)).toEqual(['intro', 'lam:fetch'])
   expect(settled.sections.at(-1)?.text).toContain('git fetch --all --prune completed')
 })
+
+test('each quota window shows its use, its projection at reset and the time to reset, coloured by the projection', async ($, on) => {
+  stubEngine(on, { rateLimits: [
+    { kind: 'seven_day', percentUsed: 80, resetsAt: '2026-11-26T09:30:00Z' },
+    { kind: 'five_hour', percentUsed: 30, resetsAt: '2026-11-25T12:30:00Z' },
+    { kind: 'spend_limit', percentUsed: 12 },
+  ] })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  const row = await statusRow($)
+  expect(row.text).toContain(' | $1.23 | 5h 30% →75% resets 3h0m | 7d 80% →93% resets 1d0h | ctx ')
+  expect(await row.colorOf('5h 30% →75% resets 3h0m')).toBe('green')
+  expect(await row.colorOf('7d 80% →93% resets 1d0h')).toBe('yellow')
+})
+
+test('a window on course to run out before it resets says when, in red', async ($, on) => {
+  stubEngine(on, { rateLimits: [{ kind: 'five_hour', percentUsed: 60, resetsAt: '2026-11-25T12:30:00Z' }] })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  const row = await statusRow($)
+  expect(row.text).toContain(' | 5h 60% full in 1h20m, resets 3h0m | ')
+  expect(await row.colorOf('5h 60% full in 1h20m, resets 3h0m')).toBe('red')
+})
+
+test('a window barely begun shows no projection', async ($, on) => {
+  stubEngine(on, { rateLimits: [{ kind: 'five_hour', percentUsed: 2, resetsAt: '2026-11-25T14:20:00Z' }] })
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+  expect((await statusRow($)).text).toContain(' | 5h 2% resets 4h50m | ')
+})

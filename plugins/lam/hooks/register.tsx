@@ -81,6 +81,12 @@ export const register: Register = (on, options) => {
     return completed
   })
 
+  on('session.measure', async ($, e, next) => {
+    const measured = await next(e)
+    if (e.changed.includes('rateLimits')) await refreshStatus($, options)
+    return measured
+  })
+
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     if (fetched === undefined) await Promise.race([fetchOutcome, $.clock.sleep(FETCH_WAIT_MS)])
