@@ -147,3 +147,39 @@ test('an awl or loom config leaves every lam check running, because the marker d
   expect(script.context?.join('')).toContain('skips or disables a test')
   expect(script.context?.join('')).toContain('escape hatch')
 })
+
+test('a test or build run piped into a filter is flagged, with the hidden exit code named', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const commands = [
+    'cargo test -p core 2>&1 | tail -n 20',
+    'cd src && dotnet test | grep -E "Failed|Passed"',
+    'RUST_LOG=debug timeout 600 cargo nextest run |& head',
+    'bun run test | tee out.log',
+  ]
+  for (const command of commands) {
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect(ran.context?.join('')).toContain('Without pipefail')
+  }
+})
+
+test('a pipeline that keeps the exit code, or pipes something other than a verification run, is not flagged', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+
+  const commands = [
+    'set -o pipefail; cargo test 2>&1 | tail -n 20',
+    'cargo test | tail; echo "exit ${PIPESTATUS[0]}"',
+    'git log --oneline | head',
+    'cargo test > out.log 2>&1; tail -n 20 out.log',
+    'cargo test || echo failed',
+    'grep "cargo test | tail" notes.md',
+    'ls | cargo-testing-tool',
+    'cat log | cargo test',
+  ]
+  for (const command of commands) {
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect(ran.context).toBeUndefined()
+  }
+})

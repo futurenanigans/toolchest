@@ -1,5 +1,5 @@
 // The pattern advisories: credentials, skipped tests, test deletion and type-system escape hatches, each firing
-// only on what the edit adds beyond the text it replaces.
+// only on what the edit adds beyond the text it replaces, and a verification command whose exit code a pipe hides.
 import { type Check, type LabelledPattern, isBlank, isEditOrWrite, fileExtension, looksLikeTestFile, newlyAddedLabels } from './text'
 
 const SECRET_PATTERNS: readonly LabelledPattern[] = [
@@ -70,7 +70,51 @@ const DOWNGRADES_BY_EXTENSION: Readonly<Record<string, readonly LabelledPattern[
   ],
 }
 
-const SHELL_DELETE = /(?:^|[;&|(\r\n]\s*|\b(?:sudo|xargs)\s+)(git\s+rm|rm|Remove-Item|ri|del|erase)\b([^&|;\r\n]*)/gim
+const VERIFICATION_COMMAND = new RegExp(
+  String.raw`^(?:\w+=\S*\s+)*(?:(?:time|env|nice|sudo|timeout\s+\S+)\s+)*(?:` +
+    [
+      String.raw`cargo\s+(?:\+\S+\s+)?(?:test|build|check|clippy|nextest)`,
+      String.raw`dotnet\s+(?:test|build)`,
+      String.raw`(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|lint|typecheck|check)\b`,
+      String.raw`(?:npx|bunx|pnpm\s+exec|yarn)\s+(?:tsc|jest|vitest|eslint|playwright)`,
+      String.raw`(?:tsc|jest|vitest|eslint|pytest|mypy|ruff|tox|ctest|make|mvn|gradle|\./gradlew|\./mvnw)\b`,
+      String.raw`python3?\s+-m\s+(?:pytest|unittest|mypy)`,
+      String.raw`go\s+(?:test|build|vet)`,
+      String.raw`claude\s+plugin\s+(?:test|validate)`,
+    ].join('|') +
+    String.raw`)(?![\w-])`,
+)
+const EXIT_STATUS_KEPT = /\bpipefail\b|\bPIPESTATUS\b/
+
+const maskQuoted = (command: string): string => command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, quoted => ' '.repeat(quoted.length))
+
+function maskedPipelines(command: string): string[][] {
+  const masked = maskQuoted(command)
+  return masked
+    .split(/&&|\|\||[;\r\n]|(?<![<>|])&(?![>&])/)
+    .map(pipeline => pipeline.split(/\|&?/).map(stage => stage.trim()))
+    .filter(stages => stages.length > 1)
+}
+
+export const pipedExitCode: Check = {
+  name: 'piped-exit-code',
+  advise: ({ tool, command }) => {
+    if (tool !== 'Bash' || isBlank(command) || EXIT_STATUS_KEPT.test(command)) return null
+    const hidden = maskedPipelines(command).flatMap(stages =>
+      stages.slice(0, -1).flatMap(stage => {
+        const match = VERIFICATION_COMMAND.exec(stage)
+        return match === null ? [] : [{ runner: stage.slice(0, match[0].length).replace(/\s+/g, ' '), sink: stages.at(-1)?.split(/\s+/)[0] ?? '' }]
+      }),
+    )
+    if (hidden.length === 0) return null
+    const pairs = hidden.map(({ runner, sink }) => `${runner} | ${sink}`).join(', ')
+    return `This command pipes a build or test run into another command (${pairs}). Without pipefail a pipeline exits with its last command's status, so a failing run reports success and only the visible excerpt says otherwise.
+
+Read the run's own exit code before reporting a result: prefix the command with \`set -o pipefail;\`, or write the output to a file and read its tail in a second step. If the excerpt shown is cut, the failure may not be in it.`
+  },
+}
+
+const SHELL_DELETE =/(?:^|[;&|(\r\n]\s*|\b(?:sudo|xargs)\s+)(git\s+rm|rm|Remove-Item|ri|del|erase)\b([^&|;\r\n]*)/gim
 
 export const secrets: Check = {
   name: 'secrets',

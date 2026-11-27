@@ -4,15 +4,16 @@ Local Agent Monitor. It watches the edits and shell commands Claude Code makes, 
 
 ## Advisory checks
 
-Every Edit and Write call, and every Bash or PowerShell call, runs through seven checks. A check that fires attaches its message to the tool result as context for the model. The call itself always goes ahead: lam never blocks or rewrites anything. If another hook or the permission system denies the call, lam leaves the denial alone, adds no advice and counts nothing.
+Every Edit and Write call, and every Bash or PowerShell call, runs through eight checks. A check that fires attaches its message to the tool result as context for the model. The call itself always goes ahead: lam never blocks or rewrites anything. If another hook or the permission system denies the call, lam leaves the denial alone, adds no advice and counts nothing.
 
-All seven checks run in every repository, including one that configures the awl or loom analyzer. A `.awl/awl.json` or `.loom/loom.json` says nothing about whether that plugin is installed, whether the file is valid, or which rules it enables, so lam cannot confirm an analyzer covers a check and accepts the occasional duplicate advisory instead.
+All eight checks run in every repository, including one that configures the awl or loom analyzer. A `.awl/awl.json` or `.loom/loom.json` says nothing about whether that plugin is installed, whether the file is valid, or which rules it enables, so lam cannot confirm an analyzer covers a check and accepts the occasional duplicate advisory instead.
 
 Most checks fire only on what the edit adds. For an Edit, the new string is compared with the string it replaces; for a Write, with the file currently on disk. Editing a file that already contains `as any` does not trigger a warning unless the edit adds a new one.
 
 | Check | Triggers on | What the model is told |
 |---|---|---|
 | `collection-first` | C#, TypeScript or JavaScript that newly takes one element of a collection: `First`, `Single`, `Last` (with or without `OrDefault` and `Async`), `find`, `at(n)`, `[0]`, single-element destructuring, or a `Pop`/`Dequeue`/`pop`/`shift` outside a loop | Taking one item is right only for a unique key, a deliberate first or last, or a branch where the count is known to be one. Otherwise iterate the matches. |
+| `piped-exit-code` | A Bash command that pipes a build, test or lint run (`cargo test`, `dotnet test`, `npm test`, `pytest`, `go test` and similar) into another command, such as `\| tail` or `\| grep`, with no `pipefail` and no `PIPESTATUS` in the command | Without pipefail the pipeline exits with its last command's status, so a failing run reports success. Read the run's own exit code before reporting a result. |
 | `readme-guidance` | The first Edit or Write to a `README.md` in a session | What a README should and should not contain, read from the repo, kept off the maintenance path of ordinary commits. Shown once per session. |
 | `secrets` | Added text matching a credential pattern: AWS, GitHub, Anthropic, OpenAI, Stripe, Slack, Google and Azure keys, a connection-string password, a private key header | Replace it with an obvious placeholder, or move the real value to user-secrets, an environment variable or a gitignored file. |
 | `skip-attributes` | A test file gaining a skip or ignore marker (pytest, unittest, Jest/Vitest `skip` and `x` forms, JUnit, xUnit, NUnit, MSTest, Go `t.Skip`, Rust `#[ignore]`, a commented-out test attribute) | A failing test points at production code. Skipping it is reward hacking unless the reason is stated in the report. |
