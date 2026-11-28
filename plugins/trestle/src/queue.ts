@@ -62,6 +62,21 @@ async function withRepoDispatchLock<T>(key: string, fn: () => Promise<T>): Promi
   }
 }
 
+async function patchQueueItem(
+  repoRoot: string,
+  homeDir: string,
+  id: string,
+  patch: Partial<QueueItem>,
+): Promise<void> {
+  await withRepoDispatchLock(queueFilePath(repoRoot, homeDir), async () => {
+    const q = await readQueue(repoRoot, homeDir)
+    const entry = q.items[id]
+    if (!entry) return
+    q.items[id] = { ...entry, ...patch, updatedAt: Date.now() }
+    await writeQueue(repoRoot, q, homeDir)
+  })
+}
+
 export function queueFilePath(repoRoot: string, homeDir = userHome()): string {
   const resolved = path.resolve(repoRoot)
   return path.join(homeDir, '.trestle', repoKey(resolved, isWindows()), 'queue.json')
@@ -101,7 +116,6 @@ function summarizeQueue(q: QueueFile): QueueSummary {
     queued: 0,
     running: 0,
     blocked: 0,
-    passed: 0,
     landed: 0,
     failed: 0,
   }
@@ -412,8 +426,9 @@ export async function queueRunNext(
     ready.map(async item => {
       const wtId = `q-${item.id}`
       const contractId = `q-${item.id}`
+      let wt: Awaited<ReturnType<typeof worktreeCreate>> | undefined
       try {
-        const wt = await worktreeCreate(resolvedRoot, wtId, { homeDir })
+        wt = await worktreeCreate(resolvedRoot, wtId, { homeDir })
         await contractCreate(
           resolvedRoot,
           {
@@ -446,7 +461,7 @@ export async function queueRunNext(
       } catch (err) {
         return {
           item,
-          wt: undefined,
+          wt,
           contractId,
           res: {
             status: 'failed' as const,
@@ -465,19 +480,14 @@ export async function queueRunNext(
 
   // Land passing items sequentially onto targetBranch
   for (const out of outcomes) {
-    const q = await readQueue(resolvedRoot, homeDir)
-    const entry = q.items[out.item.id]!
     if (out.res.status !== 'passed' || !out.wt) {
       const errMsg = out.res.error ?? out.res.lastReport?.summary ?? `Goal loop ${out.res.status}`
-      q.items[out.item.id] = {
-        ...entry,
+      await patchQueueItem(resolvedRoot, homeDir, out.item.id, {
         status: 'failed',
         worktreeId: out.wt?.id,
         contractId: out.contractId,
         error: errMsg,
-        updatedAt: Date.now(),
-      }
-      await writeQueue(resolvedRoot, q, homeDir)
+      })
       failed.push({ id: out.item.id, error: errMsg })
       continue
     }
@@ -485,9 +495,12 @@ export async function queueRunNext(
     try {
       await commitWorktreeChanges(out.wt.path, `trestle(${out.item.id}): ${out.item.title}`)
 
-      // Always resolve targetBranch (defaulting to worktree baseRef) so 2nd+ items re-sync and re-check
+      // Re-sync and re-check whenever targetBranch (defaulting to worktree baseRef) has commits the worktree lacks
       const targetBranch = options.targetBranch ?? out.wt.baseRef
-      if (landed.length > 0 && targetBranch) {
+      const targetMerged = await execCommand('git', ['merge-base', '--is-ancestor', targetBranch, 'HEAD'], {
+        cwd: out.wt.path,
+      })
+      if (targetMerged.exitCode !== 0) {
         const mergeRes = await execCommand('git', ['merge', '--no-edit', targetBranch], {
           cwd: out.wt.path,
         })
@@ -510,29 +523,23 @@ export async function queueRunNext(
       })
       await worktreeClean(resolvedRoot, out.wt.id, { homeDir, supervisor })
 
-      q.items[out.item.id] = {
-        ...entry,
+      await patchQueueItem(resolvedRoot, homeDir, out.item.id, {
         status: 'landed',
         worktreeId: out.wt.id,
         contractId: out.contractId,
         landedCommit: landedRes.landedCommit,
         error: undefined,
-        updatedAt: Date.now(),
-      }
-      await writeQueue(resolvedRoot, q, homeDir)
+      })
       landed.push(out.item.id)
     } catch (err) {
       const errMsg = (err as Error).message
-      q.items[out.item.id] = {
-        ...entry,
+      await patchQueueItem(resolvedRoot, homeDir, out.item.id, {
         status: 'failed',
         worktreeId: out.wt.id,
         contractId: out.contractId,
         error: errMsg,
         gatePassed: true,
-        updatedAt: Date.now(),
-      }
-      await writeQueue(resolvedRoot, q, homeDir)
+      })
       failed.push({ id: out.item.id, error: errMsg })
     }
   }

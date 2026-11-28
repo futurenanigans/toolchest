@@ -87,7 +87,7 @@ Ask the user (or confirm sensible defaults) for:
 ### 3. Configure Per-Repo Checks & Resource Limits (`scope: "repo"`)
 Ask whether the user wants repo config checked in (`inRepo: true` → `<repo>/.trestle/config.json`) or kept local (`inRepo: false` → `~/.trestle/<repo-key>/config.json`):
 - **Verification checks (`checks`):**
-  - Define `commands` tailored to the repo, marking fast lint/typecheck/unit checks with `heavy: false` (so they never block behind slow builds/mutation runs) and leaving full builds/integration/mutation checks as `heavy: true` (default).
+  - Define `commands` tailored to the repo, marking fast lint/typecheck/unit checks with `heavy: false` (a run made only of such steps skips the check mutex and never waits behind another worktree's build) and leaving full builds/integration/mutation checks as `heavy: true` (default).
   - Add optional `metricPattern` (regex with capture group) on benchmark commands if tracking a scalar metric.
   - Set `includeMortise` and `timeoutMs` as appropriate.
 - **Resource limits (`resources`):**

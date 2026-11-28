@@ -485,6 +485,7 @@ export async function runGoalLoop(
         void supervisor.stop(spawned.id)
       }
       params.signal?.addEventListener('abort', onAbort, { once: true })
+      if (params.signal?.aborted) onAbort()
       try {
         const [res] = await supervisor.wait([spawned.id], { mode: 'all' })
         waited = res
@@ -518,6 +519,19 @@ export async function runGoalLoop(
         continue
       }
       break
+    }
+
+    if (waited?.status === 'stopped') {
+      return {
+        status: 'cancelled',
+        contractId: contract.id,
+        worktreeId: params.worktreeId,
+        iterations: iteration,
+        baseline: baselineReport,
+        lastReport,
+        finalText,
+        error: 'Agent stopped before verification',
+      }
     }
 
     if (waited?.status === 'failed') {

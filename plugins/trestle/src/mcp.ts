@@ -107,7 +107,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'worktree_land',
-    description: 'Commit any pending worktree changes (excluding .env*) and merge its branch onto the target branch.',
+    description: 'Commit any pending worktree changes (excluding .env*) and merge its branch onto the target branch. Runs no checks; files the agent committed itself, .env included, are merged.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -121,7 +121,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'worktree_clean',
-    description: 'Stop any attached agent, remove a worktree, delete its temporary branch, and clean session dirs.',
+    description: 'Stop any attached agent, force-remove a worktree (uncommitted work is discarded), delete its temporary branch unless deleteBranch is false, and clean session dirs.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -210,7 +210,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'check_run',
-    description: 'Run mutex-gated verification checks (auto-detected tests, mortise, or explicit commands) in a worktree. Fails closed when 0 steps are detected unless allowEmpty=true.',
+    description: 'Run verification checks (auto-detected tests, mortise, or explicit commands) sequentially in a worktree; a run with any heavy step holds a per-process mutex. Fails closed when 0 steps are detected unless allowEmpty=true.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -464,7 +464,7 @@ const TOOLS: ToolDef[] = [
         repoRoot: { type: 'string' },
         statuses: {
           type: 'array',
-          items: { type: 'string', enum: ['queued', 'running', 'blocked', 'passed', 'landed', 'failed'] },
+          items: { type: 'string', enum: ['queued', 'running', 'blocked', 'landed', 'failed'] },
         },
       },
       required: ['repoRoot'],
@@ -521,7 +521,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: 'queue_run_next',
-    description: 'Dispatch up to maxParallel ready queue items (all dependsOn landed) in parallel worktrees, then land passing items sequentially.',
+    description: 'Dispatch up to maxParallel ready queue items (all dependsOn landed) in parallel worktrees, then land passing items sequentially: each is merged into targetBranch (default: the branch checked out when its worktree was created) with no confirmation, and its worktree and branch are deleted.',
     inputSchema: {
       type: 'object',
       properties: {

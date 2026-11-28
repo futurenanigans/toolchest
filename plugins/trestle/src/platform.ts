@@ -215,6 +215,7 @@ export async function execCommand(
       cwd: options.cwd,
       env: options.env ? { ...process.env, ...options.env } : process.env,
       shell: needsShell,
+      detached: !isWindows(),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     })

@@ -93,3 +93,13 @@ test('fast checks (heavy: false) do not block behind a slow heavy check holding 
   expect(fast.passed).toBe(true)
   expect(events[0]).toBe('fast-done')
 })
+
+test.skipIf(process.platform === 'win32')('execCommand timeout kills the grandchildren that hold its output pipes', async () => {
+  const started = Date.now()
+  const res = await execCommand('sh', ['-c', 'sleep 6; echo late'], { timeoutMs: 300 })
+
+  expect(res.timedOut).toBe(true)
+  expect(res.exitCode).toBe(124)
+  expect(res.stdout).toBe('')
+  expect(Date.now() - started).toBeLessThan(3_000)
+})

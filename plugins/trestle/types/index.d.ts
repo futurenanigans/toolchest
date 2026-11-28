@@ -66,7 +66,7 @@ export interface WorktreeSummary {
   createdAt: number
 }
 
-export type QueueItemStatus = 'queued' | 'running' | 'blocked' | 'passed' | 'landed' | 'failed'
+export type QueueItemStatus = 'queued' | 'running' | 'blocked' | 'landed' | 'failed'
 
 export interface QueueSummary {
   total?: number

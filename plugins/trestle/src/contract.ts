@@ -24,7 +24,7 @@ export interface Contract {
   includeMortise?: boolean
   mutationSessionId?: string
   baseline?: BaselinePolicy
-  maxIterations: number
+  maxIterations?: number
   freshContextPerIteration: boolean
   createdAt: number
 }
@@ -84,7 +84,7 @@ export async function contractCreate(
     ...(params.includeMortise !== undefined ? { includeMortise: params.includeMortise } : {}),
     ...(params.mutationSessionId !== undefined ? { mutationSessionId: params.mutationSessionId } : {}),
     ...(params.baseline !== undefined ? { baseline: params.baseline } : {}),
-    maxIterations: params.maxIterations ?? 10,
+    ...(params.maxIterations !== undefined ? { maxIterations: params.maxIterations } : {}),
     freshContextPerIteration: params.freshContextPerIteration ?? true,
     createdAt: Date.now(),
   }

@@ -52,7 +52,7 @@ test('trestle pane surfaces accurate counts, parallel contracts/checks, metrics,
       { cli: 'opencode', window: 'manual', reason: 'Free usage limit reached' },
     ],
     queue: {
-      counts: { queued: 1, running: 0, blocked: 1, passed: 0, landed: 2, failed: 1 },
+      counts: { queued: 1, running: 0, blocked: 1, landed: 2, failed: 1 },
       items: [
         { id: 'q-1', title: 'Add auth', status: 'failed', cli: 'codex', dependsOn: [], error: 'tests failed' },
         { id: 'q-2', title: 'Add tests', status: 'blocked', cli: 'claude', dependsOn: ['q-1'] },
@@ -164,5 +164,37 @@ test('trestle pane surfaces accurate counts, parallel contracts/checks, metrics,
   await $.ui.press({ plugin: 'trestle', key: 'select-draft-claude', requestId: 'trestle', surface: 'terminal' })
   expect((await ui.find({ type: 'Text', text: /Edit: src\/auth\.ts/ }))?.text).toBe('Edit: src/auth.ts')
 
+  await ui.unmount()
+})
+
+test('trestle pane refreshes after a trestle MCP tool call under the installed plugin tool prefix', async ($, on) => {
+  const files: Record<string, string> = {}
+  setupEngine(on, files)
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount(PANE)
+
+  const now = Date.now()
+  files[`/home/test/.trestle/${repoKey('/repo')}/state.json`] = JSON.stringify({
+    version: 1,
+    worktrees: {},
+    agents: {
+      'wt-i1': {
+        id: 'wt-i1',
+        cli: 'claude',
+        stage: 'goal(1/3)',
+        worktreeId: 'wt',
+        worktreePath: '/repo/.trestle-wt/wt',
+        branch: 'trestle/wt',
+        status: 'done',
+        startedAt: now - 5_000,
+        lastActivityAt: now - 1_000,
+        finishedAt: now - 1_000,
+        tail: [],
+      },
+    },
+  })
+  await $.tool.call({ tool: 'mcp__plugin_trestle_trestle__agent_list', repoRoot: '/repo' })
+
+  expect((await ui.find({ type: 'Text', text: /0 active · 1 done/ }))?.text).toContain('1 done')
   await ui.unmount()
 })

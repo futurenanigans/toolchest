@@ -299,3 +299,110 @@ test('AgentSupervisor handles missing binary cleanly and reconciles dead PIDs on
   expect(disk.agents['stale-agent']?.status).toBe('stopped')
   expect(disk.agents['stale-agent']?.finishedAt).toBeDefined()
 })
+
+async function makeHangingAgentLoop(id: string): Promise<{
+  repo: string
+  home: string
+  params: Parameters<typeof runGoalLoop>[1]
+}> {
+  const { repo, home } = await makeTempRepo()
+  const wt = await worktreeCreate(repo, `${id}-wt`, { homeDir: home })
+  const scriptPath = path.join(repo, 'mock-hang.ts')
+  await fs.writeFile(scriptPath, `setTimeout(() => {}, 30000)\n`, 'utf8')
+  await contractCreate(
+    repo,
+    {
+      id,
+      title: 'Hanging agent',
+      goal: 'Never finishes',
+      acceptanceCriteria: [{ id: 'ac1', description: 'done' }],
+      includeMortise: false,
+      baseline: 'skip',
+      checks: [{ name: 'ok', command: ['bun', '-e', 'process.exit(0)'] }],
+    },
+    home,
+  )
+  return {
+    repo,
+    home,
+    params: {
+      repoRoot: repo,
+      contractId: id,
+      cli: 'claude',
+      worktreeId: wt.id,
+      worktreePath: wt.path,
+      branch: wt.branch,
+      commandOverride: ['bun', 'run', scriptPath],
+      homeDir: home,
+    },
+  }
+}
+
+test('runGoalLoop does not verify or pass an iteration whose agent was stopped', async () => {
+  const { repo, home, params } = await makeHangingAgentLoop('stopped-agent')
+  const supervisor = new AgentSupervisor()
+  const loop = runGoalLoop(supervisor, params)
+
+  const agentId = `${params.worktreeId}-i1`
+  while (!supervisor.list().some(a => a.id === agentId && a.status === 'running')) {
+    await new Promise(r => setTimeout(r, 20))
+  }
+  await supervisor.stop(agentId)
+
+  const res = await loop
+  expect(res.status).toBe('cancelled')
+  expect(res.lastReport).toBeUndefined()
+  const contract = await contractRead(repo, 'stopped-agent', home)
+  expect(contract.acceptanceCriteria[0]?.passed).toBe(false)
+})
+
+test('runGoalLoop stops the agent when the abort arrives while it is still spawning', async () => {
+  const { params } = await makeHangingAgentLoop('abort-in-spawn')
+  const controller = new AbortController()
+  class AbortDuringSpawn extends AgentSupervisor {
+    override async spawn(spawnParams: Parameters<AgentSupervisor['spawn']>[0]) {
+      const spawned = await super.spawn(spawnParams)
+      controller.abort()
+      return spawned
+    }
+  }
+  const supervisor = new AbortDuringSpawn()
+
+  const res = await runGoalLoop(supervisor, { ...params, signal: controller.signal })
+
+  expect(res.status).toBe('cancelled')
+  expect(supervisor.list().map(a => a.status)).toEqual(['stopped'])
+})
+
+test('AgentSupervisor keeps the first terminal frame and stopByWorktree leaves finished agents alone', async () => {
+  const { repo, home } = await makeTempRepo()
+  const scriptPath = path.join(repo, 'mock-two-frames.ts')
+  await fs.writeFile(
+    scriptPath,
+    `
+console.log(JSON.stringify({ type: 'result', subtype: 'authentication_failed', is_error: true, result: 'token expired' }))
+console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'ok' }))
+`,
+    'utf8',
+  )
+  const supervisor = new AgentSupervisor()
+  await supervisor.spawn({
+    repoRoot: repo,
+    id: 'two-frames',
+    cli: 'claude',
+    stage: 'test',
+    worktreeId: 'wt-frames',
+    worktreePath: repo,
+    branch: 'main',
+    prompt: 'hi',
+    commandOverride: ['bun', 'run', scriptPath],
+    homeDir: home,
+  })
+
+  const [waited] = await supervisor.wait(['two-frames'])
+  expect(waited?.status).toBe('failed')
+  expect(waited?.failureKind).toBe('login_failed')
+
+  await supervisor.stopByWorktree('wt-frames')
+  expect(supervisor.list()[0]?.status).toBe('failed')
+})

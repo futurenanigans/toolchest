@@ -134,7 +134,7 @@ export const register: Register = on => {
 
   on('tool.call', async ($, e, next) => {
     const res = await next(e)
-    if (pollState.cwd && e.tool.startsWith('mcp__trestle__')) {
+    if (pollState.cwd && /^mcp__(plugin_trestle_)?trestle__/.test(e.tool)) {
       const active = await syncFromDisk($, pollState.cwd)
       await $.ui.invalidate('ui.render')
       if (active) startPoller($)

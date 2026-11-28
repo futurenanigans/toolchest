@@ -97,6 +97,10 @@ function classifyFailure(ev: Extract<AdapterEvent, { kind: 'turn_failed' }>): Ag
   return 'error'
 }
 
+function isTerminalStatus(status: AgentStatus): boolean {
+  return status === 'done' || status === 'failed' || status === 'stopped'
+}
+
 export class AgentSupervisor {
   private readonly agents = new Map<string, ManagedAgent>()
   private persistChain: Promise<void> = Promise.resolve()
@@ -270,7 +274,6 @@ export class AgentSupervisor {
 
   async wait(ids: readonly string[], options: { mode?: 'all' | 'any'; timeoutMs?: number } = {}): Promise<AgentSummary[]> {
     const mode = options.mode ?? 'all'
-    const isTerminal = (s: AgentStatus) => s === 'done' || s === 'failed' || s === 'stopped'
 
     for (const id of ids) {
       if (!this.agents.has(id)) throw new Error(`Unknown agent: ${id}`)
@@ -278,7 +281,7 @@ export class AgentSupervisor {
 
     const checkDone = () => {
       const statuses = ids.map(id => this.agents.get(id)?.summary.status)
-      return mode === 'any' ? statuses.some(s => s && isTerminal(s)) : statuses.every(s => s && isTerminal(s))
+      return mode === 'any' ? statuses.some(s => s && isTerminalStatus(s)) : statuses.every(s => s && isTerminalStatus(s))
     }
 
     if (!checkDone()) {
@@ -360,7 +363,9 @@ export class AgentSupervisor {
   }
 
   async stopByWorktree(worktreeId: string): Promise<void> {
-    const matching = Array.from(this.agents.values()).filter(m => m.worktreeId === worktreeId)
+    const matching = Array.from(this.agents.values()).filter(
+      m => m.worktreeId === worktreeId && !isTerminalStatus(m.summary.status),
+    )
     await Promise.all(matching.map(m => this.stop(m.summary.id)))
   }
 
@@ -470,6 +475,7 @@ export class AgentSupervisor {
   }
 
   private finalizeTurn(m: ManagedAgent, status: 'done' | 'failed', error?: string, failureKind?: AgentFailureKind): void {
+    if (isTerminalStatus(m.summary.status)) return
     m.summary.status = status
     m.summary.finishedAt = m.summary.finishedAt ?? Date.now()
     if (error) m.summary.error = error

@@ -279,3 +279,100 @@ test('queueRetry keeps the worktree of an item that passed its gate but failed t
   const branch = await execCommand('git', ['show', `${wt.branch}:work.txt`], { cwd: repo })
   expect(branch.stdout).toBe('passing work\n')
 })
+
+async function commitMockProducer(repo: string, body: string): Promise<string> {
+  const scriptPath = path.join(repo, 'mock-q-producer.ts')
+  await fs.writeFile(
+    scriptPath,
+    `
+import * as fs from 'node:fs'
+import * as readline from 'node:readline'
+import { execFileSync } from 'node:child_process'
+const rl = readline.createInterface({ input: process.stdin })
+rl.once('line', () => {
+  rl.close()
+  ${body}
+  console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'ok' }))
+})
+`,
+    'utf8',
+  )
+  await execCommand('git', ['add', 'mock-q-producer.ts'], { cwd: repo })
+  await execCommand('git', ['commit', '-m', 'add mock'], { cwd: repo })
+  return scriptPath
+}
+
+test('queueRunNext records the worktree of an item whose goal loop threw so queueRetry can clean it', async () => {
+  const { repo, home } = await makeTempRepo()
+  const scriptPath = await commitMockProducer(repo, `fs.writeFileSync('a.txt', 'A\\n', 'utf8')`)
+  await queueAdd(
+    repo,
+    {
+      id: 'a',
+      title: 'Add a.txt',
+      goal: 'Create a.txt',
+      acceptanceCriteria: [{ id: 'ac', description: 'a.txt exists' }],
+      includeMortise: false,
+      baseline: 'skip',
+      checks: [{ name: 'chk-a', command: ['bun', '-e', 'if (!require("fs").existsSync("a.txt")) process.exit(1)'] }],
+    },
+    home,
+  )
+
+  class SpawnThrows extends AgentSupervisor {
+    override async spawn(): Promise<never> {
+      throw new Error('spawn exploded')
+    }
+  }
+  const failBatch = await queueRunNext(new SpawnThrows(), repo, {
+    homeDir: home,
+    commandOverride: ['bun', 'run', scriptPath],
+  })
+  expect(failBatch.failed).toEqual([{ id: 'a', error: 'spawn exploded' }])
+  expect((await queueList(repo, home))[0]?.worktreeId).toBe('q-a')
+
+  const supervisor = new AgentSupervisor()
+  await queueRetry(repo, 'a', { homeDir: home, supervisor })
+  const retryBatch = await queueRunNext(supervisor, repo, {
+    homeDir: home,
+    commandOverride: ['bun', 'run', scriptPath],
+  })
+  expect(retryBatch.failed).toEqual([])
+  expect(retryBatch.landed).toEqual(['a'])
+})
+
+test('queueRunNext re-checks the first item against a target branch that moved during its run', async () => {
+  const { repo, home } = await makeTempRepo()
+  const scriptPath = await commitMockProducer(
+    repo,
+    `
+  fs.writeFileSync('a.txt', 'A\\n', 'utf8')
+  const repo = ${JSON.stringify(repo)}
+  fs.writeFileSync(repo + '/poison.txt', 'P\\n', 'utf8')
+  execFileSync('git', ['add', 'poison.txt'], { cwd: repo })
+  execFileSync('git', ['commit', '-m', 'move main'], { cwd: repo })
+`,
+  )
+  await queueAdd(
+    repo,
+    {
+      id: 'a',
+      title: 'Add a.txt',
+      goal: 'Create a.txt',
+      acceptanceCriteria: [{ id: 'ac', description: 'a.txt exists' }],
+      includeMortise: false,
+      baseline: 'skip',
+      checks: [{ name: 'no-poison', command: ['bun', '-e', 'if (require("fs").existsSync("poison.txt")) process.exit(1)'] }],
+    },
+    home,
+  )
+
+  const batch = await queueRunNext(new AgentSupervisor(), repo, {
+    homeDir: home,
+    commandOverride: ['bun', 'run', scriptPath],
+  })
+
+  expect(batch.landed).toEqual([])
+  expect(batch.failed[0]?.error).toContain('Post-merge recheck failed')
+  expect(await fs.exists(path.join(repo, 'a.txt'))).toBe(false)
+})
