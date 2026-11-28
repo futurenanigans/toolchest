@@ -1,17 +1,19 @@
 // The writing-style rules prose-lint and the dash hook run. Each `pattern` is a regular expression source; a rule
-// with `words` matches any of them as whole words instead.
+// with `words` matches any of them as whole words instead, a single word also in its -s, -ed and -ing forms.
 export const RULES = [
-    { "id": "em-dash", "severity": "error", "scope": "any", "pattern": "\u2014", "flags": "", "message": "Em-dash: use a period, colon, semicolon or parentheses." },
+    { "id": "em-dash", "severity": "error", "scope": "any", "pattern": "[\u2014\u2015]", "flags": "", "message": "Em-dash: use a period, colon, semicolon or parentheses." },
+    { "id": "em-dash", "severity": "error", "scope": "markdown", "pattern": "&mdash;", "flags": "", "message": "Em-dash entity: use a period, colon, semicolon or parentheses." },
     { "id": "en-dash", "severity": "error", "scope": "any", "pattern": "\u2013", "flags": "", "message": "En-dash: use a hyphen in compounds, \"to\" in ranges, or restructure." },
+    { "id": "en-dash", "severity": "error", "scope": "markdown", "pattern": "&ndash;", "flags": "", "message": "En-dash entity: use a hyphen in compounds, \"to\" in ranges, or restructure." },
     { "id": "zero-width-char", "severity": "error", "scope": "any", "pattern": "[\u200B-\u200D\uFEFF]", "flags": "", "message": "Zero-width character: delete it." },
     { "id": "citation-markup", "severity": "error", "scope": "any", "pattern": ":?contentReference\\[[^\\]]*\\]|\\boaicite\\b|\\bturn\\d+search\\d+\\b", "flags": "", "message": "Leaked chatbot citation markup: delete it." },
-    { "id": "chatbot-leftover", "severity": "error", "scope": "any", "pattern": "\\bI hope this helps\\b|\\bGreat question\\b|\\bI'd be happy to\\b|^\\s*Certainly!", "flags": "i", "message": "Chatbot reply leftover: delete it." },
+    { "id": "chatbot-leftover", "severity": "error", "scope": "any", "pattern": "\\bI hope this helps\\b|\\bGreat question\\b|\\bI['\u2019]d be happy to\\b|^\\s*Certainly!", "flags": "i", "message": "Chatbot reply leftover: delete it." },
     { "id": "separator-line", "severity": "warning", "scope": "markdown", "pattern": "^\\s*(?:-{3,}|\\*{3,}|_{3,})\\s*$", "flags": "", "message": "Horizontal rule used as a separator: a blank line separates sections." },
     { "id": "title-case-heading", "severity": "warning", "scope": "markdown", "pattern": "^#{1,6}\\s+[A-Z][a-z]+(?:\\s+(?:[A-Z][a-z]+|a|an|the|of|and|or|to|in|on|for|with|by|at))*\\s+[A-Z][a-z]+\\s*$", "flags": "", "message": "Heading in Title Case: use sentence case." },
     { "id": "emoji-heading-bullet", "severity": "warning", "scope": "markdown", "pattern": "^\\s*(?:#{1,6}\\s|[-*+]\\s|\\d+[.)]\\s).*\\p{Extended_Pictographic}", "flags": "u", "message": "Emoji in a heading or bullet: remove it." },
     { "id": "bold-colon-bullet", "severity": "warning", "scope": "markdown", "skipFiles": "^(?:SKILL|CLAUDE)\\.md$", "pattern": "^\\s*(?:[-*+]|\\d+[.)])\\s+\\*\\*[^*]+(?::\\*\\*|\\*\\*:)", "flags": "", "message": "Bullet opening with a bold phrase and a colon is a heading in disguise: use a table or prose." },
     { "id": "commit-opener", "severity": "error", "scope": "commit", "pattern": "^\\s*This (?:PR|pull request|commit|change)\\b", "flags": "i", "message": "Body opens with \"This PR/commit/change\": the reader is looking at it." },
-    { "id": "commit-scaffold", "severity": "error", "scope": "commit", "pattern": "^#{1,6}\\s*(?:Summary|Changes|Testing|Test plan)\\s*$|^\\s*[-*]\\s+\\[[ xX]\\]\\s", "flags": "i", "message": "Summary/Changes/Testing scaffold or checkbox list: say why in prose, verification in one sentence." },
+    { "id": "commit-scaffold", "severity": "error", "scope": "commit", "pattern": "^#{1,6}\\s*(?:Summary|Changes|Testing|Test plan):?\\s*$|^\\s*[-*]\\s+\\[[ xX]\\]\\s", "flags": "i", "message": "Summary/Changes/Testing scaffold or checkbox list: say why in prose, verification in one sentence." },
     { "id": "provenance", "severity": "warning", "scope": "any", "pattern": "(?<!\\\")(?:\\bas requested\\b|\\bper the requirements\\b|\\bto fix the (?:failing )?test\\b|\\bticket \\d+|\\bfrom the review\\b|\\bwe discussed\\b|\\bas discussed\\b|\\bper review\\b|\\baddresses feedback\\b)", "flags": "i", "message": "Provenance offered as a why: state the mechanism instead." },
     { "id": "filler-opener", "severity": "warning", "scope": "any", "pattern": "(?:^|[.!?]\\s+)(?:Moreover|Furthermore|Additionally),", "flags": "", "message": "Filler sentence opener: cut it." },
     { "id": "vocabulary", "severity": "info", "scope": "any", "flags": "i", "message": "Register word: reread the sentence and keep it only if meant literally.", "words": [

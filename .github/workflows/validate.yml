@@ -35,7 +35,9 @@ jobs:
       - name: Test the plugins' hooks
         run: |
           set -euo pipefail
-          for plugin in lam refactoring trestle writing; do claude plugin test "plugins/$plugin"; done
+          for plugin in plugins/*/; do
+            if [ -d "${plugin}tests" ]; then claude plugin test "$plugin"; fi
+          done
       - name: Test trestle
         working-directory: plugins/trestle
         run: bun test src/__tests__
@@ -47,5 +49,5 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s globstar nullglob
-          node plugins/writing/bin/prose-lint.mjs --format github --min-severity warning \
+          node plugins/writing/bin/prose-lint.mjs --format github --min-severity warning --fail-on warning \
             README.md claude-md/*.md plugins/*/README.md plugins/*/skills/**/*.md

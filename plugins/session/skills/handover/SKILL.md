@@ -98,9 +98,9 @@ Then:
 /session:continue .claude/handover/latest.md
 ```
 
-Use this structure exactly. Omit any section whose content would be empty.
+End the response immediately after the `/session:continue` line, with no closing remarks.
 
----
+The brief uses the structure below exactly, from the `# Handover:` heading to the end of this file. Omit any section whose content would be empty.
 
 # Handover: {one-line goal}
 
@@ -137,6 +137,3 @@ Use this structure exactly. Omit any section whose content would be empty.
 ## Deferred
 {Other goals noticed but excluded, one line each.}
 
----
-
-End the response immediately after the `/session:continue` line. No closing remarks.
