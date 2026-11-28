@@ -23,7 +23,7 @@ export function userHome(): string {
 }
 
 export function quoteWindowsArg(arg: string): string {
-  if (/[^a-zA-Z0-9_./:@=+, #()*\\-]/.test(arg)) {
+  if (/[^a-zA-Z0-9_./:@=+, #()*~\\-]/.test(arg)) {
     throw new Error('Unsafe argument for a Windows batch shim. Use a native executable for this command.')
   }
   return !arg || /[ ()*]/.test(arg) ? `"${arg}"` : arg
