@@ -140,39 +140,57 @@ export function format(hit, fmt) {
   return `${hit.file}:${hit.line}:${hit.col}: ${hit.severity} ${text}`;
 }
 
-function changedSpan(before, after) {
+function sharedEnds(before, after) {
   const max = Math.min(before.length, after.length);
   let head = 0;
   while (head < max && before[head] === after[head]) head++;
   let tail = 0;
   while (tail < max - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
-  return [head, after.length - tail];
+  return [head, tail];
 }
 
-function addedLines(before, after) {
-  const removed = new Map();
-  for (const line of splitLines(before)) removed.set(line, (removed.get(line) ?? 0) + 1);
-  return splitLines(after).map((line) => {
-    const left = removed.get(line) ?? 0;
-    if (left > 0) removed.set(line, left - 1);
+function unmatchedLines(from, against) {
+  const available = new Map();
+  for (const line of against) available.set(line, (available.get(line) ?? 0) + 1);
+  return from.map((line) => {
+    const left = available.get(line) ?? 0;
+    if (left > 0) available.set(line, left - 1);
     return left === 0;
   });
+}
+
+function introducedDashLines(hits, original, text) {
+  const before = splitLines(original);
+  const after = splitLines(text);
+  const added = unmatchedLines(after, before);
+  const dropped = unmatchedLines(before, after);
+  const replaced = before.filter((_, i) => dropped[i]);
+  const hitsByLine = new Map();
+  for (const hit of hits) hitsByLine.set(hit.line, [...(hitsByLine.get(hit.line) ?? []), hit]);
+  const byLine = new Map();
+  for (const [lineNumber, lineHits] of hitsByLine) {
+    const line = after[lineNumber - 1];
+    if (!added[lineNumber - 1]) {
+      byLine.set(lineNumber, false);
+      continue;
+    }
+    const kept = (earlier) => {
+      const [head, tail] = sharedEnds(earlier, line);
+      return lineHits.filter((hit) => hit.col - 1 + hit.match.length <= head || hit.col - 1 >= line.length - tail).length;
+    };
+    const source = replaced.findIndex((earlier) => kept(earlier) > 0);
+    const keptHits = source < 0 ? 0 : kept(replaced[source]);
+    if (source >= 0) replaced.splice(source, 1);
+    byLine.set(lineNumber, keptHits < lineHits.length);
+  }
+  return byLine;
 }
 
 export function dashAdvice({ path, text, rules, original }) {
   const markdown = MARKDOWN_EXTENSIONS.has(extensionOf(path));
   const hits = lintText(text, { scope: markdown ? "markdown" : "code", raw: !markdown, rules: rules.filter((r) => DASH_RULES.has(r.id)), file: path });
   if (hits.length === 0) return null;
-  const [start, end] = changedSpan(original, text);
-  const added = addedLines(original, text);
-  const lineStarts = [0];
-  for (let at = text.indexOf("\n"); at >= 0; at = text.indexOf("\n", at + 1)) lineStarts.push(at + 1);
-  const byLine = new Map();
-  for (const hit of hits) {
-    const offset = lineStarts[hit.line - 1] + hit.col - 1;
-    const isNew = added[hit.line - 1] && offset < end && offset + hit.match.length > start;
-    byLine.set(hit.line, isNew || (byLine.get(hit.line) ?? false));
-  }
+  const byLine = introducedDashLines(hits, original, text);
   const introduced = [...byLine].filter(([, isNew]) => isNew).map(([n]) => n);
   const untouched = [...byLine].filter(([, isNew]) => !isNew).map(([n]) => n);
   const list = (ns) => (ns.length === 1 ? "line " : "lines ") + ns.slice(0, MAX_LINES_LISTED).join(", ") + (ns.length > MAX_LINES_LISTED ? ` and ${ns.length - MAX_LINES_LISTED} more` : "");

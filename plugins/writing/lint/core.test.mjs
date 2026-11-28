@@ -34,6 +34,18 @@ test("an edit elsewhere on a line that already had a dash does not claim the das
   assert.match(advice, /line 1 that this edit did not introduce/);
 });
 
+test("a line edited beside its dash, between two other edits, keeps the dash as pre-existing", () => {
+  const advice = dashAdvice({ path: "a.md", text: `top2\nfoo ${EM} baz\nend2\n`, rules, original: `top\nfoo ${EM} bar\nend\n` });
+  assert.doesNotMatch(advice, /this edit put/);
+  assert.match(advice, /line 2 that this edit did not introduce/);
+});
+
+test("a copy of an existing dash line inserted beside it is introduced", () => {
+  const advice = dashAdvice({ path: "a.md", text: `x\na ${EM} b\na ${EM} b\ny\n`, rules, original: `x\na ${EM} b\ny\n` });
+  assert.match(advice, /this edit put em-dashes or en-dashes in a\.md on line 3\./);
+  assert.match(advice, /line 2 that this edit did not introduce/);
+});
+
 test("a second dash added to a line that had one is introduced", () => {
   const advice = dashAdvice({ path: "a.md", text: `x ${EM} y ${EM} z\n`, rules, original: `x ${EM} y\n` });
   assert.match(advice, /this edit put em-dashes or en-dashes in a\.md on line 1\./);
