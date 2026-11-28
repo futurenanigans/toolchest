@@ -9,6 +9,10 @@ Runs each eval case in three fresh copies of its fixture:
 Records exact model, loaded plugins, skill/command activation, deterministic
 and blind agy semantic grades, token counts, cost, duration, spread, and
 token cost per lift.
+
+A trial counts toward an arm's score only when it ran to completion, loaded
+the plugins its arm calls for, and every scored grader returned a verdict.
+An arm with no such trial is reported as not measured.
 """
 from __future__ import annotations
 
@@ -31,6 +35,8 @@ PLUGINS_DIR = REPO_ROOT / "plugins"
 GLOBAL_CLAUDE_MD = REPO_ROOT / "claude-md" / "CLAUDE.md"
 DEFAULT_MODEL = "claude-haiku-5-5"
 DEFAULT_JUDGE_MODEL = "gemini-3.8-flash-low"
+TREATED_ARMS = ("plugin", "suite")
+GRADER_ARMS = ("both", "with-only")
 
 
 def parse_simple_yaml(text: str) -> dict[str, Any]:
@@ -265,13 +271,16 @@ def evaluate_deterministic_grader(
 
     if gtype == "command":
         cmd = str(fm.get("command", "") or body).strip()
-        proc = subprocess.run(
-            ["bash", "-lc", cmd],
-            cwd=fixture_dir,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        try:
+            proc = subprocess.run(
+                ["bash", "-lc", cmd],
+                cwd=fixture_dir,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            return {"name": name, "type": "command", "passed": False, "reason": "Grader command timed out after 60s"}
         return {
             "name": name,
             "type": "command",
@@ -291,6 +300,37 @@ def evaluate_deterministic_grader(
         }
 
     return {"name": name, "type": gtype, "passed": False, "reason": f"Unsupported deterministic grader: {gtype}"}
+
+
+def grader_arm(grader_path: Path, fm: dict[str, Any]) -> str:
+    arm = str(fm.get("arm", "both"))
+    if arm not in GRADER_ARMS:
+        raise ValueError(f"{grader_path}: arm must be one of {GRADER_ARMS}, got {arm!r}")
+    return arm
+
+
+def judge_task_text(case_dir: Path) -> str:
+    """The task statement the judge sees, identical for every arm of a case."""
+    baseline = case_dir / "baseline_prompt.md"
+    source = baseline if baseline.exists() else case_dir / "prompt.md"
+    return source.read_text(encoding="utf-8").strip()
+
+
+def invalid_reason(trial: dict[str, Any]) -> str | None:
+    """Why a trial cannot be scored, or None when it can."""
+    if trial["timed_out"]:
+        return "timed_out"
+    if trial["trace"]["is_error"]:
+        return "errored"
+    if not trial["isolation_ok"]:
+        return "isolation_failed"
+    scored = [g for g in trial["deterministic_graders"] if g.get("scored", True)]
+    pending = [g for g in trial["llm_graders"] if g["scored"]]
+    if any(g["passed"] is None for g in scored) or len([g for g in scored if g["type"] == "llm"]) < len(pending):
+        return "ungraded"
+    if not scored:
+        return "no_scored_graders"
+    return None
 
 
 def snapshot_fixture_files(fixture_dir: Path) -> dict[str, str]:
@@ -422,10 +462,15 @@ def run_single_trial(
             for gp in sorted(graders_dir.glob("*.md")):
                 fm, body = load_frontmatter(gp)
                 gtype = fm.get("type", "")
+                with_only = grader_arm(gp, fm) == "with-only"
+                if with_only and arm not in TREATED_ARMS:
+                    continue
+                scored = not with_only
                 if gtype == "llm":
-                    llm_graders.append({"name": gp.stem, "rubric": body})
+                    llm_graders.append({"name": gp.stem, "rubric": body, "scored": scored})
                 else:
-                    det_results.append(evaluate_deterministic_grader(gp, fm, body, fixture_dir, trace_info))
+                    result = evaluate_deterministic_grader(gp, fm, body, fixture_dir, trace_info)
+                    det_results.append({**result, "scored": scored})
 
         fixture_snapshot = snapshot_fixture_files(fixture_dir) if llm_graders else {}
 
@@ -456,6 +501,7 @@ def run_single_trial(
         "run": run_idx,
         "dormant": dormant,
         "prompt": prompt_text,
+        "judge_task": judge_task_text(case_dir),
         "trace_path": str(trace_path),
         "returncode": rc,
         "timed_out": timed_out,
@@ -473,11 +519,19 @@ def run_single_trial(
     }
 
 
+def record_judge_failure(chunk: list[tuple[int, dict[str, Any]]], reason: str) -> None:
+    for _, t in chunk:
+        for g in t["llm_graders"]:
+            t["deterministic_graders"].append(
+                {"name": g["name"], "type": "llm", "passed": None, "scored": g["scored"], "reason": reason}
+            )
+
+
 def grade_llm_batch(trials: list[dict[str, Any]], judge_model: str, batch_size: int = 8) -> None:
     """Blindly grade all trials that have LLM graders using agy."""
     pending: list[tuple[int, dict[str, Any]]] = []
     for idx, t in enumerate(trials):
-        if t["llm_graders"] and not t["trace"]["is_error"] and not t["timed_out"]:
+        if t["llm_graders"] and not t["trace"]["is_error"] and not t["timed_out"] and t["isolation_ok"]:
             pending.append((idx, t))
     if not pending:
         return
@@ -490,7 +544,7 @@ def grade_llm_batch(trials: list[dict[str, Any]], judge_model: str, batch_size: 
         samples: dict[str, Any] = {}
         for local_i, (_, t) in enumerate(chunk):
             samples[str(local_i)] = {
-                "task": t["prompt"],
+                "task": t["judge_task"],
                 "criteria": [g["rubric"] for g in t["llm_graders"]],
                 "final_response": t["final_response"][:8000],
                 "successful_edits": t["successful_edits"][:10],
@@ -505,29 +559,36 @@ def grade_llm_batch(trials: list[dict[str, Any]], judge_model: str, batch_size: 
             "Respond with ONLY a JSON array of objects with keys id (string), passed (boolean array), reason (string).\n"
         )
         message = {"event": "user", "message": {"content": instruction + json.dumps(samples)}}
-        with tempfile.TemporaryDirectory() as cwd:
-            run = subprocess.run(
-                [
-                    "agy",
-                    "--model",
-                    judge_model,
-                    "--mode",
-                    "plan",
-                    "--sandbox",
-                    "--disable-slash-commands",
-                    "--input-format",
-                    "stream-json",
-                    "--output-format",
-                    "stream-json",
-                    "--print-timeout",
-                    "180s",
-                ],
-                cwd=cwd,
-                input=json.dumps(message) + "\n",
-                capture_output=True,
-                text=True,
-                timeout=210,
-            )
+        try:
+            with tempfile.TemporaryDirectory() as cwd:
+                run = subprocess.run(
+                    [
+                        "agy",
+                        "--model",
+                        judge_model,
+                        "--mode",
+                        "plan",
+                        "--sandbox",
+                        "--disable-slash-commands",
+                        "--input-format",
+                        "stream-json",
+                        "--output-format",
+                        "stream-json",
+                        "--print-timeout",
+                        "180s",
+                    ],
+                    cwd=cwd,
+                    input=json.dumps(message) + "\n",
+                    capture_output=True,
+                    text=True,
+                    timeout=210,
+                )
+        except subprocess.TimeoutExpired:
+            record_judge_failure(chunk, "Judge error: agy timed out after 210s")
+            continue
+        except FileNotFoundError:
+            record_judge_failure(chunk, "Judge error: agy is not installed or not on PATH")
+            continue
         events = []
         for line in run.stdout.splitlines():
             line = line.strip()
@@ -539,11 +600,7 @@ def grade_llm_batch(trials: list[dict[str, Any]], judge_model: str, batch_size: 
         result_ev = next((e for e in reversed(events) if e.get("event") == "result"), None)
         if not result_ev or result_ev.get("result", {}).get("status") != "SUCCESS":
             err = result_ev.get("result", {}).get("error") if result_ev else run.stderr[:300]
-            for _, t in chunk:
-                for g in t["llm_graders"]:
-                    t["deterministic_graders"].append(
-                        {"name": g["name"], "type": "llm", "passed": False, "reason": f"Judge error: {err}"}
-                    )
+            record_judge_failure(chunk, f"Judge error: {err}")
             continue
 
         raw = str(result_ev["result"]["response"]).strip()
@@ -559,20 +616,13 @@ def grade_llm_batch(trials: list[dict[str, Any]], judge_model: str, batch_size: 
                 for single in chunk:
                     grade_llm_batch([single[1]], judge_model, batch_size=1)
                 continue
-            for _, t in chunk:
-                for g in t["llm_graders"]:
-                    t["deterministic_graders"].append(
-                        {"name": g["name"], "type": "llm", "passed": False, "reason": f"Judge JSON error: {exc}"}
-                    )
+            record_judge_failure(chunk, f"Judge JSON error: {exc}")
             continue
         by_id = {str(g["id"]): g for g in grades}
         for local_i, (_, t) in enumerate(chunk):
             g_out = by_id.get(str(local_i))
             if not g_out or len(g_out.get("passed", [])) != len(t["llm_graders"]):
-                for g in t["llm_graders"]:
-                    t["deterministic_graders"].append(
-                        {"name": g["name"], "type": "llm", "passed": False, "reason": "Judge output mismatch"}
-                    )
+                record_judge_failure([(0, t)], "Judge output mismatch")
                 continue
             for g_spec, verdict in zip(t["llm_graders"], g_out["passed"]):
                 t["deterministic_graders"].append(
@@ -580,9 +630,86 @@ def grade_llm_batch(trials: list[dict[str, Any]], judge_model: str, batch_size: 
                         "name": g_spec["name"],
                         "type": "llm",
                         "passed": bool(verdict),
+                        "scored": g_spec["scored"],
                         "reason": str(g_out.get("reason", "")),
                     }
                 )
+
+
+def summarize_arm(ts: list[dict[str, Any]]) -> dict[str, Any]:
+    invalid: dict[str, int] = {}
+    valid: list[dict[str, Any]] = []
+    for t in ts:
+        reason = invalid_reason(t)
+        t["invalid_reason"] = reason
+        if reason:
+            invalid[reason] = invalid.get(reason, 0) + 1
+            continue
+        scored = [g for g in t["deterministic_graders"] if g.get("scored", True)]
+        t["score"] = sum(1 for g in scored if g["passed"]) / len(scored)
+        t["passed_all"] = t["score"] == 1.0
+        valid.append(t)
+
+    n = len(valid)
+    stats: dict[str, Any] = {
+        "measured": n > 0,
+        "n_valid": n,
+        "n_total": len(ts),
+        "invalid": invalid,
+        "isolation_ok": all(t["isolation_ok"] for t in ts),
+    }
+    if n == 0:
+        return stats
+
+    scores = [t["score"] for t in valid]
+    indicators: dict[str, list[bool]] = {}
+    for t in valid:
+        for g in t["deterministic_graders"]:
+            if not g.get("scored", True) and g["passed"] is not None:
+                indicators.setdefault(g["name"], []).append(g["passed"])
+    stats.update(
+        {
+            "mean_score": round(sum(scores) / n, 3),
+            "pass_rate": round(sum(1 for s in scores if s == 1.0) / n, 3),
+            "min_score": round(min(scores), 3),
+            "max_score": round(max(scores), 3),
+            "spread": round(max(scores) - min(scores), 3),
+            "activation_rate": round(sum(1 for t in valid if t["activated"]) / n, 3),
+            "mean_tokens": round(sum(t["trace"]["total_tokens"] for t in valid) / n),
+            "mean_cost_usd": round(sum(t["trace"]["cost_usd"] for t in valid) / n, 5),
+            "mean_wall_ms": round(sum(t["wall_ms"] for t in valid) / n),
+            "with_only_indicators": {name: round(sum(v) / len(v), 3) for name, v in sorted(indicators.items())},
+        }
+    )
+    return stats
+
+
+def compare_arms(base: dict[str, Any] | None, treated: dict[str, Any] | None) -> dict[str, Any]:
+    """Lift of a treated arm over bare. Every field is None unless both arms were measured."""
+    if not base or not treated or not base["measured"] or not treated["measured"]:
+        return {"delta": None, "exceeds_spread": None, "added_tokens": None, "tokens_per_unit_lift": None}
+    delta = round(treated["mean_score"] - base["mean_score"], 3)
+    added_tokens = treated["mean_tokens"] - base["mean_tokens"]
+    repeated = min(base["n_valid"], treated["n_valid"]) >= 2
+    return {
+        "delta": delta,
+        "exceeds_spread": abs(delta) > max(base["spread"], treated["spread"]) if repeated else None,
+        "added_tokens": added_tokens,
+        "tokens_per_unit_lift": round(added_tokens / delta) if delta > 0 else None,
+    }
+
+
+def score_cell(stats: dict[str, Any] | None) -> str:
+    if stats is None:
+        return "not run"
+    count = f"{stats['n_valid']}/{stats['n_total']}"
+    if not stats["measured"]:
+        return f"not measured {count}"
+    return f"{stats['mean_score']:.2f} ({stats['pass_rate']:.0%}) {count}"
+
+
+def stat_cell(stats: dict[str, Any] | None, key: str, fmt: str) -> str:
+    return format(stats[key], fmt) if stats and stats["measured"] else "n/a"
 
 
 def summarize(trials: list[dict[str, Any]], arms: list[str]) -> tuple[dict[str, Any], str]:
@@ -595,76 +722,43 @@ def summarize(trials: list[dict[str, Any]], arms: list[str]) -> tuple[dict[str, 
     lines = [
         "# Three-Arm Evaluation Summary",
         "",
-        "| Case | Bare score (pass) | Plugin score (pass) | Suite score (pass) | Act (P/S) | ΔP vs B | ΔS vs B | +Tok (P/S) | Cost ($) B/P/S |",
+        "Each score cell is the mean score, the share of trials passing every grader, and scored trials over trials run. "
+        "A trial that errored, timed out, loaded the wrong plugins or has an ungraded criterion is not scored.",
+        "",
+        "| Case | Bare | Plugin | Suite | Act (P/S) | ΔP vs B | ΔS vs B | +Tok (P/S) | Cost ($) B/P/S |",
         "| :- | -: | -: | -: | -: | -: | -: | -: | -: |",
     ]
 
     for case_key in sorted(by_case):
-        arm_stats: dict[str, Any] = {}
-        for arm in arms:
-            ts = by_case[case_key].get(arm, [])
-            valid = [t for t in ts if not t["trace"]["is_error"] and not t["timed_out"]]
-            scores = []
-            for t in valid:
-                gs = t["deterministic_graders"]
-                score = (sum(1 for g in gs if g["passed"]) / len(gs)) if gs else 0.0
-                t["score"] = score
-                t["passed_all"] = score == 1.0
-                scores.append(score)
-            n = len(valid)
-            mean_score = sum(scores) / n if n else 0.0
-            pass_rate = sum(1 for s in scores if s == 1.0) / n if n else 0.0
-            spread = (max(scores) - min(scores)) if n else 0.0
-            act_rate = sum(1 for t in valid if t["activated"]) / n if n else 0.0
-            mean_tokens = sum(t["trace"]["total_tokens"] for t in valid) / n if n else 0.0
-            mean_cost = sum(t["trace"]["cost_usd"] for t in valid) / n if n else 0.0
-            mean_ms = sum(t["wall_ms"] for t in valid) / n if n else 0.0
-            iso_ok = all(t["isolation_ok"] for t in valid) if n else False
-            arm_stats[arm] = {
-                "n_valid": n,
-                "n_total": len(ts),
-                "mean_score": round(mean_score, 3),
-                "pass_rate": round(pass_rate, 3),
-                "min_score": round(min(scores), 3) if n else 0.0,
-                "max_score": round(max(scores), 3) if n else 0.0,
-                "spread": round(spread, 3),
-                "activation_rate": round(act_rate, 3),
-                "mean_tokens": round(mean_tokens),
-                "mean_cost_usd": round(mean_cost, 5),
-                "mean_wall_ms": round(mean_ms),
-                "isolation_ok": iso_ok,
-            }
+        case_trials = by_case[case_key]
+        arm_stats: dict[str, Any] = {arm: summarize_arm(case_trials.get(arm, [])) for arm in arms if case_trials.get(arm)}
+        b, p, s = arm_stats.get("bare"), arm_stats.get("plugin"), arm_stats.get("suite")
+        cmp_p, cmp_s = compare_arms(b, p), compare_arms(b, s)
+        dormant = any(t["dormant"] for ts in case_trials.values() for t in ts)
 
-        b = arm_stats.get("bare", {})
-        p = arm_stats.get("plugin", {})
-        s = arm_stats.get("suite", {})
-        dp = round(p.get("mean_score", 0.0) - b.get("mean_score", 0.0), 3)
-        ds = round(s.get("mean_score", 0.0) - b.get("mean_score", 0.0), 3)
-        dtok_p = p.get("mean_tokens", 0) - b.get("mean_tokens", 0)
-        dtok_s = s.get("mean_tokens", 0) - b.get("mean_tokens", 0)
-        tpl_p = round(dtok_p / dp) if dp > 0 else None
-        tpl_s = round(dtok_s / ds) if ds > 0 else None
-
+        arm_stats["dormant"] = dormant
         arm_stats["comparison"] = {
-            "delta_plugin_vs_bare": dp,
-            "delta_suite_vs_bare": ds,
-            "plugin_exceeds_spread": abs(dp) > max(b.get("spread", 0.0), p.get("spread", 0.0)),
-            "suite_exceeds_spread": abs(ds) > max(b.get("spread", 0.0), s.get("spread", 0.0)),
-            "added_tokens_plugin": dtok_p,
-            "added_tokens_suite": dtok_s,
-            "tokens_per_unit_lift_plugin": tpl_p,
-            "tokens_per_unit_lift_suite": tpl_s,
+            "delta_plugin_vs_bare": cmp_p["delta"],
+            "delta_suite_vs_bare": cmp_s["delta"],
+            "plugin_exceeds_spread": cmp_p["exceeds_spread"],
+            "suite_exceeds_spread": cmp_s["exceeds_spread"],
+            "added_tokens_plugin": cmp_p["added_tokens"],
+            "added_tokens_suite": cmp_s["added_tokens"],
+            "tokens_per_unit_lift_plugin": cmp_p["tokens_per_unit_lift"],
+            "tokens_per_unit_lift_suite": cmp_s["tokens_per_unit_lift"],
         }
         summary_data[case_key] = arm_stats
 
+        def signed(value: Any, fmt: str) -> str:
+            return "n/a" if value is None else format(value, fmt)
+
+        label = f"`{case_key}`" + (" (dormant)" if dormant else "")
         lines.append(
-            f"| `{case_key}` | {b.get('mean_score', 0):.2f} ({b.get('pass_rate', 0):.0%}) "
-            f"| {p.get('mean_score', 0):.2f} ({p.get('pass_rate', 0):.0%}) "
-            f"| {s.get('mean_score', 0):.2f} ({s.get('pass_rate', 0):.0%}) "
-            f"| {p.get('activation_rate', 0):.0%}/{s.get('activation_rate', 0):.0%} "
-            f"| {dp:+.2f} | {ds:+.2f} "
-            f"| {dtok_p:+d}/{dtok_s:+d} "
-            f"| {b.get('mean_cost_usd', 0):.4f}/{p.get('mean_cost_usd', 0):.4f}/{s.get('mean_cost_usd', 0):.4f} |"
+            f"| {label} | {score_cell(b)} | {score_cell(p)} | {score_cell(s)} "
+            f"| {stat_cell(p, 'activation_rate', '.0%')}/{stat_cell(s, 'activation_rate', '.0%')} "
+            f"| {signed(cmp_p['delta'], '+.2f')} | {signed(cmp_s['delta'], '+.2f')} "
+            f"| {signed(cmp_p['added_tokens'], '+d')}/{signed(cmp_s['added_tokens'], '+d')} "
+            f"| {stat_cell(b, 'mean_cost_usd', '.4f')}/{stat_cell(p, 'mean_cost_usd', '.4f')}/{stat_cell(s, 'mean_cost_usd', '.4f')} |"
         )
 
     return summary_data, "\n".join(lines) + "\n"
@@ -707,7 +801,7 @@ def main() -> int:
             c, arm, r = futs[fut]
             res = fut.result()
             trials.append(res)
-            status = "ERR" if res["trace"]["is_error"] or res["timed_out"] else "OK"
+            status = "ERR" if res["trace"]["is_error"] or res["timed_out"] or not res["isolation_ok"] else "OK"
             print(
                 f"  [{status}] {res['plugin']}/{res['case']} {arm}#{r} "
                 f"iso={res['isolation_ok']} act={res['activated']} "
@@ -715,23 +809,34 @@ def main() -> int:
                 file=sys.stderr,
             )
 
-    if not args.skip_llm_judge:
+    def save(judging: str) -> str:
+        summary_data, summary_md = summarize(trials, arms)
+        saved_trials = [{k: v for k, v in t.items() if k != "fixture_snapshot"} for t in trials]
+        payload = {
+            "model": args.model,
+            "judge_model": args.judge_model,
+            "arms": arms,
+            "runs": args.runs,
+            "judging": judging,
+            "summary": summary_data,
+            "trials": saved_trials,
+        }
+        if judging == "pending":
+            summary_md += "\nLLM criteria are not graded yet, so cases that have them show as not measured.\n"
+        elif judging == "skipped":
+            summary_md += "\nLLM criteria were skipped. Scores cover the deterministic graders only.\n"
+        (out_dir / "results.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        (out_dir / "summary.md").write_text(summary_md, encoding="utf-8")
+        return summary_md
+
+    if args.skip_llm_judge:
+        for t in trials:
+            t["llm_graders"] = []
+        summary_md = save("skipped")
+    else:
+        save("pending")
         grade_llm_batch(trials, args.judge_model)
-
-    summary_data, summary_md = summarize(trials, arms)
-
-    # Strip large snapshots before saving results.json
-    saved_trials = [{k: v for k, v in t.items() if k != "fixture_snapshot"} for t in trials]
-    payload = {
-        "model": args.model,
-        "judge_model": args.judge_model,
-        "arms": arms,
-        "runs": args.runs,
-        "summary": summary_data,
-        "trials": saved_trials,
-    }
-    (out_dir / "results.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    (out_dir / "summary.md").write_text(summary_md, encoding="utf-8")
+        summary_md = save("complete")
     print(summary_md)
     print(f"Saved results to {out_dir}", file=sys.stderr)
     return 0

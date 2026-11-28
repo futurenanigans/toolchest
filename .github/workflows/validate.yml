@@ -65,6 +65,8 @@ jobs:
             README.md claude-md/*.md plugins/*/README.md plugins/*/skills/**/*.md
       - name: Check synced prose and shared audit sections
         run: node scripts/check-synced-prose.mjs
+      - name: Check eval prompts for leaked skill and grader wording
+        run: python3 scripts/lint-eval-leakage.py --fail-on-leak
 
   trestle-windows-prompt:
     runs-on: windows-2022

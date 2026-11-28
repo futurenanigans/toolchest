@@ -148,13 +148,6 @@ const ARMS: ArmConfig[] = [
   { name: 'ladder', escalationEnabled: true, modelTier: 'cheap', stepAfterFailures: 1 },
 ]
 
-// Approximate relative USD per 1M tokens (input / output) fallback if cli does not report costUsd
-const TIER_RATE_PER_M: Record<string, { in: number; out: number }> = {
-  cheap: { in: 0.80, out: 4.00 },
-  balanced: { in: 3.00, out: 15.00 },
-  strong: { in: 15.00, out: 75.00 },
-}
-
 async function seedRepo(dir: string, files: Record<string, string>) {
   await execCommand('git', ['init', '-q', '-b', 'main'], { cwd: dir })
   await execCommand('git', ['config', 'user.email', 'study@example.invalid'], { cwd: dir })
@@ -197,7 +190,7 @@ async function runTrial(task: TaskSpec, arm: ArmConfig) {
         id: `${task.id}-${arm.name}`,
         title: task.id,
         goal: task.goal,
-        acceptanceCriteria: ['All unit tests in test.ts pass without editing test.ts'],
+        acceptanceCriteria: [{ id: 'tests-pass', description: 'All unit tests in test.ts pass without editing test.ts' }],
         baseline: 'skip',
         checks: [{ name: 'test', command: task.checkCmd }],
         maxIterations: 4,
@@ -224,35 +217,11 @@ async function runTrial(task: TaskSpec, arm: ArmConfig) {
     const wallMs = Date.now() - t0
     const ledger = await readQuotaLedger(homeDir)
     const entries = ledger.entries.filter(e => e.cli === 'claude')
-    let totalIn = 0
-    let totalOut = 0
-    let reportedCost = 0
-    let hasReportedCost = false
-    for (const e of entries) {
-      totalIn += e.inputTokens ?? 0
-      totalOut += e.outputTokens ?? 0
-      if (typeof e.costUsd === 'number' && e.costUsd > 0) {
-        reportedCost += e.costUsd
-        hasReportedCost = true
-      }
-    }
+    const totalTokens = entries.reduce((sum, e) => sum + e.tokens, 0)
+    const costUsd = entries.length > 0 && entries.every(e => typeof e.costUsd === 'number')
+      ? Number(entries.reduce((sum, e) => sum + (e.costUsd ?? 0), 0).toFixed(6))
+      : null
 
-    // Use real reported costUsd when available, else tier estimate
-    const tierSeq = arm.escalationEnabled
-      ? ['cheap', 'balanced', 'strong', 'strong']
-      : Array(4).fill(arm.modelTier)
-    let estCostUsd = 0
-    if (hasReportedCost) {
-      estCostUsd = reportedCost
-    } else {
-      entries.forEach((e, idx) => {
-        const tier = tierSeq[Math.min(idx, tierSeq.length - 1)]
-        const rate = TIER_RATE_PER_M[tier]
-        estCostUsd += ((e.inputTokens ?? 0) * rate.in + (e.outputTokens ?? 0) * rate.out) / 1_000_000
-      })
-    }
-
-    // Ensure test.ts was not modified
     const diffTest = await execCommand('git', ['diff', '--quiet', '--', 'test.ts'], { cwd: wt.path })
     const accepted = res.status === 'passed' && diffTest.exitCode === 0
 
@@ -264,10 +233,8 @@ async function runTrial(task: TaskSpec, arm: ArmConfig) {
       accepted,
       iterations: res.iterations,
       wallMs,
-      inputTokens: totalIn,
-      outputTokens: totalOut,
-      totalTokens: totalIn + totalOut,
-      estCostUsd: Number(estCostUsd.toFixed(6)),
+      totalTokens,
+      costUsd,
       error: res.error,
     }
   } finally {
@@ -283,7 +250,7 @@ async function main() {
       const r = await runTrial(task, arm)
       results.push(r)
       console.error(
-        `  -> ${r.status} accepted=${r.accepted} iters=${r.iterations} tok=${r.totalTokens} ~$${r.estCostUsd} (${(r.wallMs / 1000).toFixed(1)}s)${r.error ? ' err=' + r.error : ''}`,
+        `  -> ${r.status} accepted=${r.accepted} iters=${r.iterations} tok=${r.totalTokens} cost=${r.costUsd === null ? 'not reported' : '$' + r.costUsd} (${(r.wallMs / 1000).toFixed(1)}s)${r.error ? ' err=' + r.error : ''}`,
       )
     }
   }
@@ -292,22 +259,33 @@ async function main() {
   for (const r of results) (byArm[r.arm] ??= []).push(r)
 
   const summary: Record<string, unknown> = {}
-  console.log('\n| Arm | Accepted | Total Iters | Total Tokens | Est. Cost ($) | Cost / Accepted ($) |')
-  console.log('| :- | -: | -: | -: | -: | -: |')
+  console.log('\n| Arm | Accepted | Past iteration 1 | Total iters | Total tokens | Cost ($) | Cost / accepted ($) |')
+  console.log('| :- | -: | -: | -: | -: | -: | -: |')
   for (const arm of ARMS) {
     const rows = byArm[arm.name] ?? []
     const acc = rows.filter(r => r.accepted).length
+    const retried = rows.filter(r => r.iterations > 1).length
     const iters = rows.reduce((s, r) => s + r.iterations, 0)
     const tok = rows.reduce((s, r) => s + r.totalTokens, 0)
-    const cost = rows.reduce((s, r) => s + r.estCostUsd, 0)
-    const cpa = acc > 0 ? cost / acc : null
-    summary[arm.name] = { accepted: acc, total: rows.length, iters, totalTokens: tok, estCostUsd: Number(cost.toFixed(6)), costPerAcceptedUsd: cpa ? Number(cpa.toFixed(6)) : null }
-    console.log(`| ${arm.name} | ${acc}/${rows.length} | ${iters} | ${tok} | ${cost.toFixed(5)} | ${cpa !== null ? cpa.toFixed(5) : 'N/A'} |`)
+    const cost = rows.every(r => r.costUsd !== null) ? rows.reduce((s, r) => s + (r.costUsd ?? 0), 0) : null
+    const cpa = cost !== null && acc > 0 ? cost / acc : null
+    summary[arm.name] = {
+      accepted: acc,
+      total: rows.length,
+      trialsPastFirstIteration: retried,
+      iters,
+      totalTokens: tok,
+      costUsd: cost === null ? null : Number(cost.toFixed(6)),
+      costPerAcceptedUsd: cpa === null ? null : Number(cpa.toFixed(6)),
+    }
+    console.log(
+      `| ${arm.name} | ${acc}/${rows.length} | ${retried}/${rows.length} | ${iters} | ${tok} | ${cost === null ? 'not reported' : cost.toFixed(5)} | ${cpa === null ? 'n/a' : cpa.toFixed(5)} |`,
+    )
   }
 
   const outDir = path.resolve(import.meta.dir, '../plugins/trestle/evals/results/study2-escalation')
   await fs.mkdir(outDir, { recursive: true })
-  await fs.writeFile(path.join(outDir, 'results.json'), JSON.stringify({ cli: 'claude', ratesPerMillion: TIER_RATE_PER_M, summary, trials: results }, null, 2) + '\n')
+  await fs.writeFile(path.join(outDir, 'results.json'), JSON.stringify({ cli: 'claude', summary, trials: results }, null, 2) + '\n')
   console.error(`\nSaved Study 2 results to ${outDir}/results.json`)
 }
 
