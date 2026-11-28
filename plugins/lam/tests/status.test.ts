@@ -72,7 +72,7 @@ test('a correction updates the status line total during the turn, and none shows
   stubEngine(on, { git: { remote: { exitCode: 0, stdout: '' } } })
   await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
   expect((await statusRow($)).text).not.toContain('guard')
-  await $.tool.call({ tool: 'Write', file_path: '/repo/a.ts', content: 'const x = y as any' })
+  await $.tool.call({ tool: 'Write', file_path: '/repo/a.test.ts', content: 'it.skip("x", () => {})' })
   await $.tool.call({ tool: 'Bash', command: 'rm tests/a_test.py' })
   const row = await statusRow($)
   expect(row.text).toMatch(/ \| guard 2$/)

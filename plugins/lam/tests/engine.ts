@@ -8,9 +8,9 @@ type On = Parameters<TestBody>[1]
 type TestEngine = Parameters<TestBody>[0]
 type GitOutput = { exitCode: number; stdout?: string; stderr?: string }
 export type ProcessRun = { argv: readonly string[]; env?: Readonly<Record<string, string>> }
-export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; env?: Record<string, string>; runs?: ProcessRun[]; fetchGate?: Promise<void>; denial?: string; denyFirstCall?: string; gitMissing?: boolean; contextTokens?: number; contextWindow?: number; settings?: Record<string, unknown>; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number }; rateLimits?: SessionRateLimit[] }
+export type EngineSetup = { git?: Record<string, GitOutput>; files?: Record<string, string>; env?: Record<string, string>; runs?: ProcessRun[]; fetchGate?: Promise<void>; denial?: string; denyFirstCall?: string; toolError?: string; gitMissing?: boolean; contextTokens?: number; contextWindow?: number; settings?: Record<string, unknown>; compaction?: { rawMaxTokens: number; autoCompactThreshold?: number }; rateLimits?: SessionRateLimit[] }
 
-export function stubEngine(on: On, { git = {}, files = {}, env = {}, runs = [], fetchGate, denial, denyFirstCall, gitMissing = false, contextTokens = 234_000, contextWindow = 1_000_000, settings = { effortLevel: 'high' }, compaction, rateLimits = [] }: EngineSetup = {}): void {
+export function stubEngine(on: On, { git = {}, files = {}, env = {}, runs = [], fetchGate, denial, denyFirstCall, toolError, gitMissing = false, contextTokens = 234_000, contextWindow = 1_000_000, settings = { effortLevel: 'high' }, compaction, rateLimits = [] }: EngineSetup = {}): void {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('command.register', () => ({ value: { command: 'guard-stats' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -43,7 +43,8 @@ export function stubEngine(on: On, { git = {}, files = {}, env = {}, runs = [], 
   let toolCalls = 0
   on('tool.call', () => {
     const deny = toolCalls++ === 0 ? (denyFirstCall ?? denial) : denial
-    return deny === undefined ? { result: {} } : { deny }
+    if (deny !== undefined) return { deny }
+    return toolError === undefined ? { result: {} } : { result: toolError, text: toolError, isError: true }
   })
   on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'engine intro', scope: 'shared' }] }))
   on('turn.complete', () => ({ text: '' }))

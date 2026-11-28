@@ -5,7 +5,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface as Engine, PluginOptions, Register, ToolCallInput } from 'claude-code'
 
 import type { LamCounts, StatusSegment } from '../types'
-import { type CheckInput, CORRECTING_CHECKS, adviseAll, isReadme } from '../checks'
+import { type CheckInput, CORRECTING_CHECKS, adviseAll, isReadme, isShell } from '../checks'
 import { fetchRemotes, statusSegments } from './status'
 
 const PANE = 'guard-stats'
@@ -17,7 +17,6 @@ const FETCH_SECTION = 'lam:fetch'
 const FETCH_WAIT_MS = 2_000
 const FETCH_PENDING =
   'The session-start git fetch is still running. Remote-tracking refs are unverified: treat origin/* and any ahead/behind count as unverified until a later notice in this prompt reports how the fetch went.'
-const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 
 const readmeGuided = { plugin: 'lam', key: 'readmeGuided' } as const
 
@@ -33,25 +32,13 @@ async function readIfFile($: Engine, path: string | undefined): Promise<string> 
 
 async function checkInput($: Engine, e: ToolCallInput): Promise<CheckInput | null> {
   const tool = e.tool
-  if (SHELL_TOOLS.has(tool)) {
-    return { tool, command: stringField(e, 'command'), oldText: '', contextBefore: '', isFirstReadmeEdit: false }
-  }
+  if (isShell(tool)) return { tool, command: stringField(e, 'command'), oldText: '', isFirstReadmeEdit: false }
   if (tool !== 'Edit' && tool !== 'Write') return null
 
   const filePath = stringField(e, 'file_path')
-  const onDisk = await readIfFile($, filePath)
-  const oldString = stringField(e, 'old_string') ?? ''
-  const regionStart = tool === 'Edit' ? onDisk.indexOf(oldString) : -1
   const isFirstReadmeEdit = isReadme(filePath) && (await $.state.get(readmeGuided)).value !== true
-
-  return {
-    tool,
-    filePath,
-    newText: tool === 'Edit' ? stringField(e, 'new_string') : stringField(e, 'content'),
-    oldText: tool === 'Edit' ? oldString : onDisk,
-    contextBefore: regionStart > 0 ? onDisk.slice(0, regionStart) : '',
-    isFirstReadmeEdit,
-  }
+  if (tool === 'Edit') return { tool, filePath, newText: stringField(e, 'new_string'), oldText: stringField(e, 'old_string') ?? '', isFirstReadmeEdit }
+  return { tool, filePath, newText: stringField(e, 'content'), oldText: await readIfFile($, filePath), isFirstReadmeEdit }
 }
 
 async function refreshStatus($: Engine, options: PluginOptions): Promise<void> {
@@ -106,7 +93,7 @@ export const register: Register = (on, options) => {
     if (advice.length === 0) return next(e)
 
     const ran = await next(e)
-    if (ran.deny !== undefined) return ran
+    if (ran.deny !== undefined || (ran.isError === true && !isShell(e.tool))) return ran
 
     await update($, corrections, current => {
       const tallied: LamCounts = { ...current }

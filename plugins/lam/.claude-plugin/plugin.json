@@ -1,6 +1,6 @@
 {
   "name": "lam",
-  "description": "Local Agent Monitor: advisory checks on edits and deletions with per-check advisory counts, a status line, a /guard-stats pane, and a git fetch at session start",
+  "description": "Local Agent Monitor: advisory checks on edits and shell commands with per-check advisory counts, a status line, a /guard-stats pane, and a git fetch at session start",
   "types": "./types/index.d.ts",
   "userConfig": {
     "haikuMultiplier": { "type": "string", "title": "Haiku cost multiplier", "description": "Shown after a Haiku model name in the status line; empty hides it", "default": "0.3x" },

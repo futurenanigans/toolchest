@@ -6,7 +6,6 @@ export type CheckInput = {
   command?: string
   newText?: string
   oldText: string
-  contextBefore: string
   isFirstReadmeEdit: boolean
 }
 
@@ -14,13 +13,9 @@ export type Check = { name: string; advise: (input: CheckInput) => string | null
 
 export const isEditOrWrite = (tool: string): boolean => tool === 'Edit' || tool === 'Write'
 
-export const isBlank = (text: string | undefined): text is undefined => text === undefined || text.trim() === ''
+export const isShell = (tool: string): boolean => tool === 'Bash' || tool === 'PowerShell'
 
-export function fileExtension(path: string): string {
-  const name = path.replaceAll('\\', '/').replace(/^.*\//, '')
-  const dot = name.lastIndexOf('.')
-  return dot < 0 ? '' : name.slice(dot).toLowerCase()
-}
+export const isBlank = (text: string | undefined): text is undefined => text === undefined || text.trim() === ''
 
 const TEST_PATH_INSENSITIVE = [
   /\.test\.(ts|tsx|js|jsx|mjs|cjs)$/i,
@@ -50,5 +45,5 @@ export const countMatches = (text: string, pattern: RegExp): number =>
 export type LabelledPattern = { pattern: RegExp; label: string }
 
 export function newlyAddedLabels(newText: string, oldText: string, patterns: readonly LabelledPattern[]): string[] {
-  return patterns.filter(({ pattern }) => pattern.test(newText) && !pattern.test(oldText)).map(({ label }) => label)
+  return patterns.filter(({ pattern }) => countMatches(newText, pattern) > countMatches(oldText, pattern)).map(({ label }) => label)
 }

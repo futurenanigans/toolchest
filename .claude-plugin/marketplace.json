@@ -27,7 +27,7 @@
     {
       "name": "lam",
       "source": "./plugins/lam",
-      "description": "Local Agent Monitor: advisory checks on edits and deletions with per-check correction counts, a status line, a /guard-stats pane, and a git fetch at session start"
+      "description": "Local Agent Monitor: advisory process checks on edits and shell commands with per-check correction counts, a status line, a /guard-stats pane, and a git fetch at session start"
     },
     {
       "name": "loom",

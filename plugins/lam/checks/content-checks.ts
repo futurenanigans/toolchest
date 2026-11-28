@@ -1,9 +1,12 @@
-// The pattern advisories: credentials, skipped tests, test deletion and type-system escape hatches, each firing
-// only on what the edit adds beyond the text it replaces, and a verification command whose exit code a pipe hides.
-import { type Check, type LabelledPattern, isBlank, isEditOrWrite, fileExtension, looksLikeTestFile, newlyAddedLabels } from './text'
+// The pattern advisories: credentials, skipped tests and test deletion, each firing only when an edit holds more
+// matches than the text it replaces, and a verification command whose exit code a pipe hides.
+import { type Check, type CheckInput, type LabelledPattern, countMatches, isBlank, isEditOrWrite, isShell, looksLikeTestFile, newlyAddedLabels } from './text'
+import { maskComments, maskQuoted, pipelines } from './shell'
 
-const SECRET_PATTERNS: readonly LabelledPattern[] = [
-  { pattern: /\bAKIA(?!X{16})[A-Z0-9]{16}\b/, label: 'AWS access key' },
+const PLACEHOLDER = String.raw`[{$<*%]|your|change|placeholder|example|x{3}`
+
+const TOKEN_PATTERNS: readonly LabelledPattern[] = [
+  { pattern: /\b(?:AKIA|ASIA)(?!X{16}|[A-Z0-9]{9}EXAMPLE)[A-Z0-9]{16}\b/, label: 'AWS access key' },
   { pattern: /\bgh[pousr]_[A-Za-z0-9]{36}\b/, label: 'GitHub token' },
   { pattern: /\bgithub_pat_[A-Za-z0-9_]{82}\b/, label: 'GitHub fine-grained PAT' },
   { pattern: /\bsk-ant-[A-Za-z0-9_-]{40,}/, label: 'Anthropic API key' },
@@ -14,15 +17,28 @@ const SECRET_PATTERNS: readonly LabelledPattern[] = [
   { pattern: /\bAIza[0-9A-Za-z_-]{35}\b/, label: 'Google API key' },
   { pattern: /AccountKey=[A-Za-z0-9+/]{86}==/, label: 'Azure Storage account key' },
   { pattern: /[?&]sig=[A-Za-z0-9%+/=]{40,}/, label: 'Azure SAS signature' },
-  { pattern: /\b(?:password|pwd)\s*=\s*(?![{$<*%]|your|change|placeholder|x{3})[^;"'\s]{8,}/i, label: 'connection-string password' },
+]
+
+const FILE_PATTERNS: readonly LabelledPattern[] = [
+  ...TOKEN_PATTERNS,
+  { pattern: new RegExp(String.raw`(?:^|[;"'][ \t]*)(?:password|pwd)=(?!${PLACEHOLDER})[^;"'\s]{8,}`, 'im'), label: 'connection-string password' },
+  { pattern: new RegExp(String.raw`\bpassword["']?\s*[:=]\s*["'](?!${PLACEHOLDER})[^"'\s]{8,}["']`, 'i'), label: 'password literal' },
   { pattern: /-----BEGIN[ A-Z]*PRIVATE KEY-----/, label: 'private key header' },
 ]
 
+const YAML_FILE = /\.ya?ml$/i
+const YAML_PATTERNS: readonly LabelledPattern[] = [
+  ...FILE_PATTERNS,
+  { pattern: new RegExp(String.raw`^\s*(?:-\s+)?password:[ \t]+(?!${PLACEHOLDER}|[!&|>])[^\s"'#]{8,}[ \t]*(?:#.*)?$`, 'im'), label: 'YAML password' },
+]
+
+const RUST_FILE = /\.rs$/i
+const RUST_IGNORE = /#\[\s*ignore\b/
 const SKIP_PATTERNS: readonly RegExp[] = [
-  /@pytest\.mark\.skip(if)?\b/,
+  /@pytest\.mark\.(?:skip(?:if)?|xfail)\b/,
   /@unittest\.skip\b/,
-  /\bpytest\.skip\s*\(/,
-  /\b(it|test|describe)\.skip\s*\(/,
+  /\bpytest\.(?:skip|xfail)\s*\(/,
+  /\b(?:it|test|describe)(?:\.\w+)*\.(?:skip|skipIf|todo|fixme)\b/,
   /\bx(it|test|describe)\s*\(/,
   /@Ignore\b/,
   /@Disabled\b/,
@@ -33,145 +49,129 @@ const SKIP_PATTERNS: readonly RegExp[] = [
   /\bAssert\.(Skip(When|Unless)?|Ignore|Inconclusive)\s*\(/,
   /\bSkip\.(If|IfNot|Unless)\s*\(/,
   /\/\/\s*\[\s*(Fact|Theory|Test|TestMethod|TestCase|DataTestMethod)\b/,
-  /\bt\.Skip(Now)?\s*\(/,
-  /#\[\s*ignore\s*\]/,
+  /\bt\.Skip(Now|f)?\s*\(/,
+  RUST_IGNORE,
 ]
 
-const SCRIPT_DOWNGRADES: readonly LabelledPattern[] = [
-  { pattern: /:\s*any\b/, label: ': any' },
-  { pattern: /\bas\s+any\b/, label: 'as any' },
-  { pattern: /<\s*any\s*[,>]/, label: '<any>' },
-  { pattern: /\/\/\s*@ts-ignore\b/, label: '@ts-ignore' },
-  { pattern: /\/\/\s*@ts-nocheck\b/, label: '@ts-nocheck' },
-  { pattern: /\/\/\s*@ts-expect-error\b/, label: '@ts-expect-error' },
-  { pattern: /eslint-disable/, label: 'eslint-disable' },
+const TEST_DECLARATIONS: readonly RegExp[] = [
+  /\b(?:it|test)(?:\.\w+)*\s*\(/,
+  /\[\s*(?:Fact|Theory|Test|TestMethod|TestCase|DataTestMethod)\b/,
+  /@(?:Test|ParameterizedTest)\b/,
+  /\bdef\s+test_\w*\s*\(/,
+  /\bfunc\s+Test\w*\s*\(/,
+  /#\[\s*(?:\w+::)*test\b/,
 ]
 
-const DOWNGRADES_BY_EXTENSION: Readonly<Record<string, readonly LabelledPattern[]>> = {
-  '.ts': SCRIPT_DOWNGRADES,
-  '.tsx': SCRIPT_DOWNGRADES,
-  '.js': SCRIPT_DOWNGRADES,
-  '.jsx': SCRIPT_DOWNGRADES,
-  '.mjs': SCRIPT_DOWNGRADES,
-  '.cjs': SCRIPT_DOWNGRADES,
-  '.py': [
-    { pattern: /:\s*Any\b/, label: ': Any' },
-    { pattern: /->\s*Any\b/, label: '-> Any' },
-    { pattern: /\bcast\(\s*Any\b/, label: 'cast(Any, ...)' },
-    { pattern: /#\s*type:\s*ignore\b/, label: '# type: ignore' },
-  ],
-  '.cs': [
-    { pattern: /\bdynamic\s+[A-Za-z_]\w*\s*[=;,)]/, label: 'dynamic declaration' },
-    { pattern: /<\s*dynamic\s*[,>]/, label: '<dynamic>' },
-    { pattern: /\(\s*dynamic\s*\)/, label: '(dynamic) cast' },
-    { pattern: /#pragma\s+warning\s+disable\b/, label: '#pragma warning disable' },
-    { pattern: /#nullable\s+disable\b/, label: '#nullable disable' },
-    { pattern: /\[\s*(assembly:\s*)?SuppressMessage\b/, label: '[SuppressMessage]' },
-  ],
-}
-
+const COMMAND_PATH = String.raw`^(?:[\w.~/-]*\/)?`
 const VERIFICATION_COMMAND = new RegExp(
-  String.raw`^(?:\w+=\S*\s+)*(?:(?:time|env|nice|sudo|timeout\s+\S+)\s+)*(?:` +
+  COMMAND_PATH +
+    '(?:' +
     [
       String.raw`cargo\s+(?:\+\S+\s+)?(?:test|build|check|clippy|nextest)`,
       String.raw`dotnet\s+(?:test|build)`,
       String.raw`(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|lint|typecheck|check)\b`,
       String.raw`(?:npx|bunx|pnpm\s+exec|yarn)\s+(?:tsc|jest|vitest|eslint|playwright)`,
-      String.raw`(?:tsc|jest|vitest|eslint|pytest|mypy|ruff|tox|ctest|make|mvn|gradle|\./gradlew|\./mvnw)\b`,
+      String.raw`(?:tsc|jest|vitest|eslint|pytest|mypy|ruff|tox|ctest|make|mvn|gradle|gradlew|mvnw)\b`,
       String.raw`python3?\s+-m\s+(?:pytest|unittest|mypy)`,
       String.raw`go\s+(?:test|build|vet)`,
       String.raw`claude\s+plugin\s+(?:test|validate)`,
     ].join('|') +
     String.raw`)(?![\w-])`,
 )
-const EXIT_STATUS_KEPT = /\bpipefail\b|\bPIPESTATUS\b/
+const INFORMATION_ONLY = /\s(?:--version|--help|--collect-only|--co|-list|--list|--list-tests|--listTests|--dry-run)(?![\w-])/
+const PIPEFAIL_SET = /\bset\s+(?:-\w+\s+)*-\w*o\s+pipefail\b/
+const PIPESTATUS_READ = /\bPIPESTATUS\b/
 
-const maskQuoted = (command: string): string => command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, quoted => ' '.repeat(quoted.length))
-
-function maskedPipelines(command: string): string[][] {
-  const masked = maskQuoted(command)
-  return masked
-    .split(/&&|\|\||[;\r\n]|(?<![<>|])&(?![>&])/)
-    .map(pipeline => pipeline.split(/\|&?/).map(stage => stage.trim()))
-    .filter(stages => stages.length > 1)
-}
+const DELETE_COMMAND = new RegExp(COMMAND_PATH + String.raw`(?:git\s+rm|rm|Remove-Item|ri|del|erase)(?=\s|$)`, 'i')
+const INDEX_ONLY = /\s--cached(?=\s|$)/
+const TEST_ARTIFACT = /(^|\/)(coverage|\.nyc_output|__pycache__|\.pytest_cache|node_modules|TestResults|bin|obj)(\/|$)/
+const REWARD_HACKING = 'If the test was failing, the working assumption is that the production code is wrong, not the test. Deleting test bodies to make the suite green is reward hacking; surface the failure instead. If the test is genuinely obsolete, say so explicitly before proceeding.'
 
 export const pipedExitCode: Check = {
   name: 'piped-exit-code',
   advise: ({ tool, command }) => {
-    if (tool !== 'Bash' || isBlank(command) || EXIT_STATUS_KEPT.test(command)) return null
-    const hidden = maskedPipelines(command).flatMap(stages =>
-      stages.slice(0, -1).flatMap(stage => {
-        const match = VERIFICATION_COMMAND.exec(stage)
-        return match === null ? [] : [{ runner: stage.slice(0, match[0].length).replace(/\s+/g, ' '), sink: stages.at(-1)?.split(/\s+/)[0] ?? '' }]
+    if (tool !== 'Bash' || isBlank(command)) return null
+    if (PIPEFAIL_SET.test(maskQuoted(command)) || PIPESTATUS_READ.test(maskComments(command))) return null
+    const hidden = pipelines(command).flatMap(stages =>
+      stages.slice(0, -1).flatMap(({ masked }) => {
+        const match = VERIFICATION_COMMAND.exec(masked)
+        if (match === null || INFORMATION_ONLY.test(masked)) return []
+        return [`${match[0].replace(/\s+/g, ' ')} | ${stages.at(-1)?.masked.split(/\s+/)[0] ?? ''}`]
       }),
     )
     if (hidden.length === 0) return null
-    const pairs = hidden.map(({ runner, sink }) => `${runner} | ${sink}`).join(', ')
-    return `This command pipes a build or test run into another command (${pairs}). Without pipefail a pipeline exits with its last command's status, so a failing run reports success and only the visible excerpt says otherwise.
+    return `This command pipes a build or test run into another command (${[...new Set(hidden)].join(', ')}). Without pipefail a pipeline exits with its last command's status, so a failing run reports success and only the visible excerpt says otherwise.
 
 Read the run's own exit code before reporting a result: prefix the command with \`set -o pipefail;\`, or write the output to a file and read its tail in a second step. If the excerpt shown is cut, the failure may not be in it.`
   },
 }
 
-const SHELL_DELETE =/(?:^|[;&|(\r\n]\s*|\b(?:sudo|xargs)\s+)(git\s+rm|rm|Remove-Item|ri|del|erase)\b([^&|;\r\n]*)/gim
+function secretLabels({ tool, command, newText, oldText, filePath }: CheckInput): string[] {
+  if (isShell(tool)) return isBlank(command) ? [] : newlyAddedLabels(command, '', TOKEN_PATTERNS)
+  if (!isEditOrWrite(tool) || isBlank(newText)) return []
+  return newlyAddedLabels(newText, oldText, YAML_FILE.test(filePath ?? '') ? YAML_PATTERNS : FILE_PATTERNS)
+}
 
 export const secrets: Check = {
   name: 'secrets',
-  advise: ({ tool, newText, oldText }) => {
-    if (!isEditOrWrite(tool) || isBlank(newText)) return null
-    const labels = newlyAddedLabels(newText, oldText, SECRET_PATTERNS)
+  advise: input => {
+    const labels = secretLabels(input)
     if (labels.length === 0) return null
-    return `This write appears to contain a real credential (${labels.join(', ')}). If it is a documentation placeholder, replace it with an obvious dummy such as YOUR_API_KEY_HERE. If it is a real credential, move it to user-secrets, an environment variable, or a gitignored file, and reference it from the code instead.
+    return `This ${isShell(input.tool) ? 'command' : 'write'} appears to contain a real credential (${labels.join(', ')}). If it is a documentation placeholder, replace it with an obvious dummy such as YOUR_API_KEY_HERE. If it is a real credential, move it to user-secrets, an environment variable, or a gitignored file, and reference it from the code instead.
 
 A credential committed to git stays in history after deletion, and removing it afterwards means rotating the key.`
   },
 }
 
+function skipPatterns(filePath: string | undefined): readonly RegExp[] {
+  if (looksLikeTestFile(filePath)) return SKIP_PATTERNS
+  return RUST_FILE.test(filePath ?? '') ? [RUST_IGNORE] : []
+}
+
 export const skipAttributes: Check = {
   name: 'skip-attributes',
   advise: ({ tool, newText, oldText, filePath }) => {
-    if (!isEditOrWrite(tool) || isBlank(newText) || !looksLikeTestFile(filePath)) return null
-    if (!SKIP_PATTERNS.some(pattern => pattern.test(newText) && !pattern.test(oldText))) return null
+    if (!isEditOrWrite(tool) || isBlank(newText)) return null
+    if (!skipPatterns(filePath).some(pattern => countMatches(newText, pattern) > countMatches(oldText, pattern))) return null
     return `This edit skips or disables a test. If the test is failing, the working assumption is that the production code is wrong, not the test. Skipping or disabling a failing test is reward hacking; surface the failure and fix the underlying code instead.
 
 Legitimate reasons exist: quarantining a known-flaky test, gating a test on its environment, marking a test for functionality not yet implemented. If that is the case here, say so explicitly in your report so the user can confirm.`
   },
 }
 
+function isTestTarget(argument: string): boolean {
+  const path = argument.replaceAll('\\', '/')
+  return !TEST_ARTIFACT.test(path) && (looksLikeTestFile(path) || looksLikeTestFile(`${path}/`))
+}
+
+function deletedTestPaths(command: string): string[] {
+  const deleted = new Set<string>()
+  for (const { masked, raw } of pipelines(command).flat()) {
+    const match = DELETE_COMMAND.exec(masked)
+    if (match === null || INDEX_ONLY.test(masked)) continue
+    for (const token of raw.slice(match[0].length).split(/\s+/)) {
+      if (token === '' || token.startsWith('-')) continue
+      const cleaned = token.replace(/^['",(]+|['",);]+$/g, '')
+      if (isTestTarget(cleaned)) deleted.add(cleaned)
+    }
+  }
+  return [...deleted]
+}
+
+const declaredTests = (text: string): number => TEST_DECLARATIONS.reduce((sum, pattern) => sum + countMatches(text, pattern), 0)
+
 export const testDeletion: Check = {
   name: 'test-deletion',
   advise: ({ tool, command, newText, oldText, filePath }) => {
-    if (tool === 'Bash' || tool === 'PowerShell') {
-      if (isBlank(command)) return null
-      const deleted = new Set<string>()
-      for (const match of command.matchAll(SHELL_DELETE)) {
-        for (const token of (match[2] ?? '').split(/\s+/)) {
-          if (token === '' || token.startsWith('-')) continue
-          const cleaned = token.replace(/^['",]+|['",]+$/g, '')
-          if (looksLikeTestFile(cleaned)) deleted.add(cleaned)
-        }
-      }
-      if (deleted.size === 0) return null
-      return `This command deletes what looks like test code (${[...deleted].join(', ')}). If a test was failing, the working assumption is that the production code is wrong, not the test. Deleting, skipping, or renaming a failing test to make the suite green is reward hacking; surface the failure instead. If the test is genuinely obsolete because the feature it covered was removed, say so explicitly before proceeding.`
+    if (isShell(tool)) {
+      const deleted = isBlank(command) ? [] : deletedTestPaths(command)
+      if (deleted.length === 0) return null
+      return `This command deletes what looks like test code (${deleted.join(', ')}). If a test was failing, the working assumption is that the production code is wrong, not the test. Deleting, skipping, or renaming a failing test to make the suite green is reward hacking; surface the failure instead. If the test is genuinely obsolete because the feature it covered was removed, say so explicitly before proceeding.`
     }
-    if (isEditOrWrite(tool) && looksLikeTestFile(filePath) && !isBlank(oldText) && isBlank(newText)) {
-      return 'This change removes test code by replacing it with empty content. If the test was failing, the working assumption is that the production code is wrong, not the test. Deleting test bodies to make the suite green is reward hacking; surface the failure instead. If the test is genuinely obsolete, say so explicitly before proceeding.'
-    }
-    return null
-  },
-}
-
-export const typeDowngrade: Check = {
-  name: 'type-downgrade',
-  advise: ({ tool, newText, oldText, filePath }) => {
-    if (!isEditOrWrite(tool) || isBlank(newText) || isBlank(filePath)) return null
-    const patterns = DOWNGRADES_BY_EXTENSION[fileExtension(filePath)]
-    if (patterns === undefined) return null
-    const labels = newlyAddedLabels(newText, oldText, patterns)
-    if (labels.length === 0) return null
-    return `This edit adds a type-system or analyzer escape hatch (${labels.join(', ')}). If it silences a type error or a warning, the working assumption is that the code is wrong, not the checker; downgrading types or suppressing the analyzer to get green is reward hacking. Fix the underlying mismatch instead.
-
-Legitimate uses exist (a third-party library with wrong types, interop boundaries, a suppression with a written reason at the site). If that is the case here, name it explicitly in your report.`
+    if (!isEditOrWrite(tool) || !looksLikeTestFile(filePath) || isBlank(oldText)) return null
+    if (isBlank(newText)) return `This change removes test code by replacing it with empty content. ${REWARD_HACKING}`
+    const [before, after] = [declaredTests(oldText), declaredTests(newText)]
+    if (after >= before) return null
+    return `This change removes test code: the text it replaces declares ${before} tests and the new text declares ${after}. ${REWARD_HACKING}`
   },
 }

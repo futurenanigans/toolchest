@@ -1,12 +1,13 @@
 // Every advisory check, in the order their warnings reach the model.
-import { pipedExitCode, secrets, skipAttributes, testDeletion, typeDowngrade } from './content-checks'
-import { collectionFirst, readmeGuidance, swallowedCatch } from './structure-checks'
+import { pipedExitCode, secrets, skipAttributes, testDeletion } from './content-checks'
+import { readmeGuidance } from './readme-guidance'
 import type { Check, CheckInput } from './text'
 
 export type { CheckInput } from './text'
-export { isReadme } from './structure-checks'
+export { isShell } from './text'
+export { isReadme } from './readme-guidance'
 
-export const CHECKS: readonly Check[] = [collectionFirst, pipedExitCode, readmeGuidance, secrets, skipAttributes, swallowedCatch, testDeletion, typeDowngrade]
+export const CHECKS: readonly Check[] = [pipedExitCode, readmeGuidance, secrets, skipAttributes, testDeletion]
 
 export type Advice = { check: string; message: string; corrects: boolean }
 
