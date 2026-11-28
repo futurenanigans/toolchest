@@ -1,6 +1,7 @@
-# Installs the scanners gimlet runs into the plugin data directory. Every download is checked
-# against a SHA-256 pinned in config/defaults.env and refused on mismatch; opengrep releases other
-# than the pinned one are accepted only after cosign verifies their signature.
+# Installs the scanners gimlet runs into the plugin data directory. Every download made here is
+# checked against a SHA-256 pinned in config/defaults.env and refused on mismatch; opengrep releases
+# other than the pinned one are accepted only after cosign verifies their signature. Spectral and
+# Schemathesis install through npm and uv in lib/probe.sh, pinned by version only.
 
 TOOLS_DIR="$DATA_DIR/tools"
 OPENGREP_DIR="$DATA_DIR/opengrep"
@@ -20,6 +21,16 @@ download_pinned() {
   curl_get -o "$file" "$url" || die "download failed: $url"
   actual="$(sha256_of "$file")"
   [[ "$actual" == "$expected" ]] || die "SHA-256 mismatch for $url: expected $expected, got $actual"
+}
+
+# Runs an installer and leaves its exit status in INSTALL_RC instead of ending the run, so the
+# caller can record its scanner as failed and the other scanners still run. Call it as a plain
+# command: inside a condition bash ignores errexit in everything the installer runs.
+try_install() {
+  set +e
+  ( set -e; "$@" )
+  INSTALL_RC=$?
+  set -e
 }
 
 # --- opengrep -------------------------------------------------------------------------------

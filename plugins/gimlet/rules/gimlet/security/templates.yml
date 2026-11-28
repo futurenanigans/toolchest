@@ -1,7 +1,7 @@
 rules:
 - id: gimlet.security.razor-html-raw
   message: |
-    @Html.Raw disables Razor's automatic HTML encoding — any user-controlled
+    @Html.Raw disables Razor's automatic HTML encoding: any user-controlled
     value rendered through it becomes live markup. Only pass pre-sanitized
     or constant content; for untrusted input use `@` (auto-encoded) or
     HtmlEncode.
@@ -17,6 +17,6 @@ rules:
     category: security
     cwe: CWE-79
     owasp:
-    - A03:2021 — Injection
+    - A03:2021-Injection
     confidence: medium
-    source: ASP.NET docs — Html.Raw
+    source: ASP.NET docs, Html.Raw

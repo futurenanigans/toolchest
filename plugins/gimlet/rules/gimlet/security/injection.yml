@@ -2,7 +2,7 @@ rules:
 - id: gimlet.security.sql-injection-csharp
   message: |
     SQL query text reached by a value derived from the HTTP request.
-    Replace the dynamic fragment with a parameter —
+    Replace the dynamic fragment with a parameter:
     `new SqlCommand(sql, conn)` + `cmd.Parameters.AddWithValue(...)`,
     or EF Core's `FromSqlInterpolated` / `ExecuteSqlInterpolated`
     helpers (which auto-parameterize interpolation holes).
@@ -62,12 +62,12 @@ rules:
     category: security
     cwe: CWE-89
     owasp:
-    - A03:2021 — Injection
+    - A03:2021-Injection
     confidence: high
-    source: OWASP Top 10 A03:2021 — Injection (taint-tracked)
+    source: OWASP Top 10 A03:2021-Injection (taint-tracked)
 - id: gimlet.security.dapper-identifier-injection-csharp
   message: |
-    Dapper Query/Execute SQL uses interpolated identifiers — table
+    Dapper Query/Execute SQL uses interpolated identifiers: table
     name, column name, or ORDER BY clause built from a variable.
     Parameter binding does NOT help here: parameters are values,
     not identifiers. Guard the identifier against an allow-list
@@ -93,14 +93,14 @@ rules:
     category: security
     cwe: CWE-89
     owasp:
-    - A03:2021 — Injection
+    - A03:2021-Injection
     confidence: medium
-    source: Dapper — identifier-position SQL injection (beyond parameter binding)
+    source: Dapper, identifier-position SQL injection (beyond parameter binding)
 - id: gimlet.security.dapper-sql-injection-csharp
   message: |
     Dapper Query/Execute called with a SQL string that contains
     interpolated or concatenated user input. Dapper has no built-in
-    SQL injection protection for the query string itself — only the
+    SQL injection protection for the query string itself; only the
     parameter object is bound safely. Build the query from a literal
     string and pass user values in the parameters object.
   severity: ERROR
@@ -155,6 +155,6 @@ rules:
     category: security
     cwe: CWE-89
     owasp:
-    - A03:2021 — Injection
+    - A03:2021-Injection
     confidence: high
-    source: Dapper docs — parameterized queries
+    source: Dapper docs, parameterized queries

@@ -3,7 +3,7 @@ rules:
   message: |
     Redirect target reached by a value derived from the HTTP request
     without a `Url.IsLocalUrl` / allowlist check. Attackers use this
-    for phishing — the initial URL looks legitimate, then bounces to
+    for phishing: the initial URL looks legitimate, then bounces to
     an attacker-controlled site. Gate the redirect on `Url.IsLocalUrl`
     or a host allowlist.
   severity: WARNING
@@ -66,6 +66,6 @@ rules:
     category: security
     cwe: CWE-601
     owasp:
-    - A01:2021 — Broken Access Control
+    - A01:2021-Broken Access Control
     confidence: high
     source: OWASP Unvalidated Redirects and Forwards Cheat Sheet (taint-tracked)

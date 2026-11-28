@@ -21,9 +21,9 @@ rules:
     category: security
     cwe: CWE-327
     owasp:
-    - A02:2021 — Cryptographic Failures
+    - A02:2021-Cryptographic Failures
     confidence: medium
-    source: OWASP A02:2021 — Cryptographic Failures (CWE-327)
+    source: OWASP A02:2021-Cryptographic Failures (CWE-327)
 - id: gimlet.security.weak-cipher-csharp
   message: |
     DES, 3DES, and RC2 are deprecated ciphers. DES has a 56-bit key
@@ -43,13 +43,13 @@ rules:
     category: security
     cwe: CWE-327
     owasp:
-    - A02:2021 — Cryptographic Failures
+    - A02:2021-Cryptographic Failures
     confidence: high
-    source: NIST SP 800-131A — Transitioning the Use of Cryptographic Algorithms
+    source: NIST SP 800-131A, Transitioning the Use of Cryptographic Algorithms
 - id: gimlet.security.ecb-mode-csharp
   message: |
     ECB mode encrypts each block independently, so identical plaintext
-    blocks produce identical ciphertext — patterns leak. Use an
+    blocks produce identical ciphertext; patterns leak. Use an
     authenticated mode (AES-GCM, ChaCha20-Poly1305) or at minimum
     CBC/CTR with a fresh IV per message and a separate MAC.
   severity: WARNING
@@ -65,12 +65,12 @@ rules:
     category: security
     cwe: CWE-327
     owasp:
-    - A02:2021 — Cryptographic Failures
+    - A02:2021-Cryptographic Failures
     confidence: high
-    source: OWASP Cryptographic Storage Cheat Sheet — Cipher Modes
+    source: OWASP Cryptographic Storage Cheat Sheet, Cipher Modes
 - id: gimlet.security.insecure-randomness-csharp
   message: |
-    System.Random is a linear-congruential PRNG — state is recoverable
+    System.Random is a linear-congruential PRNG; state is recoverable
     from a short output sequence. Use RandomNumberGenerator (or the
     static Create()) for tokens, keys, nonces, salts, or anything an
     attacker might predict.
@@ -84,6 +84,6 @@ rules:
     category: security
     cwe: CWE-338
     owasp:
-    - A02:2021 — Cryptographic Failures
+    - A02:2021-Cryptographic Failures
     confidence: low
-    source: .NET docs — RandomNumberGenerator (use for cryptographic randomness)
+    source: .NET docs, RandomNumberGenerator (use for cryptographic randomness)

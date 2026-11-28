@@ -2,7 +2,7 @@ rules:
 - id: gimlet.security.tls-servicepoint-always-trust-csharp
   message: |
     ServicePointManager.ServerCertificateValidationCallback is set to
-    a lambda that unconditionally returns true — every TLS certificate
+    a lambda that unconditionally returns true: every TLS certificate
     is trusted, including attacker-controlled ones. Remove the
     callback override or implement a pinning check against expected
     issuer/thumbprint.
@@ -20,9 +20,9 @@ rules:
     category: security
     cwe: CWE-295
     owasp:
-    - A02:2021 — Cryptographic Failures
+    - A02:2021-Cryptographic Failures
     confidence: high
-    source: MSFT — ServicePointManager.ServerCertificateValidationCallback security
+    source: MSFT, ServicePointManager.ServerCertificateValidationCallback security
 - id: gimlet.security.tls-httpclienthandler-always-trust-csharp
   message: |
     HttpClientHandler.ServerCertificateCustomValidationCallback
@@ -45,6 +45,6 @@ rules:
     category: security
     cwe: CWE-295
     owasp:
-    - A02:2021 — Cryptographic Failures
+    - A02:2021-Cryptographic Failures
     confidence: high
-    source: MSFT — HttpClientHandler.ServerCertificateCustomValidationCallback
+    source: MSFT, HttpClientHandler.ServerCertificateCustomValidationCallback

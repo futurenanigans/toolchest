@@ -63,7 +63,7 @@ public static class OpenRedirectMinimalApi
 
 public class ReturnDto { public string Url { get; set; } = ""; }
 
-// Legacy Web Forms — Server.Transfer / Server.Execute variants
+// Legacy Web Forms: Server.Transfer / Server.Execute variants
 public class LegacyWebForm
 {
     public void ForwardFromQuery(HttpRequest req)

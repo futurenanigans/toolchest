@@ -4,7 +4,7 @@ rules:
     File I/O reached by a value derived from the HTTP request. Call
     `Path.GetFullPath` on the composed path and verify it stays
     under an allowlisted base directory before performing I/O.
-    `Path.Combine` does NOT prevent traversal — an absolute path or
+    `Path.Combine` does NOT prevent traversal: an absolute path or
     `..` sequence in a later argument overrides earlier ones.
   severity: ERROR
   languages:
@@ -62,6 +62,6 @@ rules:
     category: security
     cwe: CWE-22
     owasp:
-    - A01:2021 — Broken Access Control
+    - A01:2021-Broken Access Control
     confidence: high
-    source: CWE-22 — Path Traversal (taint-tracked)
+    source: CWE-22, Path Traversal (taint-tracked)

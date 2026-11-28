@@ -31,7 +31,7 @@ public class CommandExamples
 
     public void SafeArgumentList()
     {
-        // ArgumentList bypasses shell interpretation — each element is a
+        // ArgumentList bypasses shell interpretation: each element is a
         // separate argv entry so quoting/expansion can't be smuggled in.
         // Uses a hardcoded arg (not a request parameter) because
         // opengrep's taint mode over-propagates through `psi` even when
@@ -71,7 +71,7 @@ public class CommandExamples
     }
 }
 
-// MVC controller with parameter binding — no HttpRequest reference,
+// MVC controller with parameter binding: no HttpRequest reference,
 // parameter attribute is the taint source.
 public class SearchController : Controller
 {
@@ -88,7 +88,7 @@ public class SearchController : Controller
     }
 }
 
-// Minimal API — lambda parameter [FromQuery]/[FromRoute]/etc. is the source.
+// Minimal API: lambda parameter [FromQuery]/[FromRoute]/etc. is the source.
 public static class MinimalApi
 {
     public static void Configure(WebApplication app)

@@ -2,7 +2,7 @@ rules:
 - id: gimlet.security.cors-wildcard-aspnet-csharp
   message: |
     AllowAnyOrigin() combined with AllowCredentials() lets any origin
-    read authenticated responses — browsers enforce this specific pair
+    read authenticated responses; browsers enforce this specific pair
     as invalid, but the policy should not be wired that way. Call
     WithOrigins(...) with an explicit allowlist before AllowCredentials.
   severity: ERROR
@@ -19,9 +19,9 @@ rules:
     category: security
     cwe: CWE-346
     owasp:
-    - A05:2021 — Security Misconfiguration
+    - A05:2021-Security Misconfiguration
     confidence: high
-    source: ASP.NET Core CORS — AllowAnyOrigin cannot be combined with AllowCredentials
+    source: ASP.NET Core CORS, AllowAnyOrigin cannot be combined with AllowCredentials
 - id: gimlet.security.cors-wildcard-origin-aspnet-csharp
   message: |
     CORS policy set with AllowAnyOrigin() permits every origin to call
@@ -35,6 +35,6 @@ rules:
     category: security
     cwe: CWE-346
     owasp:
-    - A05:2021 — Security Misconfiguration
+    - A05:2021-Security Misconfiguration
     confidence: low
-    source: ASP.NET Core CORS — prefer WithOrigins() over AllowAnyOrigin()
+    source: ASP.NET Core CORS, prefer WithOrigins() over AllowAnyOrigin()

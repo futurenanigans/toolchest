@@ -4,7 +4,7 @@ rules:
     Process launch reached by a value derived from the HTTP request.
     An attacker can inject shell metacharacters. Fix by using
     `ProcessStartInfo` with `ArgumentList` (each arg as its own
-    element — no shell parsing), and leave `UseShellExecute = false`.
+    element, no shell parsing), and leave `UseShellExecute = false`.
     Never concatenate request values into `Arguments` or the
     command-line string passed to `Process.Start`.
   severity: ERROR
@@ -54,9 +54,9 @@ rules:
     category: security
     cwe: CWE-78
     owasp:
-    - A03:2021 — Injection
+    - A03:2021-Injection
     confidence: high
-    source: CWE-78 — OS Command Injection (taint-tracked)
+    source: CWE-78, OS Command Injection (taint-tracked)
 - id: gimlet.security.command-injection-processstartinfo-useshell
   message: |
     ProcessStartInfo.UseShellExecute = true routes the command through
@@ -71,6 +71,6 @@ rules:
     category: security
     cwe: CWE-78
     owasp:
-    - A03:2021 — Injection
+    - A03:2021-Injection
     confidence: low
-    source: .NET docs — ProcessStartInfo.UseShellExecute
+    source: .NET docs, ProcessStartInfo.UseShellExecute

@@ -27,6 +27,6 @@ rules:
     category: security
     cwe: CWE-1333
     owasp:
-    - A05:2021 — Security Misconfiguration
+    - A05:2021-Security Misconfiguration
     confidence: low
-    source: 'MSFT — Regex best practices: always specify a timeout'
+    source: 'MSFT, Regex best practices: always specify a timeout'

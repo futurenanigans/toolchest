@@ -64,6 +64,6 @@ rules:
     category: security
     cwe: CWE-918
     owasp:
-    - A10:2021 — Server-Side Request Forgery
+    - A10:2021-Server-Side Request Forgery
     confidence: high
-    source: OWASP A10:2021 — Server-Side Request Forgery (taint-tracked)
+    source: OWASP A10:2021-Server-Side Request Forgery (taint-tracked)

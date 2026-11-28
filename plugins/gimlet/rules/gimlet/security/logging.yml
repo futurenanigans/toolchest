@@ -24,15 +24,15 @@ rules:
     category: security
     cwe: CWE-532
     owasp:
-    - A09:2021 — Security Logging and Monitoring Failures
+    - A09:2021-Security Logging and Monitoring Failures
     confidence: medium
-    source: CWE-532 — Insertion of Sensitive Information into Log File
+    source: CWE-532, Insertion of Sensitive Information into Log File
 - id: gimlet.security.stacktrace-in-response-csharp
   message: |
     Exception stack trace serialized into an HTTP response. Stack
     traces reveal source paths, framework versions, and internal
     logic. Log the exception server-side (ILogger.LogError) and
-    return a generic message + correlation id — in ASP.NET Core,
+    return a generic message + correlation id; in ASP.NET Core,
     rely on the built-in ProblemDetails middleware.
   severity: WARNING
   languages:
@@ -54,9 +54,9 @@ rules:
     category: security
     cwe: CWE-209
     owasp:
-    - A09:2021 — Security Logging and Monitoring Failures
+    - A09:2021-Security Logging and Monitoring Failures
     confidence: high
-    source: CWE-209 — Generation of Error Message Containing Sensitive Information
+    source: CWE-209, Generation of Error Message Containing Sensitive Information
 - id: gimlet.security.stacktrace-middleware-csharp
   message: |
     UseExceptionHandler middleware that writes Exception.ToString()
@@ -91,6 +91,6 @@ rules:
     category: security
     cwe: CWE-209
     owasp:
-    - A09:2021 — Security Logging and Monitoring Failures
+    - A09:2021-Security Logging and Monitoring Failures
     confidence: medium
-    source: ASP.NET Core docs — Exception handling
+    source: ASP.NET Core docs, Exception handling

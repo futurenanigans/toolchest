@@ -1,7 +1,7 @@
 rules:
 - id: gimlet.security.blazor-markupstring-tainted-csharp
   message: |
-    MarkupString wraps HTML without encoding — Blazor renders it as raw
+    MarkupString wraps HTML without encoding; Blazor renders it as raw
     markup. Passing a non-literal value (variable, parameter, or
     expression) to MarkupString or casting a value to it with
     (MarkupString) risks XSS if the content is user-controlled or
@@ -22,6 +22,6 @@ rules:
     category: security
     cwe: CWE-79
     owasp:
-    - A03:2021 — Injection
+    - A03:2021-Injection
     confidence: medium
-    source: Blazor security — MarkupString disables HTML encoding
+    source: Blazor security, MarkupString disables HTML encoding

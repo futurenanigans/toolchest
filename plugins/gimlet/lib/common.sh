@@ -51,7 +51,8 @@ unpack_zip() {
 }
 
 repo_root() {
-  git rev-parse --show-toplevel 2>/dev/null || pwd
+  local top
+  if top="$(git rev-parse --show-toplevel 2>/dev/null)"; then (cd "$top" && pwd -P); else pwd -P; fi
 }
 
 # Results live in the plugin data directory, keyed by the scanned repository, so a scan never
@@ -97,6 +98,6 @@ filter_findings() {
   local prefixes
   prefixes="$(printf '%s\n' "$@" | jq -R . | jq -s .)"
   jq --argjson prefixes "$prefixes" '
-    def under($f): any($prefixes[]; . == "." or $f == . or ($f | startswith(. + "/")));
+    def under($f): any($prefixes[]; . as $p | $p == "." or $f == $p or ($f | startswith($p + "/")));
     [ .[] | select(under(.file)) ]'
 }

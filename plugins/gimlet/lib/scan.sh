@@ -3,9 +3,10 @@
 
 ALL_SCANNERS=(opengrep analyzers dotnetarium packages osv secrets)
 
+# The physical path, symlinks resolved, so it compares equal to repo_root's.
 abs_path() {
   local p="$1"
-  if [[ -d "$p" ]]; then (cd "$p" && pwd); else echo "$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"; fi
+  if [[ -d "$p" ]]; then (cd "$p" && pwd -P); else echo "$(cd "$(dirname "$p")" && pwd -P)/$(basename "$p")"; fi
 }
 
 relative_to_root() {
@@ -32,6 +33,11 @@ record() {
   awk -F'\t' -v t="$1" '$1 != t' "$file" > "$file.tmp"
   printf '%s\t%s\t%s\n' "$1" "$2" "${3:-}" >> "$file.tmp"
   mv "$file.tmp" "$file"
+}
+
+# Succeeds when TOOL's status in FILE (default: this run's status.tsv) is STATUS.
+has_status() {
+  awk -F'\t' -v t="$1" -v s="$2" '$1 == t && $2 == s { found = 1 } END { exit !found }' "${3:-$RESULTS/status.tsv}"
 }
 
 # The files staged in the index that differ from the baseline, the set opengrep's baseline mode

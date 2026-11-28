@@ -6,7 +6,12 @@ RULES_DIR="$GIMLET_ROOT/rules"
 AUDIT_RULES_DIR="$GIMLET_ROOT/rules-audit"
 
 scan_opengrep() {
-  ensure_opengrep
+  try_install ensure_opengrep
+  if [[ $INSTALL_RC -ne 0 ]]; then
+    echo '[]' > "$RESULTS/opengrep.json"
+    record opengrep failed "opengrep could not be installed; the error is printed above the summary"
+    return
+  fi
   local configs=() out="$RESULTS/opengrep.raw.json" rc=0 d
   if [[ ${#RULE_DIRS[@]} -gt 0 ]]; then
     for d in "${RULE_DIRS[@]}"; do configs+=(--config "$d"); done
@@ -59,7 +64,12 @@ test_opengrep() {
 # it scans the commits since it plus the staged changes; with explicit paths it scans those files
 # as they are on disk. Secrets are redacted in every report.
 scan_secrets() {
-  ensure_betterleaks
+  try_install ensure_betterleaks
+  if [[ $INSTALL_RC -ne 0 ]]; then
+    echo '[]' > "$RESULTS/secrets.json"
+    record secrets failed "betterleaks could not be installed; the error is printed above the summary"
+    return
+  fi
   local bl common reports=() rc=0 log="$RESULTS/secrets.log"
   bl="$(betterleaks_bin)"
   common=(--redact --no-banner --no-color --exit-code 0 --report-format json)
@@ -107,7 +117,12 @@ scan_osv() {
     record osv skipped "no package manifest or lock file changed since $BASELINE"
     return
   fi
-  ensure_osv
+  try_install ensure_osv
+  if [[ $INSTALL_RC -ne 0 ]]; then
+    echo '[]' > "$RESULTS/osv.json"
+    record osv failed "osv-scanner could not be installed; the error is printed above the summary"
+    return
+  fi
   local out="$RESULTS/osv.raw.json" rc=0
   "$(osv_bin)" scan source -r "${REL_PATHS[@]}" --format json --output-file "$out" > "$RESULTS/osv.log" 2>&1 || rc=$?
   case $rc in

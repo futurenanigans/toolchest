@@ -1,7 +1,7 @@
 rules:
 - id: gimlet.security.insecure-deserialization-binaryformatter-csharp
   message: |
-    BinaryFormatter cannot be made safe for untrusted input — an
+    BinaryFormatter cannot be made safe for untrusted input: an
     attacker-crafted payload can drive arbitrary type construction and
     execute gadgets (YSoSerial.Net). Microsoft has formally deprecated
     it. Migrate to System.Text.Json or a contract-based serializer
@@ -16,13 +16,13 @@ rules:
     category: security
     cwe: CWE-502
     owasp:
-    - A08:2021 — Software and Data Integrity Failures
+    - A08:2021-Software and Data Integrity Failures
     confidence: high
-    source: MSFT — BinaryFormatter security guide (deprecated, insecure)
+    source: MSFT, BinaryFormatter security guide (deprecated, insecure)
 - id: gimlet.security.insecure-deserialization-losformatter-csharp
   message: |
     LosFormatter / ObjectStateFormatter / SoapFormatter are all unsafe
-    for untrusted input — same polymorphic gadget risk as
+    for untrusted input, the same polymorphic gadget risk as
     BinaryFormatter. Use a schema-based serializer instead.
   severity: ERROR
   languages:
@@ -36,9 +36,9 @@ rules:
     category: security
     cwe: CWE-502
     owasp:
-    - A08:2021 — Software and Data Integrity Failures
+    - A08:2021-Software and Data Integrity Failures
     confidence: high
-    source: MSFT — Data contract serializer security
+    source: MSFT, Data contract serializer security
 - id: gimlet.security.insecure-deserialization-newtonsoft-typenamehandling-csharp
   message: |
     Newtonsoft.Json with TypeNameHandling != None embeds CLR type names
@@ -59,13 +59,13 @@ rules:
     category: security
     cwe: CWE-502
     owasp:
-    - A08:2021 — Software and Data Integrity Failures
+    - A08:2021-Software and Data Integrity Failures
     confidence: medium
-    source: Newtonsoft.Json — TypeNameHandling security remarks
+    source: Newtonsoft.Json, TypeNameHandling security remarks
 - id: gimlet.security.insecure-deserialization-javascript-serializer-csharp
   message: |
     JavaScriptSerializer with a SimpleTypeResolver enables polymorphic
-    deserialization — same class of vulnerability as unsafe
+    deserialization, the same class of vulnerability as unsafe
     Newtonsoft.Json. Drop the resolver or move to System.Text.Json.
   severity: ERROR
   languages:
@@ -75,14 +75,14 @@ rules:
     category: security
     cwe: CWE-502
     owasp:
-    - A08:2021 — Software and Data Integrity Failures
+    - A08:2021-Software and Data Integrity Failures
     confidence: high
-    source: MSFT — JavaScriptSerializer is deprecated (use System.Text.Json)
+    source: MSFT, JavaScriptSerializer is deprecated (use System.Text.Json)
 - id: gimlet.security.insecure-deserialization-newtonsoft-no-binder-csharp
   message: |
     JsonSerializerSettings with TypeNameHandling set to a non-None value
     but without a SerializationBinder provides no defense against gadget-
-    chain attacks — any CLR type can be instantiated from the payload.
+    chain attacks: any CLR type can be instantiated from the payload.
     Add a SerializationBinder that allowlists expected types, or switch
     TypeNameHandling back to None.
   severity: ERROR
@@ -118,15 +118,15 @@ rules:
     category: security
     cwe: CWE-502
     owasp:
-    - A08:2021 — Software and Data Integrity Failures
+    - A08:2021-Software and Data Integrity Failures
     confidence: high
-    source: MSFT — Newtonsoft SerializationBinder mitigations
+    source: MSFT, Newtonsoft SerializationBinder mitigations
 - id: gimlet.security.datacontract-knowntypes-csharp
   message: |
     DataContractSerializer constructed with a knownTypes array, or
     a [KnownType] attribute on a type that gets deserialized from
-    untrusted input, widens the gadget surface. Any type listed —
-    or reachable through reflection from a listed type — can be
+    untrusted input, widens the gadget surface. Any type listed,
+    or reachable through reflection from a listed type, can be
     instantiated by a crafted payload. Drop [KnownType] / knownTypes
     for types that cross an untrusted boundary; deserialize into a
     sealed contract and do the type discrimination yourself.
@@ -141,9 +141,9 @@ rules:
     category: security
     cwe: CWE-502
     owasp:
-    - A08:2021 — Software and Data Integrity Failures
+    - A08:2021-Software and Data Integrity Failures
     confidence: low
-    source: Microsoft docs — DataContractSerializer KnownTypes
+    source: Microsoft docs, DataContractSerializer KnownTypes
 - id: gimlet.security.datacontract-knowntype-attribute-csharp
   message: |
     [KnownType(typeof(X))] attribute on a type that gets
@@ -160,6 +160,6 @@ rules:
     category: security
     cwe: CWE-502
     owasp:
-    - A08:2021 — Software and Data Integrity Failures
+    - A08:2021-Software and Data Integrity Failures
     confidence: low
-    source: Microsoft docs — DataContractSerializer KnownTypes
+    source: Microsoft docs, DataContractSerializer KnownTypes

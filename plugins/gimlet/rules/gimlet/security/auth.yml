@@ -1,8 +1,8 @@
 rules:
 - id: gimlet.security.auth-missing-authorize-csharp
   message: |
-    MVC/API controller has no [Authorize] or [AllowAnonymous] attribute
-    — by default it accepts unauthenticated requests unless a global
+    MVC/API controller has no [Authorize] or [AllowAnonymous] attribute;
+    by default it accepts unauthenticated requests unless a global
     filter is in place. Apply [Authorize] at the class level (with
     per-action [AllowAnonymous] where needed) to make access explicit.
   severity: WARNING
@@ -39,10 +39,10 @@ rules:
     category: security
     cwe: CWE-862
     owasp:
-    - A01:2021 — Broken Access Control
-    - A07:2021 — Identification and Authentication Failures
+    - A01:2021-Broken Access Control
+    - A07:2021-Identification and Authentication Failures
     confidence: low
-    source: ASP.NET Core — Authorization is opt-in per controller without global filter
+    source: ASP.NET Core, Authorization is opt-in per controller without global filter
 - id: gimlet.security.auth-jwt-skip-signature-validation-csharp
   message: |
     TokenValidationParameters.ValidateSignatureLast / RequireSignedTokens
@@ -67,14 +67,14 @@ rules:
     category: security
     cwe: CWE-287
     owasp:
-    - A01:2021 — Broken Access Control
-    - A07:2021 — Identification and Authentication Failures
+    - A01:2021-Broken Access Control
+    - A07:2021-Identification and Authentication Failures
     confidence: medium
-    source: MSFT — TokenValidationParameters security remarks
+    source: MSFT, TokenValidationParameters security remarks
 - id: gimlet.security.auth-jwt-skip-lifetime-validation-csharp
   message: |
     TokenValidationParameters.ValidateLifetime = false (or
-    RequireExpirationTime = false) disables expiry checks — a leaked
+    RequireExpirationTime = false) disables expiry checks: a leaked
     token stays valid indefinitely. Keep lifetime validation enabled
     and ensure tokens are issued with a short `exp` claim.
   severity: WARNING
@@ -94,7 +94,7 @@ rules:
     category: security
     cwe: CWE-613
     owasp:
-    - A01:2021 — Broken Access Control
-    - A07:2021 — Identification and Authentication Failures
+    - A01:2021-Broken Access Control
+    - A07:2021-Identification and Authentication Failures
     confidence: high
-    source: MSFT — TokenValidationParameters.ValidateLifetime
+    source: MSFT, TokenValidationParameters.ValidateLifetime

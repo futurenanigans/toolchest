@@ -116,7 +116,7 @@ public class DapperExamples
 
     public void RunStaticQueries(IDbConnection conn)
     {
-        // Static-only fixture — opengrep's C# taint analysis over-
+        // Static-only fixture: opengrep's C# taint analysis over-
         // propagates when a request param sits in scope; running this in
         // its own function keeps the literal case separable.
         // ok: gimlet.security.dapper-sql-injection-csharp

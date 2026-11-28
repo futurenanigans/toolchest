@@ -5,7 +5,7 @@ description: Run C#/.NET security scanners (opengrep rules, the SDK's Security a
 
 # Running gimlet
 
-Run it as `bash "${CLAUDE_SKILL_DIR}/../../bin/gimlet"`, which works whether or not the plugin's `bin/` is on PATH and whether or not the install kept the executable bit. The commands below shorten that to `gimlet`. Each tool installs on first use from a release pinned with its SHA-256 in `config/defaults.env`. `gimlet update` and `gimlet install --version vX.Y.Z` change only opengrep and need cosign; run them only when asked.
+Run it as `bash "${CLAUDE_SKILL_DIR}/../../bin/gimlet"`, which works whether or not the plugin's `bin/` is on PATH and whether or not the install kept the executable bit. The commands below shorten that to `gimlet`. Each tool installs on first use at the version pinned in `config/defaults.env`. The files gimlet downloads itself (opengrep, Dotnetarium, Betterleaks, OSV-Scanner, ZAP, jq) are checked against a pinned SHA-256; Spectral (npm) and Schemathesis (uv) are pinned by version only, and their own dependencies resolve at install time. `gimlet update` and `gimlet install --version vX.Y.Z` change only opengrep and need cosign; run them only when asked.
 
 Pick the narrowest command that answers the question:
 
@@ -28,9 +28,9 @@ What `--baseline REF` means per scanner:
 - `packages` and `osv` run only when a project, props, lock or package manifest file changed since REF, and then report every vulnerable package.
 - `secrets` scans the commits in `REF..HEAD` plus the staged changes.
 
-The first line of output names the scanners, baseline and paths; quote it in the report so the reader knows what was covered. The summary gives each scanner a count and a status. INCOMPLETE, SKIPPED and FAILED each carry a reason; report every one of them, because a scanner that did not run is not a clean result for what it covers. The command exits non-zero only when a scanner failed.
+The first line of output names the scanners, baseline and paths; quote it in the report so the reader knows what was covered. The summary gives each scanner a count and a status. INCOMPLETE, SKIPPED and FAILED each carry a reason; report every one of them, because a scanner that did not run is not a clean result for what it covers. A FAILED scanner makes the command exit non-zero after the summary; INCOMPLETE and SKIPPED do not. It also exits non-zero, with no summary, when the scan cannot start (an unknown option, a missing path, a baseline that is not a commit).
 
-`findings.json` in the results directory holds every finding as `{tool, rule, severity, file, line, message}` (vulnerable-package findings add `package`); query it with `jq` instead of re-running the scan. Each scanner's raw output and log sit beside it (`opengrep.raw.json` carries CWE and OWASP metadata under `.results[].extra.metadata`, the SARIF from `dotnetarium-*.sarif` carries data-flow paths).
+`findings.json` in the results directory holds every finding as `{tool, rule, severity, file, line, message}` (vulnerable-package findings add `package`); query it with `jq` instead of re-running the scan. It does not record which scanners ran: a failed or skipped scanner contributes no findings, the same as a clean one. Read `status.tsv` beside it (one `tool<TAB>status<TAB>detail` line per scanner; status is `ok`, `partial`, `skipped` or `failed`) before treating an empty or short list as clean. Each scanner's raw output and log sit beside it (`opengrep.raw.json` carries CWE and OWASP metadata under `.results[].extra.metadata`, the SARIF from `dotnetarium-*.sarif` carries data-flow paths).
 
 ## Probing a running API
 

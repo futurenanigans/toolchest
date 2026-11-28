@@ -24,7 +24,7 @@ dotnet_targets() {
       found=""
     fi
     [[ -z "$found" ]] && found="$(nearest_project_above "$dir")"
-    [[ -n "$found" ]] && printf '%s\n' "$found"
+    if [[ -n "$found" ]]; then printf '%s\n' "$found"; fi
   done | awk '!seen[$0]++'
 }
 
@@ -73,7 +73,9 @@ dotnet_restore_all() {
 
 # Runs TOOLS over a `git archive` export of the baseline commit, in a subshell with ROOT and
 # RESULTS pointed at the export, and removes from each tool's findings those the baseline already
-# had. Findings match on tool, rule, file and message, so moved lines still match.
+# had. Findings match on tool, rule, file and message, so moved lines still match. The match is
+# counted: when the scan has more findings with one rule, file and message than the baseline had,
+# the extra ones are kept (those on the highest lines; which of them is new cannot be told).
 subtract_dotnet_baseline() {
   local tools=("$@") tree="$RESULTS/baseline-tree" base="$RESULTS/baseline" tool
   rm -rf "$tree" "$base"; mkdir -p "$tree" "$base"
@@ -93,13 +95,16 @@ subtract_dotnet_baseline() {
   ) > "$base/run.log" 2>&1 || true
 
   for tool in "${tools[@]}"; do
-    if [[ ! -f "$base/$tool.json" ]] || awk -F'\t' -v t="$tool" '$1 == t && $2 == "failed" { found = 1 } END { exit !found }' "$base/status.tsv"; then
+    has_status "$tool" failed && continue
+    if [[ ! -f "$base/$tool.json" ]] || has_status "$tool" failed "$base/status.tsv"; then
       record "$tool" partial "the baseline $BASELINE could not be analyzed, so these are all findings in the scanned paths, not only new ones; see $base"
       continue
     fi
     jq --slurpfile old "$base/$tool.json" '
-      ([$old[0][] | [.rule, .file, .message]]) as $known
-      | [ .[] | select([.rule, .file, .message] as $k | $known | index([$k]) | not) ]' \
+      def key: [.rule, .file, .message] | tojson;
+      (reduce ($old[0][] | key) as $k ({}; .[$k] += 1)) as $known
+      | [ group_by(key)[] | sort_by(.line) | .[($known[.[0] | key] // 0):][] ]
+      | sort_by([.rule, .file, .line, .message])' \
       "$RESULTS/$tool.json" > "$RESULTS/$tool.new.json"
     mv "$RESULTS/$tool.new.json" "$RESULTS/$tool.json"
   done
@@ -111,18 +116,24 @@ scan_analyzers() {
   rm -rf "$sarif_dir"; mkdir -p "$sarif_dir"
   : > "$log"
   while IFS= read -r t; do
-    dotnet_env dotnet build "$t" --no-restore -nologo -v:q \
+    dotnet_env dotnet build "$t" --no-restore --no-incremental -nologo -v:q \
       --artifacts-path "$(dotnet_artifacts_dir)" \
       -p:CustomBeforeMicrosoftCommonTargets="$GIMLET_ROOT/config/analyzers.targets" \
       -p:GimletSarifDir="$sarif_dir" >> "$log" 2>&1 || rc=$?
   done < "$RESULTS/dotnet-targets.txt"
 
-  local f
+  local f sarif=()
+  for f in "$sarif_dir"/*.sarif; do
+    if [[ -f "$f" ]]; then sarif+=("$f"); fi
+  done
+  if [[ ${#sarif[@]} -eq 0 ]]; then
+    echo '[]' > "$RESULTS/analyzers.json"
+    record analyzers failed "the build (exit $rc) wrote no SARIF, so no project was analyzed; see $log"
+    return
+  fi
   {
     echo '[]'
-    for f in "$sarif_dir"/*.sarif; do
-      [[ -f "$f" ]] && sarif_to_findings analyzers "$ROOT" Security < "$f"
-    done
+    for f in "${sarif[@]}"; do sarif_to_findings analyzers "$ROOT" Security < "$f"; done
   } | jq -s 'add | unique_by([.rule, .file, .line, .message])' | apply_scope > "$RESULTS/analyzers.json"
 
   if [[ $rc -ne 0 ]]; then
@@ -137,7 +148,12 @@ scan_dotnetarium() {
     record dotnetarium skipped "needs the .NET 10 or later runtime"
     return
   fi
-  ensure_dotnetarium
+  try_install ensure_dotnetarium
+  if [[ $INSTALL_RC -ne 0 ]]; then
+    echo '[]' > "$RESULTS/dotnetarium.json"
+    record dotnetarium failed "dotnetarium could not be installed; the error is printed above the summary"
+    return
+  fi
   local log="$RESULTS/dotnetarium.log" t i=0 rc out
   rm -f "$RESULTS"/dotnetarium-*.sarif
   : > "$log"
@@ -156,11 +172,14 @@ scan_dotnetarium() {
   {
     echo '[]'
     for f in "$RESULTS"/dotnetarium-*.sarif; do
-      [[ -f "$f" ]] && sarif_to_findings dotnetarium "$ROOT" < "$f"
+      [[ -f "$f" ]] || continue
+      sarif_to_findings dotnetarium "$ROOT" < "$f"
     done
   } | jq -s 'add | unique_by([.rule, .file, .line, .message])' | apply_scope > "$RESULTS/dotnetarium.json"
 
-  if [[ ${#failures[@]} -gt 0 ]]; then
+  if [[ ${#failures[@]} -eq $i ]]; then
+    record dotnetarium failed "failed on every target: ${failures[*]}; see $log"
+  elif [[ ${#failures[@]} -gt 0 ]]; then
     record dotnetarium partial "failed on ${failures[*]}; see $log"
   elif [[ $degraded -eq 1 ]]; then
     record dotnetarium partial "input status degraded (unresolved references or compiler errors reduce coverage); see the 'Input warning' lines in $log"

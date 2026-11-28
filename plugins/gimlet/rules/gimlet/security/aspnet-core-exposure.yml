@@ -21,14 +21,14 @@ rules:
     category: security
     cwe: CWE-200
     owasp:
-    - A05:2021 — Security Misconfiguration
+    - A05:2021-Security Misconfiguration
     confidence: high
-    source: Microsoft — Swagger security in production
+    source: Microsoft, Swagger security in production
 - id: gimlet.security.developer-exception-page-in-prod-csharp
   message: |
     app.UseDeveloperExceptionPage() called outside an IsDevelopment()
     guard. The developer exception page renders full stack traces,
-    query strings, and request headers to any caller — never enable it
+    query strings, and request headers to any caller; never enable it
     in production. Wrap it inside `if (app.Environment.IsDevelopment())`.
   severity: ERROR
   languages:
@@ -43,6 +43,6 @@ rules:
     category: security
     cwe: CWE-209
     owasp:
-    - A05:2021 — Security Misconfiguration
+    - A05:2021-Security Misconfiguration
     confidence: high
-    source: ASP.NET Core docs — UseDeveloperExceptionPage is development-only
+    source: ASP.NET Core docs, UseDeveloperExceptionPage is development-only

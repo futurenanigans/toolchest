@@ -3,7 +3,7 @@ rules:
   message: |
     HandleRequirementAsync calls context.Succeed(requirement) on
     every control path with no prior condition. The handler
-    authorizes every request — the registered requirement is
+    authorizes every request; the registered requirement is
     effectively ignored. Gate the call on the actual authorization
     check, or return Task.CompletedTask to let another handler
     decide.
@@ -23,16 +23,16 @@ rules:
     category: security
     cwe: CWE-285
     owasp:
-    - A01:2021 — Broken Access Control
+    - A01:2021-Broken Access Control
     confidence: high
-    source: ASP.NET Core docs — Policy-based authorization
+    source: ASP.NET Core docs, Policy-based authorization
 - id: gimlet.security.aspnet-authz-succeed-in-catch-csharp
   message: |
     context.Succeed(requirement) called inside a catch block
     treats every handler exception as an authorization pass. An
     attacker who can induce an exception (null user, stale token,
     downstream service down) gains access. Log the exception and
-    return without calling Succeed — the default is to leave the
+    return without calling Succeed; the default is to leave the
     requirement unfulfilled.
   severity: ERROR
   languages:
@@ -52,6 +52,6 @@ rules:
     category: security
     cwe: CWE-755
     owasp:
-    - A01:2021 — Broken Access Control
+    - A01:2021-Broken Access Control
     confidence: high
-    source: ASP.NET Core docs — Policy-based authorization
+    source: ASP.NET Core docs, Policy-based authorization

@@ -41,7 +41,12 @@ spectral_dir() { echo "$TOOLS_DIR/spectral/$GIMLET_SPECTRAL_VERSION-$GIMLET_SPEC
 
 probe_spectral() {
   if ! have npm; then record spectral skipped "npm is not installed"; return; fi
-  ensure_spectral
+  try_install ensure_spectral
+  if [[ $INSTALL_RC -ne 0 ]]; then
+    echo '[]' > "$RESULTS/spectral.json"
+    record spectral failed "spectral could not be installed; the error is printed above the summary"
+    return
+  fi
   local dir out="$RESULTS/spectral.raw.json" rc=0
   dir="$(spectral_dir)"
   # The ruleset names the OWASP package, which Spectral resolves from the ruleset's own directory.
@@ -74,8 +79,10 @@ probe_schemathesis() {
   # Schemathesis writes .schemathesis/ and .hypothesis/ caches into its working directory.
   (cd "$RESULTS" && uv tool run --from "schemathesis==$GIMLET_SCHEMATHESIS_VERSION" schemathesis "${args[@]}") \
     > "$RESULTS/schemathesis.log" 2>&1 || rc=$?
-  local report
-  report="$(ls "$report_dir"/*.json 2>/dev/null | head -1)"
+  local report="" f
+  for f in "$report_dir"/*.json; do
+    if [[ -f "$f" ]]; then report="$f"; break; fi
+  done
   if [[ $rc -gt 1 || -z "$report" ]]; then
     echo '[]' > "$RESULTS/schemathesis.json"
     record schemathesis failed "schemathesis exited with status $rc; see $RESULTS/schemathesis.log"
@@ -116,7 +123,12 @@ ensure_zap() (
 probe_zap() {
   if is_windows; then record zap skipped "gimlet runs ZAP through zap.sh, which needs Linux or macOS"; return; fi
   if ! have java; then record zap skipped "Java 17 or later is not installed"; return; fi
-  ensure_zap
+  try_install ensure_zap
+  if [[ $INSTALL_RC -ne 0 ]]; then
+    echo '[]' > "$RESULTS/zap.json"
+    record zap failed "ZAP could not be installed; the error is printed above the summary"
+    return
+  fi
   local rc=0 home="$RESULTS/zap-home" report_dir="$RESULTS/zap-report"
   rm -rf "$home" "$report_dir"; mkdir -p "$home" "$report_dir"
   # ZAP validates integer plan fields before substituting ${VAR}, so the plan is rendered here.
