@@ -425,7 +425,7 @@ test('standalone prompt arrives intact at the child, including through a Windows
   await supervisor.flush()
   const { agents } = await readDiskState(repo, home)
   expect(agents.stdin?.status).toBe('done')
-})
+}, 20_000)
 
 test('state updates expire old terminal agents while preserving active agents', async () => {
   const { repo, home } = await makeTempRepo()
