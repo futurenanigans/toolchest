@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-gimlet="$(cd "$(dirname "$0")/../bin" && pwd)/gimlet"
+GIMLET_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+gimlet="$GIMLET_ROOT/bin/gimlet"
+# shellcheck source=../config/defaults.env
+source "$GIMLET_ROOT/config/defaults.env"
+# shellcheck source=../lib/common.sh
+source "$GIMLET_ROOT/lib/common.sh"
+# shellcheck source=../lib/install.sh
+source "$GIMLET_ROOT/lib/install.sh"
+ensure_jq
 fixture="$(mktemp -d)"
 trap 'rm -rf "$fixture"' EXIT
 export GIMLET_RESULTS_DIR="$fixture/scan results"
@@ -27,6 +35,8 @@ assert_clean() {
 scan
 jq -e --slurpfile legacy "$GIMLET_RESULTS_DIR/findings.json" '
   .findings == $legacy[0] and (.findings | map([.rule,.file])) == [["smoke-marker","marker.py"]]' "$report" >/dev/null
+
+bash "$gimlet" query --rule smoke-marker --format json | jq -e '.findings | length == 1' >/dev/null
 
 echo 'print("ordinary text")' > marker.py
 scan

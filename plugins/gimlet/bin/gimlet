@@ -44,6 +44,7 @@ usage: gimlet <command> [options]
       --allow-remote     allow a target that is not on this machine
   query [REPORT|DIR] [options]
                          filter merged findings without reading the whole report
+                         (default: the last scan of this repository)
       --severity LIST    filter by severity (comma-separated: error,warning,note)
       --tool LIST        filter by scanner tool name (comma-separated)
       --rule LIST        filter by rule id (comma-separated)

@@ -11,7 +11,7 @@ cmd_query() {
       --path) path_substr="${2:?--path needs a path substring}"; shift 2 ;;
       --format) format="${2:?--format needs text, json, or sarif}"; shift 2 ;;
       -h|--help)
-        echo "usage: gimlet query [REPORT_JSON|RESULTS_DIR] [--severity LIST] [--tool LIST] [--rule LIST] [--path SUBSTR] [--format text|json|sarif]"
+        echo "usage: gimlet query [REPORT_JSON|RESULTS_DIR (default: this repository's last scan)] [--severity LIST] [--tool LIST] [--rule LIST] [--path SUBSTR] [--format text|json|sarif]"
         return 0
         ;;
       -*) die "query: unknown option $1" ;;
@@ -29,12 +29,10 @@ cmd_query() {
 
   local report_file=""
   if [[ -z "$target" ]]; then
-    if [[ -f "report.json" ]]; then
-      report_file="report.json"
-    else
-      die "query: specify a report.json file or results directory"
-    fi
-  elif [[ -d "$target" ]]; then
+    target="$(results_dir)"
+    [[ -f "$target/report.json" ]] || die "query: no scan results for this repository at $target; run gimlet scan first or name a report"
+  fi
+  if [[ -d "$target" ]]; then
     if [[ -f "$target/report.json" ]]; then
       report_file="$target/report.json"
     elif [[ -f "$target/findings.json" ]]; then
@@ -82,29 +80,42 @@ cmd_query() {
       ;;
     sarif)
       jq --arg sev "$severity" --arg tool "$tool" --arg rule "$rule" --arg path "$path_substr" \
-        "$filter | {
-          \"\$schema\": \"https://json.schemastore.org/sarif-2.1.0.json\",
-          version: \"2.1.0\",
-          runs: [{
-            tool: {
-              driver: {
-                name: \"gimlet\",
-                rules: ([.findings[] | {id: ((.tool // \"gimlet\") + \"/\" + (.rule // \"unknown\"))}] | unique_by(.id))
-              }
-            },
-            results: [.findings[] | {
-              ruleId: ((.tool // \"gimlet\") + \"/\" + (.rule // \"unknown\")),
-              level: (if (.severity // \"\") == \"error\" then \"error\" elif (.severity // \"\") == \"warning\" then \"warning\" else \"note\" end),
-              message: {text: (.message // \"\")},
-              locations: [{
-                physicalLocation: {
-                  artifactLocation: {uri: (.file // \"\")},
-                  region: {startLine: (if (.line // 0) > 0 then .line else 1 end)}
-                }
+        --arg operation_tools "${OPERATION_PROBES[*]}" \
+        "$filter"'
+        | ($operation_tools | split(" ")) as $operation_tools
+        | def rule_id: (.tool // "gimlet") + "/" + (.rule // "unknown");
+          def location:
+            (.file // "") as $file
+            | if $file == "" then []
+              elif (.tool as $t | $operation_tools | index($t)) != null then
+                [{logicalLocations: [{fullyQualifiedName: $file}]}]
+              else
+                [{physicalLocation: (
+                  {artifactLocation: {uri: ($file | split("/") | map(@uri) | join("/"))}}
+                  + (if (.line // 0) > 0 then {region: {startLine: .line}} else {} end))}]
+              end;
+          {
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            version: "2.1.0",
+            runs: [{
+              tool: {driver: {name: "gimlet", rules: ([.findings[] | {id: rule_id}] | unique_by(.id))}},
+              invocations: [{
+                executionSuccessful: (all(.scanners[]; .status != "failed")),
+                toolExecutionNotifications: [
+                  .scanners[] | select(.status != "ok") | {
+                    descriptor: {id: (.tool + "/" + .status)},
+                    level: ({failed: "error", partial: "warning", skipped: "note"}[.status] // "warning"),
+                    message: {text: (.tool + " " + .status + (if (.detail // "") != "" then ": " + .detail else "" end))}
+                  }]
+              }],
+              results: [.findings[] | {
+                ruleId: rule_id,
+                level: (if .severity == "error" or .severity == "warning" then .severity else "note" end),
+                message: {text: (.message // "")},
+                locations: location
               }]
             }]
-          }]
-        }" "$report_file"
+          }' "$report_file"
       ;;
   esac
 }

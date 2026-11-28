@@ -7,7 +7,8 @@ const MAX_RECORDED = 5
 const MAX_CMD_CHARS = 160
 const SECTION_ID = 'session:failed-commands'
 
-const EXPLORATORY_PREFIX = /^(?:grep|rg|find|ls|dir|cat|head|tail|less|more|which|where|type|test|\[|pwd|echo|printf|stat|wc|git\s+(?:status|diff|log|show|branch|rev-parse|check-ignore|stash\s+list))\b/i
+const LEADING_CD = /^(?:cd\s+(?:"[^"]*"|'[^']*'|\S+)\s*(?:&&|;)\s*)+/i
+const EXPLORATORY_PREFIX = /^(?:grep|rg|find|ls|dir|cat|head|tail|less|more|which|where|type|test|\[|pwd|echo|printf|stat|wc|git\s+(?:status|diff|log|show|branch|rev-parse|check-ignore|stash\s+list))(?=\s|$)/i
 
 const failedCommands = atom({ plugin: 'session', key: 'failedCommands' } as const, [] as string[], { shape: 'failed-cmds-1' })
 
@@ -20,7 +21,7 @@ export function normalizeCommand(raw: string): string {
 }
 
 export function isExploratory(cmd: string): boolean {
-  return EXPLORATORY_PREFIX.test(cmd.trim())
+  return EXPLORATORY_PREFIX.test(cmd.trim().replace(LEADING_CD, ''))
 }
 
 export const register: Register = on => {

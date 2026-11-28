@@ -1,6 +1,6 @@
 # session
 
-Two skills for moving work from one Claude Code session to a fresh one. `handover` writes a brief aimed at one next goal; `continue` reads it back after `/clear`. Both run only when you invoke them, since the model cannot call either on its own.
+Two skills and a hook for moving work from one Claude Code session to a fresh one. `handover` writes a brief aimed at one next goal; `continue` reads it back after `/clear`. Both run only when you invoke them, since the model cannot call either on its own.
 
 ## Writing a handover
 
@@ -19,6 +19,8 @@ The brief keeps only what the fresh session needs to reach done-when, in this pr
 3. Decisions that lock in a choice.
 4. Files to read or change.
 5. The exact first action.
+
+A hook records the last five shell commands that failed in the session, without duplicates, and offers them to the skill as verified leads for item 2. A failed lookup is left out: a command that starts with a read-only tool such as `grep`, `ls`, `cat`, `test` or `git status`, with or without a leading `cd`.
 
 Before writing, it checks its own memory against the working tree. Every `file:line` anchor is opened and corrected, or loses its line number, or is dropped. Every claim about current code is checked, and the file wins where they disagree. Decisions, failed approaches and session-only facts carry a `[verified]` or `[recalled]` tag. The brief makes no claim about remote state, and other goals go under Deferred. It aims for 80 to 150 lines.
 

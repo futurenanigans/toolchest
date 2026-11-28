@@ -95,7 +95,7 @@ subtract_dotnet_baseline() {
   ) > "$base/run.log" 2>&1 || true
 
   for tool in "${tools[@]}"; do
-    has_status "$tool" failed && continue
+    if has_status "$tool" failed || has_status "$tool" skipped; then continue; fi
     if [[ ! -f "$base/$tool.json" ]] || has_status "$tool" failed "$base/status.tsv"; then
       record "$tool" partial "the baseline $BASELINE could not be analyzed, so these are all findings in the scanned paths, not only new ones; see $base"
       continue
@@ -264,7 +264,8 @@ run_dotnet_scanners() {
   local code_tools=()
   for tool in "${wanted[@]}"; do
     "scan_$tool"
-    [[ "$tool" != packages ]] && code_tools+=("$tool")
+    [[ "$tool" == packages ]] && continue
+    has_status "$tool" skipped || has_status "$tool" failed || code_tools+=("$tool")
   done
   if [[ -n "$BASELINE" && ${#code_tools[@]} -gt 0 ]]; then
     echo "gimlet: analyzing $BASELINE to subtract the findings it already had"

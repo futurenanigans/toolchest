@@ -3,6 +3,8 @@
 # contract, and ZAP runs an active scan. The API must already be running; gimlet does not start it.
 
 ALL_PROBES=(spectral schemathesis zap)
+# Probes whose findings name an API operation ("GET /users") in the file field, not a file.
+OPERATION_PROBES=(schemathesis zap)
 OPENAPI_CANDIDATES=(openapi/v1.json swagger/v1/swagger.json)
 
 # Active scanning sends attack payloads, so a target off this machine needs --allow-remote.
@@ -44,8 +46,11 @@ ensure_spectral() (
   npm ci --prefix "$stage" --no-audit --no-fund --ignore-scripts >&2
   cp "$GIMLET_ROOT/config/spectral-ruleset.yaml" "$stage/ruleset.yaml"
   # A competing installer may have already published the same verified lock.
-  if ! node -e 'require("fs").renameSync(process.argv[1],process.argv[2])' "$stage" "$dest" 2>/dev/null; then
-    [[ -x "$dest/node_modules/.bin/spectral" ]] || exit 1
+  local rename_error
+  if ! rename_error="$(node -e 'require("fs").renameSync(process.argv[1],process.argv[2])' "$stage" "$dest" 2>&1)"; then
+    [[ -x "$dest/node_modules/.bin/spectral" ]] && exit 0
+    echo "$rename_error" >&2
+    die "could not move the spectral install from $stage to $dest"
   fi
 )
 
