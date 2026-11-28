@@ -1,11 +1,12 @@
-// Local Agent Monitor. Runs the advisory checks on every Edit, Write and shell call and attaches their warnings to
-// the tool result for the model, counts each warning per check, keeps the status line current, draws the counts in
-// the /guard-stats pane, and tells the model how the session-start git fetch went.
+// Local Agent Monitor. Runs the checks on every Edit, Write, Read, Grep and shell call. A call that would read a
+// credential file is denied before it runs; every other finding is attached to the tool result as advice for the
+// model. It also counts each message per check, keeps the status line current, draws the counts in the /guard-stats
+// pane, and tells the model how the session-start git fetch went.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface as Engine, PluginOptions, Register, ToolCallInput } from 'claude-code'
 
 import type { LamCounts, StatusSegment } from '../types'
-import { type CheckInput, CORRECTING_CHECKS, adviseAll, isRead, isReadme, isShell } from '../checks'
+import { type CheckInput, CORRECTING_CHECKS, adviseAll, isGrep, isRead, isReadme, isShell } from '../checks'
 import { fetchRemotes, statusSegments } from './status'
 
 const PANE = 'guard-stats'
@@ -34,6 +35,7 @@ async function checkInput($: Engine, e: ToolCallInput): Promise<CheckInput | nul
   const tool = e.tool
   if (isShell(tool)) return { tool, command: stringField(e, 'command'), oldText: '', isFirstReadmeEdit: false }
   if (isRead(tool)) return { tool, filePath: stringField(e, 'file_path'), oldText: '', isFirstReadmeEdit: false }
+  if (isGrep(tool)) return { tool, filePath: stringField(e, 'path'), searchGlob: stringField(e, 'glob'), oldText: '', isFirstReadmeEdit: false }
   if (tool !== 'Edit' && tool !== 'Write') return null
 
   const filePath = stringField(e, 'file_path')

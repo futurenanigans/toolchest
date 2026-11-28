@@ -1,10 +1,10 @@
-// Every advisory check, in the order their warnings reach the model.
+// Every check, in the order their messages reach the model.
 import { credentialRead, destructiveGit, pipedExitCode, secrets, skipAttributes, testDeletion } from './content-checks'
 import { readmeGuidance } from './readme-guidance'
 import type { Check, CheckInput } from './text'
 
 export type { CheckInput } from './text'
-export { isRead, isShell } from './text'
+export { isGrep, isRead, isShell } from './text'
 export { isReadme } from './readme-guidance'
 
 export const CHECKS: readonly Check[] = [credentialRead, destructiveGit, pipedExitCode, readmeGuidance, secrets, skipAttributes, testDeletion]

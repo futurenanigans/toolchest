@@ -261,6 +261,7 @@ test('a test or build run piped into a filter is flagged, with the hidden exit c
     '! cargo test | tail',
     'cargo test | tail # pipefail is not set here',
     'set +o pipefail; cargo test | tail',
+    'set -o errexit +o pipefail; cargo test | tail',
   ]
   for (const command of commands) {
     const ran = await $.tool.call({ tool: 'Bash', command })
@@ -282,6 +283,7 @@ test('a pipeline that keeps the exit code, or pipes something other than a verif
     'ls | cargo-testing-tool',
     'cat log | cargo test',
     'set -euo pipefail; cargo test | tail',
+    'set -o errexit -o pipefail; cargo test | tail',
     'make --version | head -1',
     'pytest --collect-only -q | head',
     'go test -list . | wc -l',
@@ -292,7 +294,6 @@ test('a pipeline that keeps the exit code, or pipes something other than a verif
     expect(ran.context).toBeUndefined()
   }
 })
-
 
 test('blocks reading credential files via Bash or Read, while allowing .env.example', async ($, on) => {
   stubEngine(on)
@@ -311,15 +312,88 @@ test('blocks reading credential files via Bash or Read, while allowing .env.exam
   expect(exampleCat.deny).toBeUndefined()
 })
 
-test('warns on destructive git commands but stays quiet on safe alternatives', async ($, on) => {
+test('a search that names a credential file as its pattern, or reads from a pipe, is not a credential read', async ($, on) => {
   stubEngine(on)
   await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
 
-  for (const command of ['git push --force origin main', 'git reset --hard HEAD~1', 'git add -A']) {
+  const commands = [
+    'ls -la | grep .env',
+    'grep .env .gitignore',
+    'grep -rn "\\.env" src/',
+    'grep -e .env notes.md',
+    'grep "foo .env" notes.md',
+    'rg "credentials.json" docs',
+    'grep -r id_rsa .',
+    'sed -n 1,5p README.md',
+    'echo "a <.env"',
+    'cat certs/public.pem',
+    'cat fullchain.pem',
+  ]
+  for (const command of commands) {
     const ran = await $.tool.call({ tool: 'Bash', command })
-    expect(ran.context?.join('\n')).toMatch(/Destructive or overly broad git command/)
+    expect(ran.deny).toBeUndefined()
   }
-  for (const command of ['git push --force-with-lease origin feature', 'git add src/index.ts', 'git status']) {
+  const sourceSearch = await $.tool.call({ tool: 'Grep', pattern: '\\.env', path: '/app/src', glob: '*.ts' })
+  expect(sourceSearch.deny).toBeUndefined()
+})
+
+test('a credential file read through a glob, a redirect, a search tool or another reader is blocked', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+
+  const commands = [
+    'cat .env*',
+    'cat *.pem',
+    'sort .env',
+    'nl .env',
+    'cat<.env',
+    'wc -l < .env',
+    'grep KEY .env',
+    'grep -e KEY .env',
+    'sed -n 1,5p .env',
+    "awk -F= '{print $2}' .env",
+    'cd app && head -n 5 config/.env.local',
+    'cat server.key',
+  ]
+  for (const command of commands) {
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect(ran.deny).toMatch(/Blocked reading credential file/)
+  }
+  const fileSearch = await $.tool.call({ tool: 'Grep', pattern: 'KEY', path: '/app/.env' })
+  const globSearch = await $.tool.call({ tool: 'Grep', pattern: 'KEY', path: '/app', glob: '.env*' })
+  expect(fileSearch.deny).toMatch(/Blocked reading credential file/)
+  expect(globSearch.deny).toMatch(/Blocked reading credential file/)
+})
+
+test('a forced push, a hard reset and a stage-everything add are reported as already run, and narrower forms are not', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+
+  const flagged = [
+    'git push --force origin main',
+    'git push -fu origin main',
+    'git push origin +main',
+    'git -C /repo push --force',
+    'git reset --hard HEAD~1',
+    'git -C /repo reset --hard HEAD~3',
+    'git add -A',
+    'git -c core.autocrlf=false add -A',
+    'git add .',
+  ]
+  for (const command of flagged) {
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect(ran.context?.join('\n')).toContain('it has already run')
+  }
+  const quiet = [
+    'git push --force-with-lease origin feature',
+    'git push -u origin main',
+    'git add src/index.ts',
+    'git add .gitignore',
+    'git reset --soft HEAD~1',
+    'git commit -m "push -f"',
+    'git status',
+  ]
+  for (const command of quiet) {
     const ran = await $.tool.call({ tool: 'Bash', command })
     expect(ran.context).toBeUndefined()
   }

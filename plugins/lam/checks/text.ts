@@ -3,6 +3,7 @@
 export type CheckInput = {
   tool: string
   filePath?: string
+  searchGlob?: string
   command?: string
   newText?: string
   oldText: string
@@ -14,6 +15,8 @@ export type Check = { name: string; advise: (input: CheckInput) => string | null
 export const isEditOrWrite = (tool: string): boolean => tool === 'Edit' || tool === 'Write'
 
 export const isRead = (tool: string): boolean => tool === 'Read'
+
+export const isGrep = (tool: string): boolean => tool === 'Grep'
 
 export const isShell = (tool: string): boolean => tool === 'Bash' || tool === 'PowerShell'
 
