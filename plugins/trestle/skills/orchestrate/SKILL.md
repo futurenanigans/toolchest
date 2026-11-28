@@ -35,7 +35,7 @@ Run autonomous **Contract-First Goal Loops** and **dependency-aware multi-task q
 5. **Cross-check criteria for contradictions:** Before calling `contract_create`, grep every symbol that a criterion requires removing/renaming against every test that a criterion requires keeping unchanged.
 
 ### 2. Provision Worktree(s) & Run Goal Loop
-- Create an isolated worktree with `worktree_create` (e.g. `wt-impl`).
+- Create an isolated worktree with `worktree_create` (e.g. `wt-impl`). `goal_run`, `goal_start` and `agent_spawn` reject a `worktreePath` outside the repository's `.trestle-wt/`.
   - *Competing drafts:* Create 2+ worktrees (`wt-codex`, `wt-agy`) and run against the **same `contractId`**.
 - **Prefer non-blocking `goal_start`** (with `goal_status` / `goal_cancel`) for anything beyond a quick 1-iteration task so MCP calls never time out and you can steer or cancel mid-run. Use blocking `goal_run` only for short, bounded tasks.
 - **Live intervention:** Use `agent_tail` to inspect recent activity, `agent_steer` to redirect a running agent mid-turn (`claude`, `codex`, `agy`), or `agent_stop` / `goal_cancel` to abort.

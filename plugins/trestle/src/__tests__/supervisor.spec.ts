@@ -61,3 +61,66 @@ test('the total deadline fails and kills a live agent', async () => {
     await waitUntil(() => !isProcessAlive(pid))
   })
 })
+
+async function runScript(script: string, check: (supervisor: AgentSupervisor, dir: string) => Promise<void>) {
+  const dir = await fs.mkdtemp(path.join(tmpdir(), 'trestle-supervisor-'))
+  const supervisor = new AgentSupervisor()
+  const fixture = path.join(dir, 'runner.cjs')
+  try {
+    await fs.writeFile(fixture, script)
+    await supervisor.spawn({
+      id: 'agent', repoRoot: dir, worktreeId: 'fixture', worktreePath: dir, branch: 'main',
+      cli: 'claude', prompt: 'fixture', stage: 'test', commandOverride: [process.execPath, fixture], homeDir: dir,
+    })
+    await check(supervisor, dir)
+  } finally {
+    await supervisor.stopAll()
+    await fs.rm(dir, { recursive: true, force: true })
+  }
+}
+
+test('an agent that reports BLOCKED and then exits is failed with its reason kept', async () => {
+  const script = `
+    console.log(JSON.stringify({
+      type: 'assistant', message: { content: [{ type: 'text', text: 'BLOCKED: need credentials' }] },
+    }))
+    setTimeout(() => process.exit(3), 50)
+  `
+  await runScript(script, async supervisor => {
+    const [result] = await supervisor.wait(['agent'], { timeoutMs: 4_000 })
+    expect(result).toMatchObject({ status: 'failed', needsInputReason: 'need credentials', error: 'Exited with code 3' })
+  })
+})
+
+test('stopAll terminates an agent that is waiting for input', async () => {
+  const script = `
+    require('node:fs').writeFileSync('pid', String(process.pid))
+    console.log(JSON.stringify({
+      type: 'assistant', message: { content: [{ type: 'text', text: 'NEEDS_INPUT: which branch?' }] },
+    }))
+    setTimeout(() => process.exit(1), 10_000)
+  `
+  await runScript(script, async (supervisor, dir) => {
+    await waitUntil(() => supervisor.list()[0]?.status === 'needs_input')
+    const pid = Number(await fs.readFile(path.join(dir, 'pid'), 'utf8'))
+    await supervisor.stopAll()
+    expect(supervisor.list()[0]?.status).toBe('stopped')
+    await waitUntil(() => !isProcessAlive(pid))
+  })
+})
+
+test.skipIf(process.platform === 'win32')('a background process the agent left behind dies when the agent exits', async () => {
+  const script = `
+    const child = require('node:child_process').spawn(process.execPath,
+      ['-e', 'setTimeout(() => process.exit(1), 10_000)'], { stdio: 'ignore' })
+    require('node:fs').writeFileSync('child-pid', String(child.pid))
+    child.unref()
+    setTimeout(() => process.exit(0), 50)
+  `
+  await runScript(script, async (supervisor, dir) => {
+    const [result] = await supervisor.wait(['agent'], { timeoutMs: 4_000 })
+    expect(result?.status).toBe('done')
+    const pid = Number(await fs.readFile(path.join(dir, 'child-pid'), 'utf8'))
+    await waitUntil(() => !isProcessAlive(pid))
+  })
+})

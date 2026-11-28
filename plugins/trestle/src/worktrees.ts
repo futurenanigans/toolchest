@@ -5,8 +5,8 @@ import * as path from 'node:path'
 import { withFileLock } from './locks'
 import { execCommand, killProcessTree, linkOrCopy, userHome } from './platform'
 import { type PersistedWorktree, readDiskState, sessionHomeDir, updateDiskState } from './state'
-import type { AgentSupervisor } from './supervisor'
-import { ensureWorktreeIgnored, onlyWorktreeIgnoreAdded, WORKTREE_ROOT_DIR } from './worktree_ignore'
+import { isTerminalStatus, type AgentSupervisor } from './supervisor'
+import { ensureWorktreeIgnored, onlyWorktreeIgnoreAdded, withWorktreeRuleSetAside, WORKTREE_ROOT_DIR } from './worktree_ignore'
 
 const ENV_FILES_TO_LINK = ['.env', '.env.local']
 const MAX_DIFF_CHARS = 100_000
@@ -266,7 +266,7 @@ export async function worktreeLandPreview(
   const ignoreRuleOnly = repoDirty === 'M .gitignore' && await onlyWorktreeIgnoreAdded(resolvedRoot)
   const repoClean = !repoDirty || ignoreRuleOnly
   const diff = await worktreeDiff(resolvedRoot, id, {
-    baseRef: targetBranch,
+    baseRef: await git(wt.path, ['merge-base', targetBranch, 'HEAD']),
     maxChars: options.maxDiffChars,
     homeDir,
   })
@@ -322,33 +322,35 @@ export async function worktreeLand(
       throw new Error(`Target repository ${resolvedRoot} has uncommitted changes; clean before landing`)
     }
 
-    const currentBranch = await git(resolvedRoot, ['rev-parse', '--abbrev-ref', 'HEAD'])
-    const restoreTo = currentBranch === 'HEAD' ? await git(resolvedRoot, ['rev-parse', 'HEAD']) : currentBranch
-    const switched = currentBranch !== targetBranch
-    if (switched) {
-      await git(resolvedRoot, ['checkout', targetBranch])
-    }
-
-    try {
-      try {
-        await git(resolvedRoot, [
-          'merge',
-          '--no-ff',
-          wt.branch,
-          '-m',
-          options.commitMessage ?? `Merge ${wt.branch} into ${targetBranch}`,
-        ])
-      } catch (err) {
-        await execCommand('git', ['merge', '--abort'], { cwd: resolvedRoot }).catch(() => {})
-        throw err
-      }
-      const landedCommit = await git(resolvedRoot, ['rev-parse', 'HEAD'])
-      return { id, landedCommit, targetBranch }
-    } finally {
+    return withWorktreeRuleSetAside(resolvedRoot, async () => {
+      const currentBranch = await git(resolvedRoot, ['rev-parse', '--abbrev-ref', 'HEAD'])
+      const restoreTo = currentBranch === 'HEAD' ? await git(resolvedRoot, ['rev-parse', 'HEAD']) : currentBranch
+      const switched = currentBranch !== targetBranch
       if (switched) {
-        await git(resolvedRoot, ['checkout', restoreTo])
+        await git(resolvedRoot, ['checkout', targetBranch])
       }
-    }
+
+      try {
+        try {
+          await git(resolvedRoot, [
+            'merge',
+            '--no-ff',
+            wt.branch,
+            '-m',
+            options.commitMessage ?? `Merge ${wt.branch} into ${targetBranch}`,
+          ])
+        } catch (err) {
+          await execCommand('git', ['merge', '--abort'], { cwd: resolvedRoot }).catch(() => {})
+          throw err
+        }
+        const landedCommit = await git(resolvedRoot, ['rev-parse', 'HEAD'])
+        return { id, landedCommit, targetBranch }
+      } finally {
+        if (switched) {
+          await git(resolvedRoot, ['checkout', restoreTo])
+        }
+      }
+    })
   })
 }
 
@@ -368,8 +370,7 @@ export async function worktreeClean(
   }
 
   for (const agent of Object.values(state.agents)) {
-    const isActive = agent.status === 'starting' || agent.status === 'running' || agent.status === 'idle'
-    if (agent.worktreeId === id && isActive && agent.pid && agent.processStart) {
+    if (agent.worktreeId === id && !isTerminalStatus(agent.status) && agent.pid && agent.processStart) {
       await killProcessTree(agent.pid, agent.processStart)
     }
   }

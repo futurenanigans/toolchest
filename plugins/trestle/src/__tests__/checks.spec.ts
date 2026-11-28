@@ -143,3 +143,25 @@ test('malformed JUnit stdout fails verification even when the runner exits zero'
   expect(report.results[0]).toMatchObject({ passed: false, invalidReport: true })
   expect(report.results[0]?.excerpt).toContain('JUnit report')
 })
+
+test('a build that fails before writing its JUnit report shows the build output', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-junit-'))
+  tempDirs.push(dir)
+  const report = await runChecks({ worktreePath: dir, commands: [{
+    name: 'tests', command: ['bun', '-e', 'console.error("error TS2304: cannot find name"); process.exit(2)'],
+    reportFormat: 'junit-xml', reportPath: 'result.xml',
+  }] })
+  expect(report.results[0]).toMatchObject({ passed: false, exitCode: 2 })
+  expect(report.results[0]?.excerpt).toContain('error TS2304')
+  expect(report.results[0]?.invalidReport).toBeUndefined()
+})
+
+test('a JUnit report on stdout is read past the log lines a runner prints before it', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-junit-'))
+  tempDirs.push(dir)
+  const stdout = 'Restoring packages...\n<?xml version="1.0"?>\n<testsuite><testcase name="ok"/></testsuite>'
+  const report = await runChecks({ worktreePath: dir, commands: [{
+    name: 'tests', command: ['bun', '-e', 'console.log(process.argv[1])', stdout], reportFormat: 'junit-xml',
+  }] })
+  expect(report.results[0]).toMatchObject({ passed: true, failedIds: [] })
+})

@@ -7,7 +7,7 @@ import { type CheckCommandSpec, runChecks } from './checks'
 import { loadEffectiveConfig } from './config'
 import { type BaselinePolicy, contractCreate, contractRead } from './contract'
 import { evaluateGateAgainstBaseline, gateCheckOptions, runGoalLoop, type GoalLoopResult } from './goal_loop'
-import { execCommand, isProcessAlive, isWindows, userHome, type CommandSpec } from './platform'
+import { execCommand, isProcessAlive, isWindows, processStartToken, userHome, type CommandSpec } from './platform'
 import { withFileLock } from './locks'
 import { repoKey } from './repo_key'
 import { readDiskState, updateDiskState } from './state'
@@ -36,6 +36,7 @@ export interface QueueItem {
   error?: string
   gatePassed?: boolean
   ownerPid?: number
+  ownerStart?: string
   createdAt: number
   updatedAt: number
 }
@@ -44,6 +45,17 @@ export interface QueueFile {
   version: 1
   repoRoot: string
   items: Record<string, QueueItem>
+}
+
+export function queueWorktreeId(itemId: string): string {
+  return sanitizeId(`q-${itemId}`)
+}
+
+async function ownerAlive(item: QueueItem): Promise<boolean> {
+  if (!isProcessAlive(item.ownerPid)) return false
+  if (item.ownerStart === undefined) return true
+  const current = await processStartToken(item.ownerPid)
+  return current === undefined || current === item.ownerStart
 }
 
 async function patchQueueItem(
@@ -155,60 +167,69 @@ function hasCycle(items: Record<string, QueueItem>, startId: string, deps: strin
   return false
 }
 
-export async function queueAdd(
+export interface QueueAddParams {
+  id: string
+  title: string
+  goal: string
+  acceptanceCriteria: Array<{ id: string; description: string }>
+  cli?: AgentCli
+  model?: string
+  effort?: AgentEffort
+  freshContextPerIteration?: boolean
+  dependsOn?: string[]
+  priority?: number
+  checks?: CheckCommandSpec[]
+  includeMortise?: boolean
+  baseline?: BaselinePolicy
+  maxIterations?: number
+}
+
+export async function queueAdd(repoRoot: string, params: QueueAddParams, homeDir = userHome()): Promise<QueueItem> {
+  const [item] = await queueAddAll(repoRoot, [params], homeDir)
+  return item!
+}
+
+export async function queueAddAll(
   repoRoot: string,
-  params: {
-    id: string
-    title: string
-    goal: string
-    acceptanceCriteria: Array<{ id: string; description: string }>
-    cli?: AgentCli
-    model?: string
-    effort?: AgentEffort
-    freshContextPerIteration?: boolean
-    dependsOn?: string[]
-    priority?: number
-    checks?: CheckCommandSpec[]
-    includeMortise?: boolean
-    baseline?: BaselinePolicy
-    maxIterations?: number
-  },
+  batch: readonly QueueAddParams[],
   homeDir = userHome(),
-): Promise<QueueItem> {
+): Promise<QueueItem[]> {
   return withFileLock(queueFilePath(repoRoot, homeDir) + '.lock', async () => {
     const q = await readQueue(repoRoot, homeDir)
-    if (q.items[params.id]) {
-      throw new Error(`Queue item already exists: ${params.id}`)
-    }
-    const deps = Array.from(new Set(params.dependsOn ?? []))
-    if (hasCycle(q.items, params.id, deps)) {
-      throw new Error(`Dependency cycle detected for queue item: ${params.id}`)
-    }
-
     const { config } = await loadEffectiveConfig(repoRoot, homeDir)
     const now = Date.now()
-    const item: QueueItem = {
-      id: params.id,
-      title: params.title,
-      goal: params.goal,
-      acceptanceCriteria: params.acceptanceCriteria,
-      cli: params.cli ?? config.defaultCli ?? 'claude',
-      model: params.model,
-      effort: params.effort,
-      freshContextPerIteration: params.freshContextPerIteration,
-      dependsOn: deps,
-      priority: params.priority ?? 0,
-      status: 'queued',
-      checks: params.checks,
-      includeMortise: params.includeMortise,
-      baseline: params.baseline,
-      maxIterations: params.maxIterations,
-      createdAt: now,
-      updatedAt: now,
-    }
-    q.items[item.id] = item
+    const added = batch.map(params => {
+      if (q.items[params.id]) {
+        throw new Error(`Queue item already exists: ${params.id}`)
+      }
+      const deps = Array.from(new Set(params.dependsOn ?? []))
+      if (hasCycle(q.items, params.id, deps)) {
+        throw new Error(`Dependency cycle detected for queue item: ${params.id}`)
+      }
+      const item: QueueItem = {
+        id: params.id,
+        title: params.title,
+        goal: params.goal,
+        acceptanceCriteria: params.acceptanceCriteria,
+        cli: params.cli ?? config.defaultCli ?? 'claude',
+        model: params.model,
+        effort: params.effort,
+        freshContextPerIteration: params.freshContextPerIteration,
+        dependsOn: deps,
+        priority: params.priority ?? 0,
+        status: 'queued',
+        checks: params.checks,
+        includeMortise: params.includeMortise,
+        baseline: params.baseline,
+        maxIterations: params.maxIterations,
+        createdAt: now,
+        updatedAt: now,
+      }
+      q.items[item.id] = item
+      return item
+    })
     await writeQueue(repoRoot, q, homeDir)
-    return item
+    return added
   })
 }
 
@@ -216,7 +237,7 @@ export async function queueRemove(repoRoot: string, id: string, homeDir = userHo
   return withFileLock(queueFilePath(repoRoot, homeDir) + '.lock', async () => {
     const q = await readQueue(repoRoot, homeDir)
     if (!q.items[id]) return false
-    if (q.items[id].status === 'running' && isProcessAlive(q.items[id].ownerPid)) throw new Error(`Queue item ${id} is still running`)
+    if (q.items[id].status === 'running' && await ownerAlive(q.items[id])) throw new Error(`Queue item ${id} is still running`)
     delete q.items[id]
     await writeQueue(repoRoot, q, homeDir)
     return true
@@ -275,7 +296,7 @@ export async function queueRetry(
     if (existing.status === 'landed') {
       throw new Error(`Queue item ${id} is already landed`)
     }
-    if (existing.status === 'running' && isProcessAlive(existing.ownerPid)) {
+    if (existing.status === 'running' && await ownerAlive(existing)) {
       throw new Error(`Queue item ${id} is still running (Trestle process ${existing.ownerPid})`)
     }
     if (existing.worktreeId) {
@@ -296,6 +317,7 @@ export async function queueRetry(
       error: undefined,
       gatePassed: undefined,
       ownerPid: undefined,
+      ownerStart: undefined,
       worktreeId: undefined,
       updatedAt: Date.now(),
     }
@@ -315,7 +337,7 @@ export async function queueClear(
     const allowed = new Set(statuses)
     const removed: string[] = []
     for (const [id, item] of Object.entries(q.items)) {
-      if (allowed.has(item.status) && !(item.status === 'running' && isProcessAlive(item.ownerPid))) {
+      if (allowed.has(item.status) && !(item.status === 'running' && await ownerAlive(item))) {
         delete q.items[id]
         removed.push(id)
       }
@@ -333,7 +355,7 @@ export async function queueReconcile(repoRoot: string, homeDir = userHome()): Pr
     const recovered: string[] = []
     const now = Date.now()
     for (const [id, item] of Object.entries(q.items)) {
-      if (item.status === 'running' && !isProcessAlive(item.ownerPid)) {
+      if (item.status === 'running' && !(await ownerAlive(item))) {
         q.items[id] = {
           ...item,
           status: 'failed',
@@ -403,8 +425,16 @@ export async function queueRunNext(
     const selected = (await queueReadyItems(resolvedRoot, homeDir)).slice(0, maxParallel)
     if (selected.length === 0) return []
     const q = await readQueue(resolvedRoot, homeDir)
+    const ownerStart = await processStartToken(process.pid)
     for (const item of selected) {
-      q.items[item.id] = { ...q.items[item.id]!, status: 'running', ownerPid: process.pid, updatedAt: Date.now() }
+      q.items[item.id] = {
+        ...q.items[item.id]!,
+        status: 'running',
+        ownerPid: process.pid,
+        ownerStart,
+        worktreeId: queueWorktreeId(item.id),
+        updatedAt: Date.now(),
+      }
     }
     await writeQueue(resolvedRoot, q, homeDir)
     return selected
@@ -418,7 +448,7 @@ export async function queueRunNext(
     ready.map(async (item): Promise<{
       item: QueueItem; wt?: Awaited<ReturnType<typeof worktreeCreate>>; contractId: string; res: GoalLoopResult
     }> => {
-      const wtId = sanitizeId(`q-${item.id}`)
+      const wtId = queueWorktreeId(item.id)
       const contractId = wtId
       let wt: Awaited<ReturnType<typeof worktreeCreate>> | undefined
       try {

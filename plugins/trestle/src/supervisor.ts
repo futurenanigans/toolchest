@@ -11,6 +11,7 @@ import {
   processStartToken,
   isProcessAlive,
   isWindows,
+  killProcessGroup,
   killProcessTree,
   quoteWindowsArg,
   resolveCommand,
@@ -101,7 +102,7 @@ function classifyFailure(ev: Extract<AdapterEvent, { kind: 'turn_failed' }>): Ag
   return 'error'
 }
 
-function isTerminalStatus(status: AgentStatus): boolean {
+export function isTerminalStatus(status: AgentStatus): boolean {
   return status === 'done' || status === 'failed' || status === 'stopped'
 }
 
@@ -164,11 +165,7 @@ export class AgentSupervisor {
     const needsShell = isWindows() && /\.(cmd|bat)$/i.test(program)
     const spawnProgram = needsShell ? quoteWindowsArg(program) : program
     const spawnArgs = needsShell ? args.map(quoteWindowsArg) : args
-    const activeCount =
-      1 +
-      Array.from(this.agents.values()).filter(
-        m => m.summary.status === 'starting' || m.summary.status === 'running' || m.summary.status === 'idle',
-      ).length
+    const activeCount = 1 + Array.from(this.agents.values()).filter(m => !isTerminalStatus(m.summary.status)).length
     const resourceEnv = buildResourceEnv(activeCount, params.resources)
     const env: Record<string, string | undefined> = { ...process.env, ...resourceEnv, PWD: spec.cwd }
     for (const [k, v] of Object.entries(spec.env)) {
@@ -331,7 +328,7 @@ export class AgentSupervisor {
 
   async stop(id: string): Promise<void> {
     const m = this.agents.get(id)
-    if (!m || m.exited || isTerminalStatus(m.summary.status)) return
+    if (!m || isTerminalStatus(m.summary.status)) return
     this.clearTimers(m)
     m.summary.status = 'stopped'
     m.summary.finishedAt = m.summary.finishedAt ?? Date.now()
@@ -351,9 +348,7 @@ export class AgentSupervisor {
   }
 
   async stopAll(): Promise<void> {
-    const active = Array.from(this.agents.values()).filter(
-      m => m.summary.status === 'starting' || m.summary.status === 'running' || m.summary.status === 'idle',
-    )
+    const active = Array.from(this.agents.values()).filter(m => !isTerminalStatus(m.summary.status))
     await Promise.all(active.map(m => this.stop(m.summary.id)))
     await this.flush()
   }
@@ -367,8 +362,7 @@ export class AgentSupervisor {
         const nextAgents = { ...cur.agents }
         for (const [id, agent] of Object.entries(nextAgents)) {
           if (this.agents.has(id)) continue
-          const isActive = agent.status === 'starting' || agent.status === 'running' || agent.status === 'idle'
-          if (isActive && !isProcessAlive(agent.pid)) {
+          if (!isTerminalStatus(agent.status) && !isProcessAlive(agent.pid)) {
             reconciled += 1
             nextAgents[id] = {
               ...agent,
@@ -424,6 +418,10 @@ export class AgentSupervisor {
       this.schedulePersist(m.repoRoot, m.homeDir)
     })
 
+    m.child.on('exit', () => {
+      void killProcessGroup(m.child.pid)
+    })
+
     m.child.on('close', code => {
       if (stdoutBuf.trim()) this.handleLine(m, stdoutBuf)
       if (stderrBuf.trim()) {
@@ -434,7 +432,7 @@ export class AgentSupervisor {
       m.exited = true
       m.resolveExit()
       this.clearTimers(m)
-      if (m.summary.status === 'running' || m.summary.status === 'idle' || m.summary.status === 'starting') {
+      if (!isTerminalStatus(m.summary.status)) {
         m.summary.finishedAt = m.summary.finishedAt ?? Date.now()
         if (code === 0) {
           m.summary.status = 'done'
@@ -565,8 +563,7 @@ export class AgentSupervisor {
   }
 
   private async killManaged(m: ManagedAgent): Promise<void> {
-    const token = await m.processStart
-    if (!m.exited && token) await killProcessTree(m.child.pid, token)
+    if (m.child.exitCode === null && m.child.signalCode === null) await killProcessTree(m.child.pid)
   }
 
   private pruneAgents(): void {

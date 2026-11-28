@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 
-import { junitFailureIds } from './junit'
+import { junitDocument, junitFailureIds } from './junit'
 import { Mutex } from './locks'
 import { execCommand, type CommandSpec } from './platform'
 
@@ -206,6 +206,22 @@ export function parseStructuredFailures(format: CheckReportFormat | undefined, r
   return undefined
 }
 
+async function readReport(
+  step: CheckCommandSpec,
+  reportPath: string | undefined,
+  res: { exitCode: number; stdout: string },
+): Promise<string | undefined> {
+  if (reportPath) {
+    const file = await fs.readFile(reportPath, 'utf8').catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT' || step.reportFormat === 'sarif') throw error
+      return undefined
+    })
+    if (file !== undefined) return file
+    if (res.exitCode !== 0) return undefined
+  }
+  return step.reportFormat === 'junit-xml' ? junitDocument(res.stdout) : res.stdout
+}
+
 export async function runChecks(options: CheckRunOptions): Promise<CheckRunReport> {
   const steps = (await detectDefaultSteps(options.worktreePath, options))
     .filter(step => !options.onlySteps || options.onlySteps.has(step.name))
@@ -226,21 +242,26 @@ export async function runChecks(options: CheckRunOptions): Promise<CheckRunRepor
           timeoutMs: options.timeoutMs ?? 10 * 60 * 1000,
         })
         const metric = extractMetric(step.metricPattern, res.stdout, res.stderr)
-        let reportSource = res.stdout
-        if (fullReportPath) {
-          reportSource = step.reportFormat === 'sarif'
-            ? await fs.readFile(fullReportPath, 'utf8')
-            : await fs.readFile(fullReportPath, 'utf8').catch(() => res.stdout)
+        const output = res.exitCode === 0 ? '' : formatExcerpt(res.stdout, res.stderr)
+        let failedIds: string[] | undefined
+        let invalidReport: string | undefined
+        try {
+          const report = await readReport(step, fullReportPath, res)
+          if (report !== undefined) failedIds = parseStructuredFailures(step.reportFormat, report)
+        } catch (err) {
+          invalidReport = (err as Error).message
         }
-        const failedIds = parseStructuredFailures(step.reportFormat, reportSource)
         const findings = step.reportFormat === 'sarif' ? failedIds?.length ?? 0 : 0
         results.push({
           name: step.name,
-          passed: res.exitCode === 0 && findings === 0,
-          exitCode: res.exitCode,
+          passed: res.exitCode === 0 && findings === 0 && invalidReport === undefined,
+          exitCode: invalidReport === undefined ? res.exitCode : res.exitCode || 1,
           durationMs: Date.now() - start,
-          excerpt: findings ? `${findings} SARIF finding(s)` : res.exitCode === 0 ? '' : formatExcerpt(res.stdout, res.stderr),
+          excerpt: invalidReport !== undefined
+            ? [invalidReport, output].filter(Boolean).join('\n\n')
+            : findings ? `${findings} SARIF finding(s)` : output,
           ...(metric ? { metric } : {}),
+          ...(invalidReport !== undefined ? { invalidReport: true } : {}),
           ...(failedIds !== undefined ? { failedIds } : {}),
         })
       } catch (err) {

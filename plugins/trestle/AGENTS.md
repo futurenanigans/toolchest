@@ -14,7 +14,7 @@ Asking an LLM to produce exact syntax/paths/fields for programmatic branching in
 
 ### Applying This Rule in Trestle
 - **Verification gates (`src/checks.ts`, `src/goal_gate.ts`, `src/goal_run.ts`):**
-  - Pass/fail decisions come strictly from process exit codes and structured test-runner reports (`libtest-json`, `nextest-json`, `junit-xml`). Never parse free-form prose to infer test pass/fail.
+  - Pass/fail decisions come strictly from process exit codes and structured reports (`libtest-json`, `nextest-json`, `junit-xml`, `sarif`). Never parse free-form prose to infer test pass/fail.
   - Baseline gating (`require-green` / `no-new-failures`) and `stuck` detection rely on deterministic check outputs. Prefer structured `reportFormat` (`failedIds`) over raw stderr excerpts so non-deterministic timestamps/durations in logs don't perturb digests.
 - **Adapter event streams (`src/adapters/*.ts`):**
   - Control-flow transitions (`turn_done`, `turn_failed`, `session`, `usage`) must come strictly from the CLI harness's own structured protocol frames, never from parsing assistant message text.

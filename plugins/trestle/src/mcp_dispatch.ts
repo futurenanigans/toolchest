@@ -244,13 +244,15 @@ const handlers = {
     )
   }),
   goal_run: define.goal_run(async args => {
-    const repoRoot = await ensureRepoReconciled(args.repoRoot)
+    const repoRoot = await canonicalRepoRoot(args.repoRoot)
+    const worktreePath = await resolveAgentWorktree(repoRoot, args.worktreePath)
+    await reconcileRepo(repoRoot)
     return runGoalLoop(supervisor, {
       repoRoot,
       contractId: args.contractId,
       cli: args.cli,
       worktreeId: args.worktreeId,
-      worktreePath: path.resolve(args.worktreePath),
+      worktreePath,
       branch: args.branch,
       model: args.model,
       effort: args.effort,
@@ -259,13 +261,15 @@ const handlers = {
     })
   }),
   goal_start: define.goal_start(async args => {
-    const repoRoot = await ensureRepoReconciled(args.repoRoot)
+    const repoRoot = await canonicalRepoRoot(args.repoRoot)
+    const worktreePath = await resolveAgentWorktree(repoRoot, args.worktreePath)
+    await reconcileRepo(repoRoot)
     return goalJobs.start(supervisor, {
       repoRoot,
       contractId: args.contractId,
       cli: args.cli,
       worktreeId: args.worktreeId,
-      worktreePath: path.resolve(args.worktreePath),
+      worktreePath,
       branch: args.branch,
       model: args.model,
       effort: args.effort,

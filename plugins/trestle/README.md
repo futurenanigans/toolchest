@@ -25,21 +25,25 @@ A goal loop runs the checks after every iteration. Every two failed iterations i
 
 Check steps run one after another. A run that contains a heavy step (the default; `heavy: false` opts a step out) waits for a mutex, so two such runs in the same MCP server process never overlap. Separate server processes do not share the mutex. Without configured checks, Trestle detects them from `Cargo.toml`, `package.json`, `*.sln`, `go.mod` or `pyproject.toml`, and fails closed when it finds none.
 
-Worktrees live under `<repo>/.trestle-wt/`. Creation appends `/.trestle-wt/` to the root `.gitignore` when Git does not already ignore the directory. The edit stays unstaged. Queue, contract and experiment state lives under `~/.trestle/<repo-key>/`. `worktree_land` commits pending changes first and leaves `.env` and `.env.local` out of that commit, then merges the branch and aborts on a conflict. A `.env` that an agent committed itself merges like any other file.
+Worktrees live under `<repo>/.trestle-wt/`. Creation appends `/.trestle-wt/` to the root `.gitignore` when Git does not already ignore the directory. The edit stays unstaged. `worktree_land` removes that line for the duration of the merge and appends it again afterwards, so a branch that changes `.gitignore` still merges. Queue, contract and experiment state lives under `~/.trestle/<repo-key>/`. `worktree_land` commits pending changes first and leaves `.env` and `.env.local` out of that commit, then merges the branch and aborts on a conflict. With `preview: true` it merges nothing and returns the diff from the merge base with the target branch, which is what the merge would bring in. A `.env` that an agent committed itself merges like any other file.
 
 Configure an Awl or Loom scan to emit SARIF 2.1.0 and set the check's `reportFormat` to `sarif`. The checker reads stdout, or the file named by `reportPath`. Findings fail the check even when the scanner exits zero.
 
-Queue mutations and reservations are serialized across MCP servers sharing the queue. Landing is serialized per Git repository, including a queued item's target recheck. A queue run stops for an existing task branch so its previous commits can be inspected.
+A `junit-xml` check reads the file named by `reportPath`, or stdout from the first `<?xml` or `<testsuite` onward. Text after the document, or a document that is not well-formed, fails the check; a runner that logs to stdout needs a `reportPath`. When the command fails and wrote no report file, the result carries the command's output and no test IDs.
+
+Queue mutations and reservations are serialized across MCP servers sharing the queue. Landing is serialized per Git repository, including a queued item's target recheck. A queue run stops for an existing task branch so its previous commits can be inspected. A running item records its worktree and the start token of the server process that owns it. An item whose owner is gone is marked failed on the next call, and `queue_retry` removes its worktree and branch before requeueing it.
 
 Baseline checks use the same linked environment files as production worktrees. A newly failing check is rerun once on the pinned base commit. Under `require-green`, a matching base failure blocks the job. Under `no-new-failures`, matching failures become part of the baseline. A green gate with an empty worktree diff fails the producer run.
 
-The supervisor batches activity writes over 75 ms. Terminal agent and job history expires after 24 hours on subsequent access or updates. Cleanup signals a recorded agent only when its process start token matches. Older records without a token cannot authorize a signal.
+The supervisor batches activity writes over 75 ms. Terminal agent and job history expires after 24 hours on subsequent access or updates. Cleanup signals an agent recorded by an earlier server process only when its process start token matches. Older records without a token cannot authorize a signal. On Linux and macOS, when an agent's process exits, Trestle terminates whatever is left of its process group; on Windows such leftover processes keep running.
 
 ## Requirements
 
 `bun` and `git` on `PATH`, and each agent CLI you want to drive, installed and signed in. A provider frame identifying an authentication error ends the run with `login_failed`. Errors supplied only as text appear as ordinary failures. A structured usage-limit error puts that CLI on cooldown and the loop continues on the first fallback CLI with quota left (`escalation.fallbackClis`, by default `claude` then `codex`); when none is available the run ends with `usage_limit`.
 
-Bun resolves Trestle’s pinned dependencies for schema validation and XML parsing on first MCP startup. Every tool advertises its input schema through `tools/list` and checks arguments before dispatch. `agent_spawn` requires an existing directory inside the repository’s `.trestle-wt/` after resolving symbolic links.
+Bun resolves Trestle’s pinned dependencies for schema validation and XML parsing on first MCP startup. Every tool advertises its input schema through `tools/list` and checks arguments before dispatch. `agent_spawn`, `goal_run` and `goal_start` require an existing directory inside the repository’s `.trestle-wt/` after resolving symbolic links. Counts and durations (`maxIterations`, `maxParallel`, `timeoutMs`, `idleMs`, `tailLines` and similar) must be positive integers; omit one to get its default.
+
+`blueprint_import` adds one queue item per task in a feature-architect blueprint's Build Sequence, or none when any item cannot be added. Tasks that share a `Bundle` range become a single item with one acceptance criterion per task, because they cannot pass their checks separately. Each item's contract is created when `queue_run_next` dispatches it.
 
 ## Development
 

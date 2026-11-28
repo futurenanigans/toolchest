@@ -7,7 +7,7 @@ import * as path from 'node:path'
 
 import { execCommand, linkOrCopy, resolveCommand, processStartToken, killProcessTree } from '../platform'
 import { appendExperiment, readDiskState, readExperiments } from '../state'
-import { worktreeClean, worktreeCreate, worktreeDiff, worktreeLand, worktreeList } from '../worktrees'
+import { worktreeClean, worktreeCreate, worktreeDiff, worktreeLand, worktreeLandPreview, worktreeList } from '../worktrees'
 
 const tempDirs: string[] = []
 
@@ -222,4 +222,48 @@ test('killProcessTree terminates an owned child and the descendant holding its o
   } finally {
     if (child.exitCode === null && child.signalCode === null) child.kill()
   }
+})
+
+test('a branch that edits .gitignore lands over the uncommitted worktree ignore rule', async () => {
+  const { repo, home } = await makeTempRepo()
+  const ignore = path.join(repo, '.gitignore')
+  await fs.writeFile(ignore, '.env\n')
+  await execCommand('git', ['commit', '-am', 'drop the worktree rule'], { cwd: repo })
+  const wt = await worktreeCreate(repo, 'ignore-edit', { homeDir: home })
+  expect(await fs.readFile(ignore, 'utf8')).toBe('.env\n/.trestle-wt/\n')
+  await fs.appendFile(path.join(wt.path, '.gitignore'), 'dist/\n')
+
+  await worktreeLand(repo, 'ignore-edit', { homeDir: home })
+
+  expect((await execCommand('git', ['show', 'main:.gitignore'], { cwd: repo })).stdout).toBe('.env\ndist/\n')
+  expect(await fs.readFile(ignore, 'utf8')).toBe('.env\ndist/\n/.trestle-wt/\n')
+})
+
+test('a branch that adds the first .gitignore lands over the one Trestle created', async () => {
+  const { repo, home } = await makeTempRepo()
+  const ignore = path.join(repo, '.gitignore')
+  await fs.rm(path.join(repo, '.env'))
+  await execCommand('git', ['rm', '-q', '.gitignore'], { cwd: repo })
+  await execCommand('git', ['commit', '-m', 'no ignore file'], { cwd: repo })
+  const wt = await worktreeCreate(repo, 'ignore-add', { homeDir: home })
+  expect(await fs.readFile(ignore, 'utf8')).toBe('/.trestle-wt/\n')
+  await fs.writeFile(path.join(wt.path, '.gitignore'), 'dist/\n')
+
+  await worktreeLand(repo, 'ignore-add', { homeDir: home })
+
+  expect(await fs.readFile(ignore, 'utf8')).toBe('dist/\n/.trestle-wt/\n')
+})
+
+test('the land preview lists only what the merge brings in when the target has moved on', async () => {
+  const { repo, home } = await makeTempRepo()
+  const wt = await worktreeCreate(repo, 'preview-moved', { homeDir: home })
+  await fs.writeFile(path.join(wt.path, 'feature.ts'), 'export const x = 1\n')
+  await fs.writeFile(path.join(repo, 'later.txt'), 'added on main after the worktree\n')
+  await execCommand('git', ['add', 'later.txt'], { cwd: repo })
+  await execCommand('git', ['commit', '-m', 'main moves on'], { cwd: repo })
+
+  const preview = await worktreeLandPreview(repo, 'preview-moved', { homeDir: home })
+
+  expect(preview.files).toEqual(['feature.ts'])
+  expect(preview.diff).not.toContain('later.txt')
 })

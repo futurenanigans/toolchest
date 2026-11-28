@@ -1,7 +1,6 @@
 import type { AgentCli, AgentEffort } from '../types'
 import type { CheckCommandSpec } from './checks'
-import { contractCreate } from './contract'
-import { queueAdd } from './queue'
+import { queueAddAll, queueWorktreeId, type QueueAddParams } from './queue'
 
 export interface BlueprintTask {
   number: number
@@ -10,7 +9,7 @@ export interface BlueprintTask {
   acceptance: string
   context: string
   dependencies: number[]
-  bundle?: string
+  bundle?: { first: number; last: number }
 }
 
 export interface ParsedBlueprint {
@@ -30,6 +29,38 @@ function extractSection(markdown: string, heading: string): string {
   return (nextHeading ? after.slice(0, nextHeading.index) : after).trim()
 }
 
+const TASK_FIELDS = ['Files', 'Acceptance', 'Context', 'Dependencies', 'Bundle']
+const FIELD_LINE = new RegExp(`^\\s*(${TASK_FIELDS.join('|')})\\s*:\\s*(.*)$`, 'i')
+
+function taskFields(block: string): Map<string, string> {
+  const fields = new Map<string, string[]>()
+  let current: string[] | undefined
+  for (const line of block.split(/\r?\n/)) {
+    const start = FIELD_LINE.exec(line)
+    if (start) {
+      const key = start[1]!.toLowerCase()
+      current = fields.get(key) ? undefined : [start[2]!]
+      if (current) fields.set(key, current)
+    } else if (!line.trim()) {
+      current = undefined
+    } else {
+      current?.push(line.trim())
+    }
+  }
+  return new Map(Array.from(fields, ([key, lines]) => [key, lines.join('\n').trim()]))
+}
+
+function parseBundle(raw: string, taskNumber: number): { first: number; last: number } | undefined {
+  if (!raw || raw.toLowerCase() === 'none') return undefined
+  const range = /^(\d+)\s*\.\.\s*(\d+)\b/.exec(raw)
+  const first = Number(range?.[1])
+  const last = Number(range?.[2])
+  if (!range || first >= last || taskNumber < first || taskNumber > last) {
+    throw new Error(`Task ${taskNumber} has an unusable Bundle marker '${raw}'; expected a range such as 2..3 that includes the task`)
+  }
+  return { first, last }
+}
+
 function parseDependencies(raw: string): number[] {
   const trimmed = raw.trim().toLowerCase()
   if (!trimmed || trimmed === 'none' || trimmed === 'n/a') return []
@@ -43,9 +74,6 @@ function parseDependencies(raw: string): number[] {
   return nums
 }
 
-/**
- * Parse a `feature-architect` Markdown blueprint into structured tasks and context sections.
- */
 export function parseBlueprint(markdown: string): ParsedBlueprint {
   const orientation = extractSection(markdown, 'Orientation')
   const architectureDecision = extractSection(markdown, 'Architecture Decision')
@@ -73,12 +101,10 @@ export function parseBlueprint(markdown: string): ParsedBlueprint {
     const blockEnd = nextMatch?.index ?? buildSequence.length
     const block = buildSequence.slice(blockStart, blockEnd)
 
-    const field = (label: string): string => {
-      const fRe = new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, 'im')
-      return fRe.exec(block)?.[1]?.trim() ?? ''
-    }
+    const fields = taskFields(block)
+    const field = (label: string): string => fields.get(label) ?? ''
 
-    const acceptance = field('Acceptance')
+    const acceptance = field('acceptance')
     if (!acceptance) {
       throw new Error(`Task ${num} (${title}) is missing an Acceptance field`)
     }
@@ -86,11 +112,11 @@ export function parseBlueprint(markdown: string): ParsedBlueprint {
     tasks.push({
       number: num,
       title,
-      files: field('Files'),
+      files: field('files'),
       acceptance,
-      context: field('Context'),
-      dependencies: parseDependencies(field('Dependencies')),
-      bundle: field('Bundle') || undefined,
+      context: field('context'),
+      dependencies: parseDependencies(field('dependencies')),
+      bundle: parseBundle(field('bundle'), num),
     })
   }
 
@@ -112,70 +138,79 @@ export interface ImportBlueprintOptions {
   homeDir?: string
 }
 
-/**
- * Convert a `feature-architect` blueprint into Trestle contracts and dependency-wired queue items.
- */
+function bundleGroups(tasks: readonly BlueprintTask[]): BlueprintTask[][] {
+  const ranges: Array<{ first: number; last: number }> = []
+  for (const range of tasks.flatMap(t => t.bundle ?? []).sort((a, b) => a.first - b.first)) {
+    const previous = ranges.at(-1)
+    if (previous && range.first <= previous.last) previous.last = Math.max(previous.last, range.last)
+    else ranges.push({ ...range })
+  }
+  const groups = new Map<number, BlueprintTask[]>()
+  for (const task of tasks) {
+    const range = ranges.find(r => task.number >= r.first && task.number <= r.last)
+    const key = range?.first ?? task.number
+    groups.set(key, [...(groups.get(key) ?? []), task])
+  }
+  return Array.from(groups.values())
+}
+
+function taskGoal(task: BlueprintTask): string {
+  return [
+    `Task ${task.number}: ${task.title}`,
+    task.files ? `Predicted files: ${task.files}` : '',
+    `Acceptance: ${task.acceptance}`,
+    task.context && task.context.toLowerCase() !== 'none' ? `Referenced blueprint context: ${task.context}` : '',
+  ].filter(Boolean).join('\n')
+}
+
 export async function importBlueprint(repoRoot: string, options: ImportBlueprintOptions) {
   const parsed = parseBlueprint(options.blueprintMarkdown)
   const cleanPrefix = options.prefix.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/^-+|-+$/g, '')
   if (!cleanPrefix) throw new Error('prefix must contain at least one alphanumeric character')
 
-  const taskNumbers = new Set(parsed.tasks.map(t => t.number))
+  const groups = bundleGroups(parsed.tasks)
+  const itemIdByTask = new Map<number, string>()
+  for (const group of groups) {
+    for (const task of group) {
+      if (itemIdByTask.has(task.number)) throw new Error(`Task ${task.number} appears more than once in the Build Sequence`)
+      itemIdByTask.set(task.number, `${cleanPrefix}-task-${group[0]!.number}`)
+    }
+  }
   for (const t of parsed.tasks) {
     for (const dep of t.dependencies) {
-      if (!taskNumbers.has(dep)) {
+      if (!itemIdByTask.has(dep)) {
         throw new Error(`Task ${t.number} depends on unknown Task ${dep}`)
       }
     }
   }
 
-  const imported: Array<{ taskNumber: number; id: string; contractId: string; dependsOn: string[] }> = []
-  for (const task of parsed.tasks) {
-    const id = `${cleanPrefix}-task-${task.number}`
-    const dependsOn = task.dependencies.map(d => `${cleanPrefix}-task-${d}`)
-    const goalLines = [
-      `Task ${task.number}: ${task.title}`,
-      task.files ? `Predicted files: ${task.files}` : '',
-      `Acceptance: ${task.acceptance}`,
-      task.context && task.context.toLowerCase() !== 'none' ? `Referenced blueprint context: ${task.context}` : '',
-      parsed.criticalDetails ? `\nCritical Details:\n${parsed.criticalDetails}` : '',
-      parsed.workedExamples ? `\nWorked Examples:\n${parsed.workedExamples}` : '',
-    ].filter(Boolean)
+  const shared = [
+    parsed.criticalDetails ? `Critical Details:\n${parsed.criticalDetails}` : '',
+    parsed.workedExamples ? `Worked Examples:\n${parsed.workedExamples}` : '',
+  ].filter(Boolean)
 
-    const acceptanceCriteria = [{ id: 'ac-1', description: task.acceptance }]
-    const goal = goalLines.join('\n')
-    const contract = await contractCreate(
-      repoRoot,
-      {
-        id,
-        title: task.title,
-        goal,
-        acceptanceCriteria,
-        checks: options.checks,
-        maxIterations: options.maxIterations,
-      },
-      options.homeDir,
-    )
+  const batch: QueueAddParams[] = groups.map(group => {
+    const id = itemIdByTask.get(group[0]!.number)!
+    const dependsOn = new Set(group.flatMap(t => t.dependencies).map(d => itemIdByTask.get(d)!))
+    dependsOn.delete(id)
+    return {
+      id,
+      title: group.map(t => t.title).join(' + '),
+      goal: [...group.map(taskGoal), ...shared].join('\n\n'),
+      acceptanceCriteria: group.map((t, i) => ({ id: `ac-${i + 1}`, description: t.acceptance })),
+      cli: options.cli,
+      model: options.model,
+      effort: options.effort,
+      checks: options.checks,
+      maxIterations: options.maxIterations,
+      dependsOn: [...dependsOn],
+    }
+  })
+  await queueAddAll(repoRoot, batch, options.homeDir)
 
-    await queueAdd(
-      repoRoot,
-      {
-        id,
-        title: task.title,
-        goal,
-        acceptanceCriteria,
-        cli: options.cli,
-        model: options.model,
-        effort: options.effort,
-        checks: options.checks,
-        maxIterations: options.maxIterations,
-        dependsOn,
-      },
-      options.homeDir,
-    )
-
-    imported.push({ taskNumber: task.number, id, contractId: contract.id, dependsOn })
-  }
-
-  return { prefix: cleanPrefix, count: imported.length, items: imported }
+  const items = parsed.tasks.map(task => {
+    const item = batch.find(b => b.id === itemIdByTask.get(task.number))!
+    return { taskNumber: task.number, id: item.id, contractId: queueWorktreeId(item.id), dependsOn: item.dependsOn ?? [] }
+  })
+  return { prefix: cleanPrefix, count: batch.length, items }
 }

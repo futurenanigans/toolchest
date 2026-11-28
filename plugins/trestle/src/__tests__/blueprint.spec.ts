@@ -4,7 +4,6 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 
 import { importBlueprint, parseBlueprint } from '../blueprint'
-import { contractRead } from '../contract'
 import { execCommand } from '../platform'
 import { queueList } from '../queue'
 import { worktreeCreate, worktreeLandPreview } from '../worktrees'
@@ -61,13 +60,68 @@ describe('blueprint bridge and worktree_land preview', () => {
       expect(imported.items[0]?.id).toBe('feat-cache-task-1')
       expect(imported.items[1]?.dependsOn).toEqual(['feat-cache-task-1'])
 
-      const contract2 = await contractRead(repo, 'feat-cache-task-2', home)
-      expect(contract2.title).toBe('Wire cache into API')
-      expect(contract2.acceptanceCriteria[0]?.description).toContain('cached responses')
+      expect(imported.items[1]?.contractId).toBe('q-feat-cache-task-2')
 
       const queue = await queueList(repo, home)
       expect(queue).toHaveLength(2)
-      expect(queue.find(i => i.id === 'feat-cache-task-2')?.dependsOn).toEqual(['feat-cache-task-1'])
+      const second = queue.find(i => i.id === 'feat-cache-task-2')
+      expect(second?.dependsOn).toEqual(['feat-cache-task-1'])
+      expect(second?.title).toBe('Wire cache into API')
+      expect(second?.acceptanceCriteria[0]?.description).toContain('cached responses')
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true })
+    }
+  })
+
+  test('a blueprint that cannot be queued whole leaves the queue untouched', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-bp-'))
+    try {
+      const cyclic = SAMPLE_BLUEPRINT.replace('Dependencies: none', 'Dependencies: 2')
+      await expect(importBlueprint(tmp, { prefix: 'loop', blueprintMarkdown: cyclic, homeDir: tmp })).rejects.toThrow('cycle')
+      expect(await queueList(tmp, tmp)).toEqual([])
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true })
+    }
+  })
+
+  test('bundled tasks become one queue item and a multi-line Acceptance is kept whole', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-bp-'))
+    const blueprint = `
+### Build Sequence
+
+Task 1: Add the store contract
+Acceptance: bun test src/store.spec.ts passes
+Dependencies: none
+
+Task 2: Declare the cache port
+Acceptance: tsc reports no errors once Task 3 lands
+Dependencies: 1
+Bundle: 2..3
+
+Task 3: Implement the cache port
+Acceptance: bun test src/cache.spec.ts passes
+  and the TTL case expires at 60 seconds
+Dependencies: 2
+Bundle: 2..3
+
+Task 4: Document the cache
+Acceptance: README names the TTL
+Dependencies: 3
+`
+    try {
+      const imported = await importBlueprint(tmp, { prefix: 'cache', blueprintMarkdown: blueprint, homeDir: tmp })
+      expect(imported.items.map(i => i.id)).toEqual(['cache-task-1', 'cache-task-2', 'cache-task-2', 'cache-task-4'])
+
+      const queue = await queueList(tmp, tmp)
+      expect(queue.map(i => [i.id, i.dependsOn])).toEqual([
+        ['cache-task-1', []],
+        ['cache-task-2', ['cache-task-1']],
+        ['cache-task-4', ['cache-task-2']],
+      ])
+      expect(queue[1]?.acceptanceCriteria.map(c => c.description)).toEqual([
+        'tsc reports no errors once Task 3 lands',
+        'bun test src/cache.spec.ts passes\nand the TTL case expires at 60 seconds',
+      ])
     } finally {
       await fs.rm(tmp, { recursive: true, force: true })
     }

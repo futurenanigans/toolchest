@@ -338,6 +338,61 @@ test('queueRunNext records the worktree of an item whose goal loop threw so queu
   expect(retryBatch.landed).toEqual(['a'])
 })
 
+test('an item interrupted mid-run keeps its worktree on record so queueRetry can clean it and rerun', async () => {
+  const { repo, home } = await makeTempRepo()
+  const scriptPath = await commitMockProducer(repo, `fs.writeFileSync('a.txt', 'A\\n', 'utf8')`)
+  await queueAdd(
+    repo,
+    {
+      id: 'a',
+      title: 'Add a.txt',
+      goal: 'Create a.txt',
+      acceptanceCriteria: [{ id: 'ac', description: 'a.txt exists' }],
+      includeMortise: false,
+      baseline: 'skip',
+      checks: [{ name: 'chk-a', command: ['bun', '-e', 'if (!require("fs").existsSync("a.txt")) process.exit(1)'] }],
+    },
+    home,
+  )
+
+  const qPath = queueFilePath(repo, home)
+  let midRun = ''
+  class SnapshotsThenThrows extends AgentSupervisor {
+    override async spawn(): Promise<never> {
+      midRun = await fs.readFile(qPath, 'utf8')
+      throw new Error('server died here')
+    }
+  }
+  await queueRunNext(new SnapshotsThenThrows(), repo, { homeDir: home, commandOverride: ['bun', 'run', scriptPath] })
+  const crashed = JSON.parse(midRun)
+  expect(crashed.items.a).toMatchObject({ status: 'running', worktreeId: 'q-a' })
+  crashed.items.a.ownerPid = 99999999
+  await fs.writeFile(qPath, JSON.stringify(crashed, null, 2), 'utf8')
+
+  expect(await queueReconcile(repo, home)).toEqual(['a'])
+  const supervisor = new AgentSupervisor()
+  await queueRetry(repo, 'a', { homeDir: home, supervisor })
+  const retryBatch = await queueRunNext(supervisor, repo, { homeDir: home, commandOverride: ['bun', 'run', scriptPath] })
+  expect(retryBatch.failed).toEqual([])
+  expect(retryBatch.landed).toEqual(['a'])
+})
+
+test('queueReconcile recovers a running item whose owner PID now belongs to another process', async () => {
+  const { repo, home } = await makeTempRepo()
+  await queueAdd(
+    repo,
+    { id: 'reused', title: 'Reused', goal: 'Reused', acceptanceCriteria: [{ id: 'r1', description: 'ok' }] },
+    home,
+  )
+  const qPath = queueFilePath(repo, home)
+  const raw = JSON.parse(await fs.readFile(qPath, 'utf8'))
+  raw.items.reused = { ...raw.items.reused, status: 'running', ownerPid: process.pid, ownerStart: 'started before the reboot' }
+  await fs.writeFile(qPath, JSON.stringify(raw, null, 2), 'utf8')
+
+  expect(await queueReconcile(repo, home)).toEqual(['reused'])
+  expect(await queueRemove(repo, 'reused', home)).toBe(true)
+})
+
 test('queueRunNext re-checks the first item against a target branch that moved during its run', async () => {
   const { repo, home } = await makeTempRepo()
   const scriptPath = await commitMockProducer(

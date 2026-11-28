@@ -73,7 +73,15 @@ test('tool calls validate nested arguments before dispatch', async () => {
   expect(await handleToolCall('goal_status')).toEqual([])
 })
 
-test('agent_spawn only accepts directories physically inside the repository worktree root', async () => {
+test('tool calls reject counts and durations that would silently change what the call does', async () => {
+  const goal = { repoRoot: '.', contractId: 'c', cli: 'claude', worktreeId: 'w', worktreePath: '.', branch: 'b' }
+  await expect(handleToolCall('goal_run', { ...goal, maxIterations: 0 })).rejects.toThrow('maxIterations')
+  await expect(handleToolCall('agent_wait', { ids: ['a'], timeoutMs: 0 })).rejects.toThrow('timeoutMs')
+  await expect(handleToolCall('experiment_read', { repoRoot: '.', tailLines: 0 })).rejects.toThrow('tailLines')
+  await expect(handleToolCall('queue_list', { repoRoot: '' })).rejects.toThrow('repoRoot')
+})
+
+test('agent_spawn, goal_run and goal_start only accept directories physically inside the repository worktree root', async () => {
   const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-spawn-'))
   try {
     const managed = path.join(repo, '.trestle-wt')
@@ -89,6 +97,14 @@ test('agent_spawn only accepts directories physically inside the repository work
         repoRoot: repo, id: 'fixture', cli: 'claude', stage: 'test', worktreeId: 'fixture',
         worktreePath: invalid, branch: 'fixture', prompt: 'fixture',
       })).rejects.toThrow('worktreePath must be inside')
+    }
+    for (const tool of ['goal_run', 'goal_start']) {
+      for (const invalid of [repo, sibling, alias]) {
+        await expect(handleToolCall(tool, {
+          repoRoot: repo, contractId: 'fixture', cli: 'claude', worktreeId: 'fixture',
+          worktreePath: invalid, branch: 'fixture',
+        })).rejects.toThrow('worktreePath must be inside')
+      }
     }
   } finally {
     await fs.rm(repo, { recursive: true, force: true })

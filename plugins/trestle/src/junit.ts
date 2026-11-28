@@ -5,6 +5,11 @@ interface ReportElement {
   testId?: string
 }
 
+export function junitDocument(stdout: string): string {
+  const start = stdout.search(/<\?xml|<(?:[\w.-]+:)?testsuites?[\s>]/)
+  return start > 0 ? stdout.slice(start) : stdout
+}
+
 export function junitFailureIds(xml: string): string[] {
   const parser = new SaxesParser({ xmlns: true, fileName: 'JUnit report' })
   const elements: ReportElement[] = []

@@ -163,6 +163,19 @@ export async function killProcessTree(pid: number | undefined, expectedStart?: s
   }
 }
 
+export async function killProcessGroup(pgid: number | undefined): Promise<void> {
+  if (pgid === undefined || pgid <= 0 || isWindows()) return
+  for (const signal of ['SIGTERM', 'SIGKILL'] as const) {
+    try {
+      process.kill(-pgid, signal)
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ESRCH') return
+      throw err
+    }
+    if (signal === 'SIGTERM') await new Promise(r => setTimeout(r, 250))
+  }
+}
+
 class BoundedBuffer {
   private chunks: Buffer[] = []
   private totalBytes = 0
