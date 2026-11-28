@@ -39,10 +39,10 @@ Apply the conventions from existing knowledge rather than re-deriving them from 
 
 ## XML doc comments
 
-The `writing:comments` skill governs `///` exactly as it governs `//`: a member carries no doc comment. The member's name and signature carry the meaning, and a constraint they cannot express goes in a type, a guard, or a test-anchored constraint comment.
+The `writing:comments` skill governs `///` exactly as it governs `//`. A public or protected member of a packaged library, in an assembly other codebases reference, carries a `<summary>` and the `<param>`, `<returns>` and `<exception>` elements that tell a caller something the signature does not; `<inheritdoc/>` is right where the member overrides or implements a documented one. Every other member carries no doc comment: its name and signature carry the meaning, and a constraint they cannot express goes in a type, a guard, or a test-anchored constraint comment.
 
-- Delete a member's `///` in the lines a task touches, `<inheritdoc/>` included.
-- `CS1591` as an error demands a comment on every public member. Put `CS1591` in `NoWarn` for application code and libraries alike, and keep `GenerateDocumentationFile` on: build-time IDE0005 (unused usings) reports only when the documentation file is generated. Say so when a project has CS1591 enabled as an error.
+- Delete an internal member's `///` in the lines a task touches, `<inheritdoc/>` included. `public` in an application is internal for this purpose.
+- `CS1591` reports every public member without a doc comment. A packaged library leaves it on, so a gap in its public API documentation fails the build. Application code puts `CS1591` in `NoWarn`. Both keep `GenerateDocumentationFile` on: build-time IDE0005 (unused usings) reports only when the documentation file is generated.
 
 ## Analyzer rules that bite here
 

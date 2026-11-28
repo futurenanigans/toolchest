@@ -2,11 +2,11 @@
 name: mutation-testing
 description: Configures, runs and analyzes mutation testing in bounded chunks, then closes the test gaps the surviving mutants show. Splits a codebase into chunks of whole units sized to a time budget, pairs each with its unit's tests, keeps a resumable plan, groups survivors into behaviours a test should pin, then triages the findings and fixes them in batches verified by rerunning the mutants they target. Use when the user asks to "run mutation testing", "set up cargo-mutants or Stryker", "check the tests with mutants", or "work through the surviving mutants". Supports Rust, C# and TypeScript or JavaScript.
 disable-model-invocation: true
-argument-hint: "[--plan] [--chunk <n>|next] [--diff <base>] [--address [1,3]] [--auto] [path]"
+argument-hint: "[--plan] [--chunk <n>|next] [--diff <base>] [--fix [1,3]] [--auto] [path]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
-Follow `${CLAUDE_SKILL_DIR}/../../references/audit-procedure.md` for the report format, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/mutation-report.md`. Mutation flag: `--address`. Extra git command: `git diff <base>` to build the `--diff` chunk. Tool commands, configuration keys and output layouts per stack are in `${CLAUDE_SKILL_DIR}/references/tools.md`; read it before the first command and do not write flags from memory.
+Follow `${CLAUDE_SKILL_DIR}/../../references/audit-procedure.md` for the report format, the mutation pre-flight, and `--auto`, with the deviations stated below. Report path: `.claude/state/mutation-report.md`. Mutation flag: `--fix`. Extra git command: `git diff <base>` to build the `--diff` chunk. Tool commands, configuration keys and output layouts per stack are in `${CLAUDE_SKILL_DIR}/references/tools.md`; read it before the first command and do not write flags from memory.
 
 A mutation run changes one expression at a time and reruns tests. A mutant no test fails on marks behaviour the suite does not pin. The run is slow by construction, so this skill is on demand only: it never becomes a gate, a pre-commit step or part of the default test command, and no score threshold is ever set to fail a build.
 
@@ -17,7 +17,7 @@ A repository's own mutation instructions win over this file. Where the project d
 - No plan on disk, or `--plan`: set up the tool if needed, then write the chunk plan and stop.
 - `--chunk <n>` or `--chunk next`: run one chunk, triage its survivors, write the report.
 - `--diff <base>`: skip the plan and run one chunk made of the lines changed since `<base>`.
-- `--address`: fix the findings in the current report, all or a cherry-picked subset.
+- `--fix`: fix the findings in the current report, all or a cherry-picked subset.
 - A bare invocation with a plan on disk behaves as `--chunk next`.
 
 One invocation runs one chunk. Whole-repository runs are never the default; a user who asks for one gets the plan and the estimated total first.
@@ -98,7 +98,7 @@ Triage every finding first, then fix them in batches. This replaces the audit pr
    - Changes production code only where a finding says the code cannot be tested as it stands, and then only to add the seam.
 3. **Verify once per round.** After a round of batches returns, rerun all their mutants in one run with the tool's filter, then the build and the fast tests once. A batch is done when every mutant in it is caught and the tests pass, and gets one commit staging its test and seam files. A mutant that still survives goes back to its batch's subagent with the mutant's diff: the test does not assert what it claims, so fix the test, never the filter. A build or test failure halts as the audit procedure describes.
 
-Statuses follow the audit procedure per batch, the way its `--auto` section describes: every finding in a batch is set `in_progress` before dispatch, `done` with the batch's commit after it, and `halted` on failure. A resumed `--address` re-verifies as the audit procedure's Resume describes, re-verifying a remaining finding by checking its mutated lines are still in the code at HEAD, then rebuilds the triage and batches from what remains.
+Statuses follow the audit procedure per batch, the way its `--auto` section describes: every finding in a batch is set `in_progress` before dispatch, `done` with the batch's commit after it, and `halted` on failure. A resumed `--fix` re-verifies as the audit procedure's Resume describes, re-verifying a remaining finding by checking its mutated lines are still in the code at HEAD, then rebuilds the triage and batches from what remains.
 
 Never clear a survivor by skipping it. A skip attribute, a disable comment or a new exclusion is allowed only for a mutant classified as equivalent or arid, with the reason beside it. Skipping a finding in triage leaves its mutants surviving and says so in the report.
 

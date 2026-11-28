@@ -6,24 +6,24 @@ Install it if you want Claude to answer questions like "what's broken here", "wh
 
 ## Skills
 
-| Skill | Use it for | Mutation flag | Report |
-| --- | --- | --- | --- |
-| `bug-hunt` | Correctness defects. Treats tests, comments and names as claims, judges intent only from type contracts, invariants, callers, domain rules and compiler or analyzer output, and writes throwaway reproductions where cheap. | `--fix` | `.claude/state/bug-report.md` |
-| `codebase-health` | Maintainability of units and their collaborators: coupling, cohesion, testability, complexity. Separates strategic (multi-file, root cause) findings from tactical ones. | `--improve` | `.claude/state/health-report.md` |
-| `architecture-scan` | The architecture the code is converging toward (N-Layer, Clean Architecture, Vertical Slice, Feature Folders and so on), plus inconsistencies and boundary violations. It never imposes a pattern. Moves use `git mv` to keep history. | `--reorganize` | `.claude/state/structure-report.md` |
-| `dead-code` | Unused code and dependencies. Inventories roots first (entry points, framework discovery, public API) and treats every candidate as alive until a named source shows nothing reaches it. Age is never evidence. | `--remove` | `.claude/state/dead-code-report.md` |
-| `pattern-discovery` | Library reimplementations, repeated structural shapes and unnamed conventions, each with a recommendation: adopt a library, extract shared code, document the convention, or leave it alone. | `--formalize` | `.claude/state/patterns-report.md` |
-| `file-decomposition` | Splitting one large file into modules. Presents a plan first, then extracts step by step with characterization tests before each move. | none | none |
-| `pattern-awareness` | Background guidance while writing code: flags new code that adds a fourth instance of an existing shape, reimplements a library, or diverges from a convention, without forcing adoption. | none | none |
+| Skill | Use it for | Report |
+| --- | --- | --- |
+| `bug-hunt` | Correctness defects. Treats tests, comments and names as claims, judges intent only from type contracts, invariants, callers, domain rules and compiler or analyzer output, and writes throwaway reproductions where cheap. | `.claude/state/bug-report.md` |
+| `codebase-health` | Maintainability of units and their collaborators: coupling, cohesion, testability, complexity. Separates strategic (multi-file, root cause) findings from tactical ones. | `.claude/state/health-report.md` |
+| `architecture-scan` | The architecture the code is converging toward (N-Layer, Clean Architecture, Vertical Slice, Feature Folders and so on), plus inconsistencies and boundary violations. It never imposes a pattern. Moves use `git mv` to keep history. | `.claude/state/structure-report.md` |
+| `dead-code` | Unused code and dependencies. Inventories roots first (entry points, framework discovery, public API) and treats every candidate as alive until a named source shows nothing reaches it. Age is never evidence. | `.claude/state/dead-code-report.md` |
+| `pattern-discovery` | Library reimplementations, repeated structural shapes and unnamed conventions, each with a recommendation: adopt a library, extract shared code, document the convention, or leave it alone. | `.claude/state/patterns-report.md` |
+| `file-decomposition` | Splitting one large file into modules. Presents a plan first, then extracts step by step with characterization tests before each move. | none |
+| `pattern-awareness` | Background guidance while writing code: flags new code that adds a fourth instance of an existing shape, reimplements a library, or diverges from a convention, without forcing adoption. | none |
 
 The five audits trigger from requests that match their descriptions ("find bugs", "health check", "remove unused code") or by name, for example `/refactoring:bug-hunt`. Their arguments are:
 
 ```
 /refactoring:bug-hunt [--auto] [--fix [1,3]] [--context <path>] [path]
-/refactoring:architecture-scan [--auto] [--reorganize [1,3]] [path]
+/refactoring:architecture-scan [--auto] [--fix [1,3]] [path]
 ```
 
-The other three audits take the same shape as `bug-hunt` with their own mutation flag. `path` narrows the scope; without it the whole project is scanned. `--context <path>` feeds in output from an external tool (complexity metrics, clone detection, dependency graphs); any format works, and a finding seeded from it still has to hold up against the code. `architecture-scan` does not take `--context`.
+The other three audits take the same shape as `bug-hunt`. `--fix` is the mutation flag in every audit: it acts on the findings, which for `architecture-scan` means moving files and for `dead-code` means deleting. `path` narrows the scope; without it the whole project is scanned. `--context <path>` feeds in output from an external tool (complexity metrics, clone detection, dependency graphs); any format works, and a finding seeded from it still has to hold up against the code. `architecture-scan` does not take `--context`.
 
 `file-decomposition` sets `disable-model-invocation`, so Claude never starts it on its own. Run it yourself with `/refactoring:file-decomposition "path/to/large-file.ext"`. It refuses `--auto`, because each extraction depends on the plan you approve and on the step before it. Files under 300 lines rarely benefit.
 
@@ -61,7 +61,7 @@ With `--auto`, Claude skips your review of the report and dispatches every actio
 
 Both `task-implementer` and `implementation-reviewer` load the convention skills the global `CLAUDE.md` maps to their files through the Skill tool, so a dispatch need not paste those conventions in.
 
-`task-implementer` is told never to run git, and a hook enforces it. `hooks/register.ts` inspects every Bash and PowerShell command, and when the caller is `task-implementer` and the command invokes git, it denies the call and tells the agent to return `NEEDS_CONTEXT` or `BLOCKED` instead. Other agents and the main session are unaffected. The hook runs inside Claude Code, so it needs nothing else installed.
+`task-implementer` is told never to run git, and a hook backs the rule up. `hooks/register.ts` inspects every Bash and PowerShell command, and when the caller is `task-implementer` and the command contains `git` as a word, it denies the call and tells the agent to return `NEEDS_CONTEXT` or `BLOCKED` instead. It guards against habit and is no sandbox: a command that builds the name at run time, or runs a script that calls git, gets through, and a command that only mentions the word (`grep git src`) is denied. Other agents and the main session are unaffected. The hook runs inside Claude Code, so it needs nothing else installed.
 
 ## Convention skills
 

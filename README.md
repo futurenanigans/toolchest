@@ -41,7 +41,7 @@ The two analyzers are opt-in per repository. Awl does nothing until the reposito
 | [`awl`](https://github.com/futurenanigans/awl-dist) | Roslyn semantic analysis on every C# edit. It denies an edit that breaks a rule and reports design advisories, with a skill that explains each rule and how to resolve it. Installed from a sha256-pinned awl-dist release; needs the .NET 10 SDK on PATH. |
 | [`dotnet`](plugins/dotnet/README.md) | C# conventions that follow Microsoft's style over a project's local one, a skill that installs a standard `.editorconfig` and `Directory.Build.props`, and a NuGet update workflow that updates in tested groups and commits locally. |
 | [`gimlet`](plugins/gimlet/README.md) | Runs C#/.NET security scanners over a repository (opengrep with a bundled ruleset, the SDK's Security analyzers, Dotnetarium taint analysis, NuGet and OSV vulnerable-package checks, Betterleaks secrets) and probes a running API through its OpenAPI document (Spectral, Schemathesis, ZAP), merging everything into one findings file. A skill picks the scan (whole tree, a path, or only what a branch introduced) and triages the findings. Each tool it downloads is pinned to a version and installed on first use. |
-| [`lam`](plugins/lam/README.md) | Local Agent Monitor. It adds advice when an edit or command looks like a shortcut (a skipped or deleted test, a type escape hatch, a swallowed exception, a pasted credential), counts those corrections, draws a status line and fetches from git at session start. |
+| [`lam`](plugins/lam/README.md) | Local Agent Monitor. It adds advice when an edit or command looks like a process shortcut (a skipped or deleted test, a test run piped past its exit code, a pasted credential), counts those corrections, draws a status line and fetches from git at session start. |
 | [`loom`](https://github.com/futurenanigans/loom-dist) | TypeScript, JavaScript and Vue analysis on every edit, with the same deny-or-advise model as awl and a skill for reading its findings. Installed from a sha256-pinned loom-dist release carrying engines for linux-x64 (glibc) and windows-x64; needs `bun` on PATH. |
 | [`memory`](plugins/memory/README.md) | Checks Claude Code's saved memories against the repository and your instructions and reports which to keep, update, merge, promote or delete; `--apply` backs up the store and asks before changing it. |
 | [`refactoring`](plugins/refactoring/README.md) | Audits of the code on disk for bugs, maintainability, architecture, dead code and repeated patterns. Each writes an evidence-backed report and can fix its findings one commit at a time. |
@@ -55,7 +55,7 @@ The two analyzers are opt-in per repository. Awl does nothing until the reposito
 
 ## Evals
 
-`dotnet`, `rust` and `review` carry `claude plugin eval` smoke cases under `evals/`, tagged `smoke`. Each case runs with and without its plugin, so the score shows what the plugin changes. They call the model on your credentials, so they run on demand, never in CI. From the plugin's folder:
+`dotnet`, `rust`, `review`, `writing`, `testing` and `refactoring` carry `claude plugin eval` smoke cases under `evals/`, tagged `smoke`. Each case runs with and without its plugin, so the score shows what the plugin changes. They call the model on your credentials, so they run on demand, never in CI. From the plugin's folder:
 
 ```sh
 claude plugin eval . --tag smoke --scaffold --allow-tools Edit Write Bash --no-publish

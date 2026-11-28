@@ -1,11 +1,11 @@
 ---
 name: pattern-discovery
 description: Discovers emergent patterns in the current code on disk (library reimplementations, repeated structural shapes, unnamed conventions) and optionally formalizes them by adopting a library, extracting shared code, documenting the convention, or leaving them alone. Use when the user asks to "find duplicated patterns", "find repeated code", "what could use a library here", "simplify recurring structures", or "surface conventions". Never reviews a git diff.
-argument-hint: "[--auto] [--formalize [1,3]] [--context <path>] [path]"
+argument-hint: "[--auto] [--fix [1,3]] [--context <path>] [path]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
-Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`. Report path: `.claude/state/patterns-report.md`. Mutation flag: `--formalize`.
+Follow `${CLAUDE_SKILL_DIR}/../codebase-health/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`. Report path: `.claude/state/patterns-report.md`. Mutation flag: `--fix`.
 
 ## External context
 

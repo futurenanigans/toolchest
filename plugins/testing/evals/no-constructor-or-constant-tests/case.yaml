@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: no-constructor-or-constant-tests
+description: Tests written for a small account module cover the overdraft rule and assert neither a constant's literal value nor that a constructor stored its argument.
+tags: [smoke]
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

@@ -10,7 +10,7 @@ Before writing any test, answer: **if this test were deleted, would confidence i
 ## Noise: do not write tests that verify these
 
 1. **Constructor or property assignment**: DI wiring assigns fields. The container guarantees this; if it fails the app will not start.
-2. **Mock configuration verification**: asserting a mock was called with particular arguments tests the test's own setup.
+2. **Mock configuration verification**: asserting that a mock returned what the test told it to return, or that a collaborator was called in the order the implementation happens to use, tests the test's own setup. What the code sent across an outbound boundary (the message published, the request body) is behaviour and belongs under integration boundaries below.
 3. **Trivial mapping**: field-for-field copies arriving intact after a mapper or serializer runs, unless the mapping has conditional logic or transforms data.
 4. **Framework behavior**: that the ORM persists, the HTTP client sends, the logger logs, the queue enqueues. Trust the framework.
 5. **Constant or enum value assertions**: a constant equals its literal value. These cannot regress independently of their definition.

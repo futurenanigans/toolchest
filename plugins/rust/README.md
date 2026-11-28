@@ -17,7 +17,7 @@ The skill prefers the newer convention when both work, but a project's existing,
 | Idioms | `let ... else`, let-chains, inline format arguments, native `async fn` in traits, `#[expect(..., reason = "...")]` |
 | Unsafe | `#![forbid(unsafe_code)]` where possible; one job per `unsafe {}` block with a `// SAFETY:` comment |
 | Async | no `std::sync::Mutex` guard across `.await`, blocking work in `spawn_blocking`, timeouts on network calls |
-| Comments | a `//!` module doc per file and no `///` on items, except a required `# Safety` section |
+| Comments | a `//!` module doc per file, `///` on the items a published library exports, and none elsewhere beyond a required `# Safety` section |
 
 Before calling Rust work done, Claude runs `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings` and `cargo test`, unless the project names its own commands. Formatting changes in files the task did not touch are kept, not reverted.
 

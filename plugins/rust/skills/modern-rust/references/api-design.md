@@ -143,7 +143,7 @@ Avoid:
 
 ## Documentation shape
 
-The `writing:comments` skill governs: a file opens with a `//!` module doc of one short paragraph, and items carry no `///`. A contract a caller must know lives in the signature (a typed error enum for failures, a newtype for a valid range) or in a test that pins it.
+The `writing:comments` skill governs: a file opens with a `//!` module doc of one short paragraph, the items a published library exports carry `///`, and other items carry none. A contract a caller must know lives first in the signature (a typed error enum for failures, a newtype for a valid range); the `///` on an exported item states what the signature cannot, under `# Errors`, `# Panics` and `# Safety`.
 
 ## Semver-conscious public APIs (libraries)
 

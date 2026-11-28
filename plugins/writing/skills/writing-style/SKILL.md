@@ -26,7 +26,7 @@ A hook in this plugin runs the linter's dash rules over each file Claude writes 
 
 ## Greppable checks
 
-These rules are mechanical, and `prose-lint.mjs` runs them alongside the dash check, over the same files, with the same silence on a clean result. Its rules live in `${CLAUDE_SKILL_DIR}/../../lint/rules.mjs`; it masks fenced code, inline code and front matter, and exits 1 only on an error-severity rule. A project can drop a rule id or vocabulary word by listing it in `.writing/allow.txt`, and add its own warning words in `.writing/stoplist.txt`. For comments and docstrings in code, grep for the same patterns:
+These rules are mechanical, and `prose-lint.mjs` runs them alongside the dash check, over the same files, with the same silence on a clean result. Its rules live in `${CLAUDE_SKILL_DIR}/../../lint/rules.mjs`; it masks fenced code, inline code, `<code>` and `<pre>` spans, HTML comments, URLs and front matter, and exits 1 on an error-severity rule unless `--fail-on` names a lower severity. A project can drop a rule id or vocabulary word by listing it in `.writing/allow.txt`, and add its own warning words in `.writing/stoplist.txt`. For comments and docstrings in code, grep for the same patterns:
 
 - Provenance offered as a why, in comments and docstrings: `as requested`, `per the requirements`, `to fix the (failing )?test`, `ticket \d+`, `from the review`, `we discussed`.
 - Change history and block markers in comments: a comment starting with `Added`, `Removed`, `Changed`, `Updated`, `Fixed`, or an `end if` / `end of` marker.
@@ -140,7 +140,7 @@ That test screens for session-local provenance and lets durable repo history thr
 
 ## Editing prose someone else wrote
 
-A comment the `comments` skill (`${CLAUDE_SKILL_DIR}/../comments/SKILL.md`) does not allow gets deleted in the lines a task touches, with no benefit of the doubt; rewording it keeps a comment that should not exist. A module doc or constraint comment that is allowed stays as written, unless it breaks the always-on punctuation and sentence-shape rules or the why-is-in-the-code rule above. Rewrite it when it is false or stale against the code beside it, or when its stated reason is provenance instead of mechanism. The trigger is wrongness, not taste, and the comment must be attached to code the task already reaches. Do not open a file solely to correct its prose.
+A comment the `comments` skill (`${CLAUDE_SKILL_DIR}/../comments/SKILL.md`) does not allow gets deleted in the lines a task touches, with no benefit of the doubt; rewording it keeps a comment that should not exist. A module doc, constraint comment or public API doc that is allowed stays as written, unless it breaks the always-on punctuation and sentence-shape rules or the why-is-in-the-code rule above. Rewrite it when it is false or stale against the code beside it, or when its stated reason is provenance instead of mechanism. The trigger is wrongness, not taste, and the comment must be attached to code the task already reaches. Do not open a file solely to correct its prose.
 
 **Text that is moved is text that is written.** Prose carried into a new file, merged into another document, or restated at a different tier gets the full ruleset applied at the moment of the move. Prior presence in the repo is not a pass: relocating prose re-authors it. The "stays as written" limit protects prose left in place, never prose being lifted. Re-run the punctuation and sentence-shape checks over the destination file.
 

@@ -14,7 +14,7 @@ What it asks for:
 - Commit and PR bodies that explain why in a few sentences, without a "This PR" opener or a Summary/Changes/Testing scaffold.
 - A why that names a property of the code (an invariant, a failure mode, a limit) instead of where the request came from.
 
-The plugin also runs the mechanical part of these rules. A hook inside Claude Code runs the linter's dash rules over each file Claude writes or edits, with the same Markdown masking and `.writing/allow.txt` exceptions. It tells Claude to fix only the dash lines the edit introduced, and names any others as pre-existing for Claude to report to you; it never blocks the edit. For a Write, the file as it stood before the write is the original. `bin/prose-lint.mjs` (Node 18 or later, or Bun; no dependencies) lints Markdown files, or a commit or PR body with `--stdin --scope commit`, against the rules in `lint/rules.mjs`, skipping fenced code, inline code and front matter. It prints `--format text` or `--format github` annotations, filters with `--min-severity`, and exits 1 only on an error-severity hit, so vocabulary hits never fail a run. In a repository, `.writing/allow.txt` lists rule ids or words to drop and `.writing/stoplist.txt` adds words to warn on, one per line.
+The plugin also runs the mechanical part of these rules. A hook inside Claude Code runs the linter's dash rules over each file Claude writes or edits, with the same Markdown masking and `.writing/allow.txt` exceptions. It tells Claude to fix only the dash lines the edit introduced, and names any others as pre-existing for Claude to report to you; it never blocks the edit. For a Write, the file as it stood before the write is the original. `bin/prose-lint.mjs` (Node 18 or later, or Bun; no dependencies) lints Markdown files, or a commit or PR body with `--stdin --scope commit`, against the rules in `lint/rules.mjs`, skipping fenced code, inline code, `<code>` and `<pre>` spans, HTML comments, URLs and front matter. It prints `--format text` or `--format github` annotations and filters with `--min-severity`. It exits 1 on an error-severity hit by default, so vocabulary hits never fail a run; `--fail-on warning` or `--fail-on info` lowers that bar for CI. In a repository, `.writing/allow.txt` lists rule ids or words to drop and `.writing/stoplist.txt` adds words to warn on, one per line.
 
 ```sh
 node plugins/writing/bin/prose-lint.mjs --min-severity warning README.md docs/*.md
@@ -25,7 +25,7 @@ It also carries a vocabulary warning list and limits on editing prose someone el
 
 ## The comments skill
 
-The `comments` skill covers code comments in any language. It allows two kinds of comment: a short module doc at the top of a file, and a constraint comment that names the test keeping it true. Every other comment in lines Claude touches gets deleted, except sections a compiler or lint requires.
+The `comments` skill covers code comments in any language. It allows three kinds of comment: a short module doc at the top of a file, a constraint comment that names the test keeping it true, and a doc comment on the public API of a published package, written for the IDE and the documentation generator that show it to callers. Every other comment in lines Claude touches gets deleted, except sections a compiler or lint requires.
 
 Claude loads it from its description before writing or editing a comment, and the global `CLAUDE.md` in this repository points to it as well. You can also run `/writing:comments` directly.
 

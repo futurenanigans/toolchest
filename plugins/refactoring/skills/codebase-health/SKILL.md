@@ -1,11 +1,11 @@
 ---
 name: codebase-health
 description: Assesses maintainability of the current code on disk at the level of units and their collaborators (coupling, cohesion, testability, complexity), and separates strategic (multi-file, root-cause) findings from tactical ones. Use when the user asks for a "health check", "code quality assessment", "how maintainable is this", or "what's the state of this codebase". Leaves architectural layout to architecture-scan and repeated patterns to pattern-discovery. Never reviews a git diff. Optionally addresses the findings.
-argument-hint: "[--auto] [--improve [1,3]] [--context <path>] [path]"
+argument-hint: "[--auto] [--fix [1,3]] [--context <path>] [path]"
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent
 ---
 
-Follow `${CLAUDE_SKILL_DIR}/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`. Report path: `.claude/state/health-report.md`. Mutation flag: `--improve`.
+Follow `${CLAUDE_SKILL_DIR}/references/audit-procedure.md` for scanning against code on disk, report state and frontmatter, `--context`, the mutation pre-flight, and `--auto`. Report path: `.claude/state/health-report.md`. Mutation flag: `--fix`.
 
 ## External context
 
@@ -24,7 +24,7 @@ Flag naming or formatting only when it masks intent or causes misuse.
 
 Two adjacent questions belong to other skills, so they get no finding here. How directories, layers, and projects are organized, and whether dependencies flow the way that layout prescribes, belongs to `architecture-scan`. Duplicated behavioral shapes and library reimplementations belong to `pattern-discovery`. When either shows up prominently, list it under Out of scope.
 
-Distinguish **strategic** findings (structural, multi-file, root-cause issues that compound) from **tactical** ones (localized, symptomatic). Both go in the report; the distinction guides effort during `--improve`.
+Distinguish **strategic** findings (structural, multi-file, root-cause issues that compound) from **tactical** ones (localized, symptomatic). Both go in the report; the distinction guides effort during `--fix`.
 
 **Severity.** High: the problem slows or endangers most changes in the area, or blocks testing it. Medium: it raises the cost of some changes or hides intent in a frequently read unit. Low: localized friction.
 

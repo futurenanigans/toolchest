@@ -97,7 +97,7 @@ Read the file before starting and treat it as supplementary data from an externa
 
 ## Mutation
 
-Applies under the skill's mutation flag (`--fix`, `--improve`, `--formalize`, `--remove`, or `--reorganize`), with all findings or a cherry-picked subset such as `[1,3]`. A finding recommended as **Leave alone** (or quarantined, in `bug-hunt` and `dead-code`) is skipped; if the user cherry-picks one explicitly, confirm before acting.
+Applies under the skill's mutation flag (`--fix`), with all findings or a cherry-picked subset such as `[1,3]`. A finding recommended as **Leave alone** (or quarantined, in `bug-hunt` and `dead-code`) is skipped; if the user cherry-picks one explicitly, confirm before acting.
 
 1. Pre-flight: require a clean working tree outside `.claude/state/` (`git status --porcelain -- . ':!.claude/state'` prints nothing). The scan's own report lives there and does not count. If dirty, stop and ask the user to commit or stash first.
 2. Collect the test baseline. Every test passing at baseline must still pass afterwards.

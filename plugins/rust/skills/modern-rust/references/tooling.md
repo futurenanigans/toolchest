@@ -18,7 +18,7 @@ nursery = { level = "warn", priority = -1 }   # optional; some lints are noisy
 # pedantic lints commonly turned back off:
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
-missing_errors_doc = "allow"           # items carry no `///` under the `writing:comments` skill
+missing_errors_doc = "allow"           # a published library drops these two allows: its exported items carry `///`
 missing_panics_doc = "allow"
 # stricter than the defaults:
 unwrap_used = "warn"                   # `expect("why")` stays allowed for invariants
@@ -143,4 +143,4 @@ components = ["rustfmt", "clippy"]
 
 - `cargo doc --open` locally; enable `#![doc = include_str!("../README.md")]` on `lib.rs` so README and crate docs stay in sync.
 - Intra-doc links in the `//!` module doc: `` [`Config`] ``, `` [`Self::parse`] ``; never bare URLs to docs.rs.
-- Items carry no `///`; the `writing:comments` skill allows a `//!` module doc and a test-anchored constraint comment only.
+- A published library documents the items it exports with `///`, one summary sentence and the `# Errors`, `# Panics` and `# Safety` sections that apply, and sets `missing_docs = "warn"` under `[lints.rust]`. Other items carry no `///`; the `writing:comments` skill has the rule.

@@ -80,16 +80,21 @@ Microsoft Defender often blocks or quarantines a freshly built, unsigned `.exe` 
 
 ## Implementation requirements
 
+### The language's idiom decides the form
+The rules in this file are written without a language in mind, and languages do not solve the same problem the same way. Where a rule names a mechanism (an interface, an exception, a validation library, a DI container), read it as the outcome it protects and reach that outcome the way the language's own guidance does. The stack skill states that form and wins over this file where the two differ. With no stack skill, the language's official guidance and its standard library's conventions decide.
+
+A Rust function returns `Result` where C# throws. A Go consumer declares the small interface it needs where C# registers one per service. A Rust struct holds a concrete type or a generic parameter where a trait object would exist only to satisfy a rule. When the idiom and a rule here disagree, follow the idiom and say so once.
+
 ### Scope and restraint
 Change what the task requires; leave the rest alone. Restraint preserves reviewability and avoids orthogonal damage.
 
 - Bug fixes do not need surrounding code cleaned up. Simple features do not need extra configurability. Every changed line should trace to the request.
 - Duplicated logic and architectural structure are different questions, decided differently.
   - **Logic**: the same steps written in two places. Consolidate it into a shared helper on evidence, once the shape has repeated and stopped moving; the wrong shared helper costs more than the copies.
-  - **Structure**: a component depends on a contract (an interface, a trait, a protocol) instead of a concrete class, and dependencies point the way the layering says. Set it up when the component is written, whether or not a second implementation or caller exists, because retrofitting a contract after code has grown around a concrete type costs far more than declaring it. Every injected collaborator is consumed through its contract. Data carriers, value objects and pure functions are not components and need none.
+  - **Structure**: a component depends on a contract (an interface, a trait, a protocol) instead of a concrete class, and dependencies point the way the layering says. Set it up when the component is written, whether or not a second implementation or caller exists, because retrofitting a contract after code has grown around a concrete type costs far more than declaring it. Every injected collaborator is consumed through its contract. Data carriers, value objects and pure functions are not components and need none. What a contract looks like, and when the language's idiom is a concrete type until a second implementation or a test seam exists, is the stack skill's call.
   - Implementation count and caller count are not the test for either. What a task does not earn is configurability or generality it does not need; a contract at a component boundary is part of writing the component, never an addition to the task.
-- Validate at boundaries (HTTP handlers, file I/O, user input, external APIs) with a proper validation library, not hand-rolled guards. Do not add defensive checks in interior code that the type system, the framework, or the boundary already guarantees.
-- Do not add docstrings, comments, or type annotations to unchanged code. Comments are limited to a module doc and an anchored constraint comment; the `writing:comments` skill has the detail.
+- Validate at boundaries (HTTP handlers, file I/O, user input, external APIs) with the validation library the project already uses or the one standard for the stack, not hand-rolled guards. Where the project has none, adding one is a dependency decision for the user. Do not add defensive checks in interior code that the type system, the framework, or the boundary already guarantees.
+- Do not add docstrings, comments, or type annotations to unchanged code. Comments are limited to a module doc, an anchored constraint comment, and a doc comment on a published package's public API; the `writing:comments` skill has the detail.
 - Do not reformat, rename, or "improve" adjacent code the task did not reach. If a separate cleanup is warranted, surface it as a follow-up instead of folding it into the current change.
 
 This rule is not in tension with "Fix defects in the path of work" below: completing correctness in code already being touched is part of the task. Reformatting code not being touched is not.
@@ -97,7 +102,7 @@ This rule is not in tension with "Fix defects in the path of work" below: comple
 ### Read before write
 - When the user references a file, open and read it before answering. Treat prior assumptions about the codebase as unverified until re-read in this session.
 - Before writing a new helper, formatter, validator, DTO, or composable, check the project's shared-utility locations and adjacent files for an existing one. Extend the existing helper if it almost fits; surface the duplication if it does not.
-- Where existing patterns and conventions are visible in neighbouring files, match them. Style consistency comes from the codebase, not from this file.
+- Where existing patterns and conventions are visible in neighbouring files, match them. Style consistency comes from the codebase, not from this file. A stack skill that says otherwise for its language wins: the `dotnet` skill puts Microsoft's conventions above a project's local style.
 
 ### Complete implementation mandate
 For the work the task requires, deliver it complete. The opposite of "complete" is half-done work on the task taken on, not narrower scope.
@@ -151,6 +156,8 @@ When a library, compiler API, or analyzer owns a question, its answer is the ans
 - A limitation that cannot be confirmed is not a licence to guess. Say what was verified, what was not, and what that costs.
 
 ### Error handling
+These rules are written in exception terms. In a language that returns errors as values, catching is handling the error value and propagating is returning it to the caller.
+
 - Catch exceptions at boundaries (HTTP handlers, message-bus consumers, CLI entry points, file I/O). In interior code, let exceptions propagate.
 - When catching, attach context (input, operation, upstream cause) before rethrowing or returning a typed error. Do not strip stack traces by passing only `ex.Message` to a logger.
 - Do not catch and swallow. A `catch` block with no rethrow, no typed error return, and no recoverable action is a deliberately broken window.

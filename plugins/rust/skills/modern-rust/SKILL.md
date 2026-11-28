@@ -3,7 +3,7 @@ name: modern-rust
 description: Reference for modern Rust (edition 2024, current stable toolchain), covering old-versus-modern idioms, Cargo workspace and lint setup, module layout, error types, API design, and clippy and rustfmt config. Use when scaffolding, reviewing or refactoring Rust code or a Cargo workspace, or when the user asks "is this idiomatic". The always-apply conventions live in the `rust` skill in this plugin.
 ---
 
-# Modern Rust
+# Modern Rust reference
 
 The always-apply conventions are in `${CLAUDE_SKILL_DIR}/../rust/SKILL.md`; read it before writing or reviewing Rust. This skill is the full reference behind it.
 
@@ -135,7 +135,7 @@ Migrate with `cargo fix --edition` then bump `edition`.
 - Unit tests in `#[cfg(test)] mod tests` next to the code; integration tests in `tests/` against the public API.
 - `#![allow(clippy::unwrap_used)]` (or `#![cfg_attr(test, allow(...))]`) is fine in test modules.
 - Property tests with `proptest`; fuzz parsers with `cargo fuzz`; `cargo nextest` as the runner, `insta` for snapshots.
-- Comments follow the `writing:comments` skill: a `//!` module doc of one short paragraph at the top of a file, and no `///` on items. Where Mortise runs, its finding is the rule. The one item doc that stays is the `# Safety` section clippy requires on a public `unsafe fn`.
+- Comments follow the `writing:comments` skill: a `//!` module doc of one short paragraph at the top of a file, `///` on the items a published library crate exports, and none on any other item beyond the `# Safety` section clippy requires on an `unsafe fn`. Where Mortise runs, its finding is the rule.
 
 ## Workflow before declaring code done
 

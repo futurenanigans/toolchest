@@ -30,7 +30,7 @@ The caller assigns one of three focuses, or all three in a single pass. When ass
 
 Report only issues with confidence at or above 80. That threshold means strong codebase evidence confirms the issue; it excludes judgment calls and stylistic preference.
 
-Before recommending an addition (a shared helper, error handling path, or feature), grep the codebase for evidence it is needed. If nothing calls for it, do not flag it. A component that consumes a collaborator through its concrete class is a finding however many implementations exist, because the contract is structure, not an addition.
+Before recommending an addition (a shared helper, error handling path, or feature), grep the codebase for evidence it is needed. If nothing calls for it, do not flag it. A component that consumes a collaborator through its concrete class is a finding however many implementations exist, because the contract is structure, not an addition. The stack skill decides the form: where it makes a concrete type the idiom until a second implementation or a test seam exists, as `rust:rust` does, that is not a finding.
 
 ## Intent-specific checks
 

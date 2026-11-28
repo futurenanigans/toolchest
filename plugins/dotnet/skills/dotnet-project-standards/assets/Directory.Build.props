@@ -6,7 +6,7 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <!-- Run IDE code-style rules (IDE0xxx, IDE1006) at build time, not just in the IDE -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <!-- IDE0005 (unused usings) is enforced at build only when the documentation file is generated; CS1591 is suppressed because members carry no doc comments -->
+    <!-- IDE0005 (unused usings) is enforced at build only when the documentation file is generated; CS1591 is suppressed because application members carry no doc comments; a packaged library removes it from NoWarn in its own project -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

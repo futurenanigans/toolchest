@@ -93,7 +93,7 @@ After a mutation run, reply with one line per finding acted on: its number and t
 
 ## Mutation
 
-Applies under the skill's mutation flag (`--address`), with all findings or a cherry-picked subset such as `[1,3]`.
+Applies under the skill's mutation flag (`--fix`), with all findings or a cherry-picked subset such as `[1,3]`.
 
 1. Pre-flight: require a clean working tree outside `.claude/state/` (`git status --porcelain -- . ':!.claude/state'` prints nothing). The scan's own report lives there and does not count. If dirty, stop and ask the user to commit or stash first.
 2. Collect the test baseline. Every test passing at baseline must still pass afterwards.
