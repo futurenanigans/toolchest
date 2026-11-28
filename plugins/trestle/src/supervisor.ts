@@ -5,8 +5,10 @@ import * as path from 'node:path'
 
 import type { AgentCli, AgentEffort, AgentFailureKind, AgentStatus, AgentSummary } from '../types'
 import { createAdapter, type AdapterDriver, type AdapterEvent, type AgentPermissionMode, type LaunchSpec } from './adapters'
+import { Mutex } from './locks'
 import type { ResourcesConfig } from './config'
 import {
+  processStartToken,
   isProcessAlive,
   isWindows,
   killProcessTree,
@@ -15,7 +17,7 @@ import {
   userHome,
   type CommandSpec,
 } from './platform'
-import { ephemeralRunsDir, sessionHomeDir, updateDiskState } from './state'
+import { TERMINAL_RETENTION_MS, ephemeralRunsDir, sessionHomeDir, updateDiskState } from './state'
 
 const MAX_TAIL_LINES = 500
 const DEFAULT_IDLE_MS = 10 * 60 * 1000
@@ -52,6 +54,8 @@ interface ManagedAgent {
   ephemeralHome: boolean
   driver: AdapterDriver
   spec: LaunchSpec
+  processStart: Promise<string | undefined>
+  startToken?: string
   child: ChildProcess
   exited: boolean
   exitPromise: Promise<void>
@@ -103,13 +107,10 @@ function isTerminalStatus(status: AgentStatus): boolean {
 
 export class AgentSupervisor {
   private readonly agents = new Map<string, ManagedAgent>()
-  private persistChain: Promise<void> = Promise.resolve()
+  private pendingWrites = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly persistMutex = new Mutex()
   private idCounter = 0
 
-  /**
-   * Generates a unique agent ID based on `baseId` so repeated goal loops or
-   * retries never collide with previous runs in memory.
-   */
   allocateId(baseId: string): string {
     if (!this.agents.has(baseId)) return baseId
     let candidate: string
@@ -121,6 +122,7 @@ export class AgentSupervisor {
   }
 
   async spawn(params: SpawnAgentParams): Promise<AgentSummary> {
+    this.pruneAgents()
     if (this.agents.has(params.id)) {
       throw new Error(`Agent ${params.id} already exists`)
     }
@@ -213,6 +215,7 @@ export class AgentSupervisor {
       ephemeralHome,
       driver,
       spec,
+      processStart: processStartToken(child.pid),
       child,
       exited: false,
       exitPromise,
@@ -222,29 +225,17 @@ export class AgentSupervisor {
     }
     this.agents.set(params.id, managed)
 
-    // Attach stream, error, and close listeners IMMEDIATELY to prevent unhandled ENOENT
-    // crashes and catch early exits during driver.ready().
     this.attachStreams(managed)
-    this.resetIdleTimer(managed)
 
     const totalMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS
     managed.totalTimer = setTimeout(() => {
       void this.failAndKill(managed, `Total timeout (${Math.round(totalMs / 1000)}s) exceeded`, 'timeout')
     }, totalMs)
 
-    if (driver.ready) {
-      try {
-        await driver.ready(spec, () => managed.exited)
-      } catch (err) {
-        const msg = (err as Error).message
-        await this.failAndKill(managed, msg, 'error')
-        if (ephemeralHome) await fs.rm(runHome, { recursive: true, force: true }).catch(() => {})
-        throw err
-      }
-    }
-
+    managed.startToken = await managed.processStart
     if (!managed.exited && summary.status === 'starting') {
       summary.status = 'running'
+      this.resetIdleTimer(managed)
       if (child.stdin && !child.stdin.destroyed) {
         if (spec.initialStdin) {
           child.stdin.write(spec.initialStdin)
@@ -256,10 +247,12 @@ export class AgentSupervisor {
     }
 
     this.schedulePersist(params.repoRoot, homeDir)
+    await this.flush()
     return { ...summary, tail: [...summary.tail] }
   }
 
   list(): AgentSummary[] {
+    this.pruneAgents()
     return Array.from(this.agents.values()).map(m => ({ ...m.summary, tail: [...m.summary.tail] }))
   }
 
@@ -328,33 +321,21 @@ export class AgentSupervisor {
     if (action.kind === 'unsupported') {
       return { delivered: false, reason: action.reason }
     }
-    if (action.kind === 'stdin') {
-      if (!m.child.stdin || m.child.stdin.destroyed) {
-        return { delivered: false, reason: 'Agent stdin is closed' }
-      }
-      m.child.stdin.write(action.data)
-      this.pushTail(m, `[steer] ${text.slice(0, 100)}`)
-      return { delivered: true }
+    if (!m.child.stdin || m.child.stdin.destroyed) {
+      return { delivered: false, reason: 'Agent stdin is closed' }
     }
-    const res = await fetch(action.url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(action.headers ?? {}) },
-      body: JSON.stringify(action.body),
-    })
-    if (!res.ok) {
-      return { delivered: false, reason: `HTTP ${res.status}` }
-    }
+    m.child.stdin.write(action.data)
     this.pushTail(m, `[steer] ${text.slice(0, 100)}`)
     return { delivered: true }
   }
 
   async stop(id: string): Promise<void> {
     const m = this.agents.get(id)
-    if (!m) return
+    if (!m || m.exited || isTerminalStatus(m.summary.status)) return
     this.clearTimers(m)
     m.summary.status = 'stopped'
     m.summary.finishedAt = m.summary.finishedAt ?? Date.now()
-    await killProcessTree(m.child.pid)
+    await this.killManaged(m)
     this.notifyWaiters(m)
     this.schedulePersist(m.repoRoot, m.homeDir)
     if (m.ephemeralHome) {
@@ -374,12 +355,9 @@ export class AgentSupervisor {
       m => m.summary.status === 'starting' || m.summary.status === 'running' || m.summary.status === 'idle',
     )
     await Promise.all(active.map(m => this.stop(m.summary.id)))
+    await this.flush()
   }
 
-  /**
-   * Reconciles persisted agents on disk against live OS PIDs after a crash/restart.
-   * Marks any stale starting/running/idle agents whose PID is no longer alive as stopped.
-   */
   async reconcileDiskState(repoRoot: string, homeDir = userHome()): Promise<number> {
     let reconciled = 0
     const now = Date.now()
@@ -483,13 +461,11 @@ export class AgentSupervisor {
     this.clearTimers(m)
     m.child.stdin?.end()
 
-    // Wait briefly for the child process to exit cleanly before waking waiters
-    // (avoids file-lock races on Windows and lingering server processes).
     void (async () => {
       if (!m.exited) {
         await Promise.race([m.exitPromise, new Promise(r => setTimeout(r, EXIT_GRACE_MS))])
         if (!m.exited) {
-          await killProcessTree(m.child.pid)
+          await this.killManaged(m)
         }
       }
       this.notifyWaiters(m)
@@ -507,6 +483,13 @@ export class AgentSupervisor {
       } else if (ev.kind === 'message') {
         m.finalText = ev.text
         this.recordActivity(m, `msg: ${ev.text.replace(/\s+/g, ' ').slice(0, 100)}`)
+        const blockedMatch = /^(?:BLOCKED|NEEDS_CONTEXT|NEEDS_INPUT)\s*:\s*(.+)/im.exec(ev.text)
+        const blockedReason = blockedMatch?.[1]?.trim()
+        if (blockedReason && m.summary.status !== 'done' && m.summary.status !== 'failed' && m.summary.status !== 'stopped') {
+          m.summary.status = 'needs_input'
+          m.summary.needsInputReason = blockedReason
+          this.schedulePersist(m.repoRoot, m.homeDir)
+        }
       } else if (ev.kind === 'usage') {
         if (ev.cumulative || !m.summary.usage) {
           m.summary.usage = {
@@ -536,6 +519,7 @@ export class AgentSupervisor {
         this.pushTail(m, '[done]')
         this.finalizeTurn(m, 'done')
       } else if (ev.kind === 'turn_failed') {
+        if (!isTerminalStatus(m.summary.status)) m.summary.resetAt = ev.resetAt
         this.pushTail(m, `[failed] ${ev.error}`)
         this.finalizeTurn(m, 'failed', ev.error, classifyFailure(ev))
       }
@@ -575,9 +559,21 @@ export class AgentSupervisor {
     m.summary.error = reason
     m.summary.failureKind = failureKind
     this.pushTail(m, `[failed] ${reason}`)
-    await killProcessTree(m.child.pid)
+    await this.killManaged(m)
     this.notifyWaiters(m)
     this.schedulePersist(m.repoRoot, m.homeDir)
+  }
+
+  private async killManaged(m: ManagedAgent): Promise<void> {
+    const token = await m.processStart
+    if (!m.exited && token) await killProcessTree(m.child.pid, token)
+  }
+
+  private pruneAgents(): void {
+    const cutoff = Date.now() - TERMINAL_RETENTION_MS
+    for (const [id, agent] of this.agents) {
+      if (agent.exited && agent.summary.finishedAt && agent.summary.finishedAt < cutoff) this.agents.delete(id)
+    }
   }
 
   private clearTimers(m: ManagedAgent): void {
@@ -593,40 +589,57 @@ export class AgentSupervisor {
   }
 
   private schedulePersist(repoRoot: string, homeDir: string): void {
-    this.persistChain = this.persistChain
-      .then(() =>
-        updateDiskState(
-          repoRoot,
-          cur => {
-            const nextAgents = { ...cur.agents }
-            for (const m of this.agents.values()) {
-              if (m.repoRoot !== repoRoot || m.homeDir !== homeDir) continue
-              nextAgents[m.summary.id] = {
-                id: m.summary.id,
-                cli: m.summary.cli,
-                model: m.summary.model,
-                effort: m.summary.effort,
-                stage: m.summary.stage,
-                worktreeId: m.worktreeId,
-                worktreePath: m.summary.worktree,
-                branch: m.summary.branch,
-                status: m.summary.status,
-                pid: m.child.pid,
-                sessionId: m.summary.sessionId,
-                startedAt: m.summary.startedAt,
-                lastActivityAt: m.summary.lastActivityAt,
-                finishedAt: m.summary.finishedAt,
-                tail: m.summary.tail.slice(-40),
-                error: m.summary.error,
-                failureKind: m.summary.failureKind,
-                usage: m.summary.usage,
-              }
-            }
-            return { ...cur, agents: nextAgents }
-          },
-          homeDir,
-        ).then(() => {}),
-      )
-      .catch(() => {})
+    const key = JSON.stringify([repoRoot, homeDir])
+    if (this.pendingWrites.has(key)) return
+    const timer = setTimeout(() => {
+      this.pendingWrites.delete(key)
+      this.persist(repoRoot, homeDir)
+    }, 75)
+    this.pendingWrites.set(key, timer)
+  }
+
+  async flush(): Promise<void> {
+    for (const [key, timer] of this.pendingWrites) {
+      clearTimeout(timer)
+      this.pendingWrites.delete(key)
+      const [repoRoot, homeDir] = JSON.parse(key)
+      this.persist(repoRoot, homeDir)
+    }
+    await this.persistMutex.drain()
+  }
+
+  private persist(repoRoot: string, homeDir: string): void {
+    void this.persistMutex.run(() => updateDiskState(
+      repoRoot,
+      cur => {
+        const nextAgents = { ...cur.agents }
+        for (const m of this.agents.values()) {
+          if (m.repoRoot !== repoRoot || m.homeDir !== homeDir) continue
+          nextAgents[m.summary.id] = {
+            id: m.summary.id,
+            cli: m.summary.cli,
+            model: m.summary.model,
+            effort: m.summary.effort,
+            stage: m.summary.stage,
+            worktreeId: m.worktreeId,
+            worktreePath: m.summary.worktree,
+            branch: m.summary.branch,
+            status: m.summary.status,
+            pid: m.child.pid,
+            processStart: m.startToken,
+            sessionId: m.summary.sessionId,
+            startedAt: m.summary.startedAt,
+            lastActivityAt: m.summary.lastActivityAt,
+            finishedAt: m.summary.finishedAt,
+            tail: m.summary.tail.slice(-40),
+            error: m.summary.error,
+            failureKind: m.summary.failureKind,
+            usage: m.summary.usage,
+          }
+        }
+        return { ...cur, agents: nextAgents }
+      },
+      homeDir,
+    )).catch(() => {})
   }
 }

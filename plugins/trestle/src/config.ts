@@ -11,35 +11,23 @@ export type ModelTier = 'cheap' | 'balanced' | 'strong'
 export type TierTarget = string | { model: string; effort?: AgentEffort }
 
 export interface QuotaWindowConfig {
-  /** Rolling 5-hour token cap (input + output) */
   fiveHourMaxTokens?: number
-  /** Rolling 5-hour USD spend cap */
   fiveHourMaxCostUsd?: number
-  /** Rolling 7-day (weekly) token cap (input + output) */
   weeklyMaxTokens?: number
-  /** Rolling 7-day (weekly) USD spend cap */
   weeklyMaxCostUsd?: number
-  /** Always keep this CLI disabled after a usage-limit error until manually re-enabled via `quota_clear_cooldown` */
   manualReenable?: boolean
 }
 
 export interface AgentCliConfig {
-  /** Optional runner override (e.g. `['bun', 'x', '@openai/codex']` on Windows) */
   command?: CommandSpec
-  /** Default model ID or tier name when no explicit model is requested */
   defaultModel?: string
-  /** Default reasoning effort level for this CLI */
   defaultEffort?: AgentEffort
-  /** Highest tier this CLI is allowed to use via tier aliases or escalation (e.g. `'cheap'` or `'balanced'`) */
   maxTier?: string
-  /** Rolling 5-hour and weekly subscription/budget caps */
   quota?: QuotaWindowConfig
-  /** Named tier -> native CLI model ID (or `{ model, effort }`) mappings */
   tiers?: Record<string, TierTarget | undefined>
 }
 
 export interface ChecksConfig {
-  /** Custom verification commands for this repo (replaces auto-detection when non-empty) */
   commands?: CheckCommandSpec[]
   includeMortise?: boolean
   timeoutMs?: number
@@ -47,24 +35,16 @@ export interface ChecksConfig {
 }
 
 export interface EscalationConfig {
-  /** Ordered tier names to step through on failed iterations (e.g. `['cheap', 'balanced', 'strong']`) */
-  tiers: string[]
-  /** Number of failed iterations at a tier before escalating to the next tier (default: 2) */
+  tiers?: string[]
   stepAfterFailures?: number
-  /** Disable automatic escalation when false */
   enabled?: boolean
-  /** Optional higher-budget CLI(s) to hand off to when the active CLI hits `maxTier` or a 5h/weekly quota cap */
   fallbackClis?: AgentCli[]
 }
 
 export interface ResourcesConfig {
-  /** Default max parallel writer items in `queue_run_next` (override per repo, e.g. 1 for heavy Rust/.NET repos) */
   maxParallel?: number
-  /** Minimum free system RAM (MiB) required before admitting a 2nd+ parallel writer (default: 2048) */
   minFreeMemMb?: number
-  /** Optional per-agent heap limit (MiB) forwarded to `NODE_OPTIONS` and `DOTNET_GCHeapHardLimit` */
   perAgentMaxMemMb?: number
-  /** Partition CPU/build threads (`CARGO_BUILD_JOBS`, `RAYON_NUM_THREADS`) across concurrent writers (default: true) */
   partitionThreads?: boolean
 }
 
@@ -226,10 +206,6 @@ export async function readRepoConfig(
   return (await readJsonFile(repoLocalConfigPath(repoRoot, homeDir))) ?? { version: 1 }
 }
 
-/**
- * Loads the merged effective configuration with precedence:
- * built-in defaults < user (`~/.trestle/config.json`) < checked-in repo (`<repo>/.trestle/config.json`) < local repo (`~/.trestle/<repo-key>/config.json`).
- */
 export async function loadEffectiveConfig(
   repoRoot?: string,
   homeDir = userHome(),
@@ -306,11 +282,6 @@ function clampTierName(
   return { tier: tierName, clamped: false }
 }
 
-/**
- * Resolves a requested `model` (which may be a tier alias like `cheap`/`balanced`/`strong`
- * or a literal native model ID), `effort`, and optional `commandOverride` for a given CLI.
- * Enforces `agents.<cli>.maxTier` when resolving tier aliases.
- */
 export function resolveAgentConfig(
   config: TrestleConfig,
   cli: AgentCli,
@@ -359,11 +330,6 @@ export function resolveAgentConfig(
   return { model: undefined, effort: fallbackEffort, commandOverride: cliCfg?.command }
 }
 
-/**
- * Resolves the model/tier/effort for a goal-loop iteration, applying tier escalation when
- * enabled, respecting `agents.<cli>.maxTier`, and optionally falling back to a higher-budget
- * CLI (`escalation.fallbackClis`) when the current CLI has hit its `maxTier` ceiling.
- */
 export function resolveEscalationAgentConfig(
   config: TrestleConfig,
   cli: AgentCli,
@@ -390,7 +356,6 @@ export function resolveEscalationAgentConfig(
     }
   }
 
-  // If caller explicitly pinned a literal model ID (not a tier alias), respect it without escalating.
   if (requestedModelOrTier && !base.resolvedFromTier) {
     return { cli, model: base.model, effort: base.effort, commandOverride: base.commandOverride }
   }
@@ -403,7 +368,6 @@ export function resolveEscalationAgentConfig(
   const desiredIdx = Math.min(esc.tiers.length - 1, startIdx + Math.floor(failedIterations / stepAfter))
   const maxTierIdx = cliCfg?.maxTier ? esc.tiers.indexOf(cliCfg.maxTier) : -1
 
-  // If desired tier exceeds this CLI's maxTier, try handing off to a fallbackCli that allows desiredTier
   if (maxTierIdx >= 0 && desiredIdx > maxTierIdx && esc.fallbackClis && esc.fallbackClis.length > 0) {
     const desiredTierName = esc.tiers[desiredIdx]!
     for (const fbCli of esc.fallbackClis) {

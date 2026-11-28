@@ -1,9 +1,0 @@
-schema_version: "1.1"
-name: second-responsibility-new-file
-description: Invoice formatting asked for in a session-auth module lands in its own file, and the auth module gains no formatting code.
-tags: [smoke]
-context:
-  scaffold_script: fixture.sh
-execution:
-  max_turns: 15
-  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

@@ -13,7 +13,10 @@ import type {
   QueueSummary,
 } from '../types'
 import { isWindows, userHome } from './platform'
+import { withFileLock } from './locks'
 import { repoKey } from './repo_key'
+
+export const TERMINAL_RETENTION_MS = 24 * 60 * 60 * 1000
 
 export interface PersistedWorktree {
   id: string
@@ -33,6 +36,7 @@ export interface PersistedAgent {
   worktreePath: string
   branch: string
   status: AgentStatus
+  processStart?: string
   pid?: number
   sessionId?: string
   startedAt: number
@@ -111,23 +115,21 @@ export async function writeDiskState(
   await fs.rename(tmp, target)
 }
 
-let stateQueue: Promise<void> = Promise.resolve()
 
 export async function updateDiskState(
   repoRoot: string,
   updater: (current: TrestleDiskState) => TrestleDiskState,
   homeDir = userHome(),
 ): Promise<TrestleDiskState> {
-  let result!: TrestleDiskState
-  const run = stateQueue.then(async () => {
+  return withFileLock(path.join(stateDir(repoRoot, homeDir), 'state.lock'), async () => {
     const current = await readDiskState(repoRoot, homeDir)
     const next = updater(current)
+    for (const [id, agent] of Object.entries(next.agents)) {
+      if (agent.finishedAt && agent.finishedAt < Date.now() - TERMINAL_RETENTION_MS) delete next.agents[id]
+    }
     await writeDiskState(repoRoot, next, homeDir)
-    result = next
+    return next
   })
-  stateQueue = run.catch(() => {})
-  await run
-  return result
 }
 
 export interface ExperimentEntry {
@@ -177,10 +179,6 @@ export async function readExperiments(
   }
 }
 
-/**
- * Reads the last `maxEntries` complete `## [...]` experiment entries without slicing mid-entry.
- * Optionally excludes specific outcomes (e.g. `['continued']` when building the dead-end list).
- */
 export async function readExperimentEntries(
   repoRoot: string,
   maxEntries = 10,

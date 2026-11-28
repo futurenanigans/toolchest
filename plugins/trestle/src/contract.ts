@@ -73,14 +73,12 @@ export async function contractCreate(
     id,
     title: params.title,
     goal: params.goal,
-    // Default-FAIL: every acceptance criterion starts false until verified.
     acceptanceCriteria: params.acceptanceCriteria.map(c => ({
       id: c.id,
       description: c.description,
       passed: false,
     })),
     checks: params.checks,
-    // Leave undefined when omitted so goal_loop falls back to repo/user config.checks.includeMortise
     ...(params.includeMortise !== undefined ? { includeMortise: params.includeMortise } : {}),
     ...(params.mutationSessionId !== undefined ? { mutationSessionId: params.mutationSessionId } : {}),
     ...(params.baseline !== undefined ? { baseline: params.baseline } : {}),
@@ -115,7 +113,6 @@ export async function contractList(repoRoot: string, homeDir = userHome()): Prom
       const raw = await fs.readFile(path.join(dir, file), 'utf8')
       contracts.push(JSON.parse(raw) as Contract)
     } catch {
-      // Skip unreadable/corrupt contract file
     }
   }
   return contracts.sort((a, b) => b.createdAt - a.createdAt)

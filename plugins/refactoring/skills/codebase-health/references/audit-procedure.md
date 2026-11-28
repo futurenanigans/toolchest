@@ -101,7 +101,7 @@ Applies under the skill's mutation flag (`--fix`), with all findings or a cherry
 
 1. Pre-flight: require a clean working tree outside `.claude/state/` (`git status --porcelain -- . ':!.claude/state'` prints nothing). The scan's own report lives there and does not count. If dirty, stop and ask the user to commit or stash first.
 2. Collect the test baseline. Every test passing at baseline must still pass afterwards.
-3. For each finding, dispatch a single-purpose subagent with the finding embedded in its prompt, following the skill's per-finding instructions. The prompt tells the subagent to read `${CLAUDE_SKILL_DIR}/../code-organization/SKILL.md` and `${CLAUDE_SKILL_DIR}/../inline-defect-prevention/SKILL.md` before writing code, with the paths expanded, because a subagent does not load those skills on its own.
+3. For each finding, dispatch a single-purpose subagent with the finding embedded in its prompt, following the skill's per-finding instructions. The prompt tells the subagent to read `${CLAUDE_SKILL_DIR}/../code-organization/SKILL.md` before writing code, with the path expanded, because a subagent does not load that skill on its own.
 4. After each finding, run build and tests in the main context. Commit if passing, staging the files the finding changed and never `.claude/state/`. A failure stops further work so the user can intervene.
 
 ### Finding status

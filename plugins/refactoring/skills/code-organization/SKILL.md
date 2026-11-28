@@ -1,6 +1,6 @@
 ---
 name: code-organization
-description: Where a new file goes and whether new code belongs in the file it is landing in. Load before creating a source file or folder, placing new code, or adding code to an existing source file in any language.
+description: File placement and module-boundary rules. ALWAYS load this skill before creating a new source file or folder, choosing where a new module/parser/handler/helper goes, or deciding whether new code belongs in an existing file, especially when a repository has architecture docs, migration notes, or a structured directory layout.
 ---
 
 # Code organization

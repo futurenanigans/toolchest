@@ -106,6 +106,11 @@ test("prose beside a masked span is still linted", () => {
   assert.deepEqual(hits.map((h) => h.col), [...text.split("\n")[6].matchAll(new RegExp(EM, "g"))].map((m) => m.index + 1));
 });
 
+test("a product name in a heading is advisory", () => {
+  const hits = lintMarkdown("## Visual Studio\n");
+  assert.deepEqual(hits.map((hit) => [hit.rule, hit.severity]), [["title-case-heading", "info"]]);
+});
+
 test("a setext heading underline is not a separator, a rule after a blank line or a list item is", () => {
   assert.deepEqual(ids(lintMarkdown("Heading text\n---\n\nBody.\n")), []);
   assert.deepEqual(lintMarkdown("Body.\n\n---\n\n- item\n---\n").map((h) => [h.rule, h.line]), [["separator-line", 3], ["separator-line", 6]]);
@@ -172,4 +177,19 @@ test("a file that cannot be linted is a usage error, not a lint failure", () => 
     assert.equal(ran.status, 2, name);
     assert.match(ran.stderr, new RegExp(name.replace(".", "\\.")));
   }
+});
+
+
+test("info-severity sentence-shape lints detect negative parallelism, noun triads, and flat variance", () => {
+  const rules = loadRules({ root: "/" });
+  const text = [
+    "It's not about speed, it's about correctness and clarity, scalability, and reliability.",
+    "",
+    "The worker reads one job from the queue. The parser checks each field for valid types. The router sends each item to its handler. The store writes one row into the table. The client logs the status to the console.",
+  ].join("\n");
+  const hits = lintText(text, { scope: "markdown", rules, file: "doc.md" });
+  const byRule = new Map(hits.map((h) => [h.rule, h.severity]));
+  assert.equal(byRule.get("negative-parallelism"), "info");
+  assert.equal(byRule.get("noun-triad"), "info");
+  assert.equal(byRule.get("sentence-length-variance"), "info");
 });

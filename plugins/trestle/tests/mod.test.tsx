@@ -35,8 +35,8 @@ test('trestle pane renders empty state after session start', async ($, on) => {
   setupEngine(on)
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   const ui = await $.ui.mount(PANE)
-  expect((await ui.find({ type: 'Text', text: /Trestle — 0 active/ }))?.text).toBe(
-    'Trestle — 0 active agent(s)',
+  expect((await ui.find({ type: 'Text', text: /Trestle · 0 active/ }))?.text).toBe(
+    'Trestle · 0 active agent(s)',
   )
   await ui.unmount()
 })
@@ -125,31 +125,26 @@ test('trestle pane surfaces accurate counts, parallel contracts/checks, metrics,
 
   const key = repoKey('/repo')
   setupEngine(on, {
+    '/repo/.git': '',
     [`/home/test/.trestle/${key}/state.json`]: stateJson,
     [`/home/test/.trestle/${key}/experiments.md`]: experimentsMd,
   })
 
-  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.session.start({ cwd: '/repo/nested/src', surface: 'terminal', isInteractive: true })
   const ui = await $.ui.mount(PANE)
 
-  // Accurate header: 0 active · 1 done · 1 failed (NOT "2 active")
-  expect((await ui.find({ type: 'Text', text: /Trestle — 0 active · 1 done · 1 failed/ }))?.text).toBe(
-    'Trestle — 0 active · 1 done · 1 failed',
+  expect((await ui.find({ type: 'Text', text: /Trestle · 0 active · 1 done · 1 failed/ }))?.text).toBe(
+    'Trestle · 0 active · 1 done · 1 failed',
   )
-  // Aggregate usage line + disabled CLIs rendered in panel
   expect((await ui.find({ type: 'Text', text: /Usage: 12\.0k in \/ 400 out \(8\.0k cached\) · \$0\.0042/ }))?.text).toContain(
     '$0.0042',
   )
   expect((await ui.find({ type: 'Text', text: /Disabled CLIs: opencode \(manual re-enable\)/ }))?.text).toContain(
     'opencode',
   )
-  // Frozen duration + agent/model + effort level for draft-codex (12s, not 120s)
   expect((await ui.find({ type: 'Text', text: /draft-codex \(codex\/gpt-6\.2-sol · effort:medium\).*12s/ }))?.text).toContain('effort:medium')
-  // Agent error surfaced
   expect((await ui.find({ type: 'Text', text: /error: Claude rate limit rejected/ }))?.text).toContain('rate limit')
-  // Queue shows blocked count
   expect((await ui.find({ type: 'Text', text: /1 blocked · 1 failed/ }))?.text).toContain('1 blocked')
-  // Contract & checks labeled by worktree with metric and failure excerpt
   expect((await ui.find({ type: 'Text', text: /Contract \[wt-codex\]: Implement auth/ }))?.text).toContain('iter 2/5')
   expect((await ui.find({ type: 'Text', text: /Checks \[wt-codex\]: 1\/2 check\(s\) failed/ }))?.text).toContain('bun-test')
   expect((await ui.find({ type: 'Text', text: /mortise-check \(42ms\) \[0 issues\]/ }))?.text).toContain('[0 issues]')
@@ -158,7 +153,6 @@ test('trestle pane surfaces accurate counts, parallel contracts/checks, metrics,
   expect((await ui.find({ type: 'Text', text: /\[DISCARDED\] c1-i1/ }))?.text).toContain('c1-i1')
   expect((await ui.find({ type: 'Text', text: /Bash: cargo test/ }))?.text).toBe('Bash: cargo test')
 
-  // Interactive selection button switches tail to draft-claude
   const inspectBtn = await ui.find({ type: 'Button' })
   expect(inspectBtn?.props.label).toBe('Inspect')
   await $.ui.press({ plugin: 'trestle', key: 'select-draft-claude', requestId: 'trestle', surface: 'terminal' })

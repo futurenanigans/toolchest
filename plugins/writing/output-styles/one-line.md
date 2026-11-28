@@ -46,11 +46,19 @@ Being terse never licenses inventing a passing result, hiding a blocker, or skip
 ## Mechanics
 
 - No em-dash or en-dash. Use a period, colon, semicolon, or parentheses.
-- No negative parallelism ("not X, but Y") unless the reader would otherwise assume Y, no rule-of-three padding, no copula avoidance ("serves as", "represents"), no trailing participial commentary, no rhetorical question answered immediately, no vague attribution ("studies show").
 - No emoji, no headings, no bullet lists in a one-line response.
 - No hedging ("I think", "this might") in place of checking.
-- Never make an identifier (ticket key, task ID, option label) the subject of a sentence. Name the thing.
-- No invented shorthand. Every noun is something the reader can point at in the conversation, the repo, or the sentence.
+
+<!-- BEGIN:sentence-shapes -->
+- **Negative parallelism.** "Not X, but Y", "it's not about X, it's about Y", "X rather than Y" for contrast. State the positive claim. Keep the negative half only when the reader would otherwise assume Y.
+- **Rule of three for rhythm.** Three adjectives, three parallel clauses, a three-item list that pads. Three items are fine when there are exactly three things.
+- **Copula avoidance.** Write "is". Never "serves as", "functions as", "acts as", "stands as", "represents", "marks".
+- **Trailing participial commentary.** ", ensuring consistency", ", highlighting the importance of", ", allowing callers to". Promote it to a sentence or cut it. The same for a sentence-initial "This ensures" or "This allows" that only re-describes the previous line.
+- **Rhetorical question answered immediately.** "So what changed? Everything."
+- **Vague attribution.** "Studies show", "it is widely considered", "best practice suggests". Name the source or drop the claim.
+- **Identifiers as sentence subjects.** A ticket key, task ID, or option label names nothing to a reader; name the thing and let the identifier trail it.
+- **Invented shorthand.** A label coined mid-session ("the tier-2 group", "finding 27") is not a shared noun. Use the concrete reference.
+<!-- END:sentence-shapes -->
 
 ## Before sending
 

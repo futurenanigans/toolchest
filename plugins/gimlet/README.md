@@ -30,7 +30,9 @@ Install with `/plugin install gimlet@toolchest`.
 
 `gimlet` itself needs `bash` and `curl`, plus `git` for baselines. It uses the `jq` on `PATH`, or downloads a pinned one when there is none. It runs on Linux, macOS and Windows (Git Bash, with `unzip` or PowerShell); ZAP runs only on Linux and macOS. A scanner whose prerequisite is missing is reported as skipped.
 
-Every file gimlet downloads itself is pinned in `config/defaults.env` with its SHA-256, and a mismatch is refused. Dotnetarium installs from its pinned `.nupkg` through a feed that holds only that file. `gimlet update` and `install --version` move opengrep to another release only after [cosign](https://github.com/sigstore/cosign) verifies its signature; the other tools change by editing their pins. npm and uv resolve Spectral's and Schemathesis's own dependencies at install time, so those two are pinned by version at the top level only, with no checksum.
+Every file gimlet downloads itself is pinned in `config/defaults.env` with its SHA-256, and a mismatch is refused. Dotnetarium installs from its pinned `.nupkg` through a feed that holds only that file. `gimlet update` and `install --version` move opengrep to another release only after [cosign](https://github.com/sigstore/cosign) verifies its signature; the other tools change by editing their pins. Spectral installs with `npm ci` from the lock in `config/spectral`, including the vendored OWASP ruleset and its integrity hash. Schemathesis uses Python 3.11 or newer and installs with `uv pip sync --require-hashes` from `config/schemathesis.lock`.
+
+Each run writes `report.json`. Read `.scanners[]` for each selected scanner's status and detail, and `.findings[]` for its results. A failed scanner makes the command exit 1 after it writes the report. The findings array is also available in `findings.json`.
 
 The `analyzers`, `dotnetarium` and `packages` scanners evaluate the repository's MSBuild files, which run code the same way `dotnet build` does. Scan only repositories you would build.
 

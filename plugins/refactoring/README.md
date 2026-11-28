@@ -14,7 +14,6 @@ Install it if you want Claude to answer questions like "what's broken here", "wh
 | `dead-code` | Unused code and dependencies. Inventories roots first (entry points, framework discovery, public API) and treats every candidate as alive until a named source shows nothing reaches it. Age is never evidence. | `.claude/state/dead-code-report.md` |
 | `pattern-discovery` | Library reimplementations, repeated structural shapes and unnamed conventions, each with a recommendation: adopt a library, extract shared code, document the convention, or leave it alone. | `.claude/state/patterns-report.md` |
 | `file-decomposition` | Splitting one large file into modules. Presents a plan first, then extracts step by step with characterization tests before each move. | none |
-| `pattern-awareness` | Background guidance while writing code: flags new code that adds a fourth instance of an existing shape, reimplements a library, or diverges from a convention, without forcing adoption. | none |
 
 The five audits trigger from requests that match their descriptions ("find bugs", "health check", "remove unused code") or by name, for example `/refactoring:bug-hunt`. Their arguments are:
 
@@ -26,8 +25,6 @@ The five audits trigger from requests that match their descriptions ("find bugs"
 The other three audits take the same shape as `bug-hunt`. `--fix` is the mutation flag in every audit: it acts on the findings, which for `architecture-scan` means moving files and for `dead-code` means deleting. `path` narrows the scope; without it the whole project is scanned. `--context <path>` feeds in output from an external tool (complexity metrics, clone detection, dependency graphs); any format works, and a finding seeded from it still has to hold up against the code. `architecture-scan` does not take `--context`.
 
 `file-decomposition` sets `disable-model-invocation`, so Claude never starts it on its own. Run it yourself with `/refactoring:file-decomposition "path/to/large-file.ext"`. It refuses `--auto`, because each extraction depends on the plan you approve and on the step before it. Files under 300 lines rarely benefit.
-
-`pattern-awareness` has no command form in practice. It loads when Claude is writing code that resembles existing code.
 
 ## How an audit runs
 
@@ -45,7 +42,7 @@ Add the mutation flag to act on all findings, or pass numbers such as `--fix [1,
 
 1. Pre-flight: the working tree must be clean outside `.claude/state/`. If it is dirty, Claude stops and asks you to commit or stash.
 2. Claude records the test baseline. Every test passing now must still pass afterwards.
-3. Each finding goes to its own subagent, which is told to read the plugin's two convention skills before writing code.
+3. Each finding goes to its own subagent, which is told to read `code-organization` before writing code.
 4. After each finding, Claude runs the build and tests. A pass is committed, staging only that finding's files and never `.claude/state/`. A failure stops the run so you can step in.
 5. Claude records each finding's status in the report (`pending`, `in_progress`, `done` with its commit, `skipped`, `halted`). The report stays under `.claude/state/` and is never committed. Running the mutation flag again while findings are unfinished resumes: Claude re-checks each remaining finding against the current code, drops those already gone, and continues. The final reply gives the count per status.
 
@@ -65,11 +62,10 @@ Both `task-implementer` and `implementation-reviewer` load the convention skills
 
 ## Convention skills
 
-The plugin ships two skills that apply while writing code in any language.
+The plugin ships one convention skill that applies while placing files or adding code in any language.
 
 | Skill | Covers |
 | --- | --- |
 | `code-organization` | Where a new file goes (following `.claude/state/structure-report.md` from `architecture-scan` when present, then `CLAUDE.md`, then the directory layout) and whether new code belongs in the file it is landing in. |
-| `inline-defect-prevention` | Defect shapes to catch while writing: data loss paths, unvalidated input at trust boundaries, swallowed errors, resource leaks, race-prone sequences and defensive cruft. Obvious fixes are made silently; design choices are flagged for you. |
 
-Claude loads each from its description before writing code or placing files, or you can run `/refactoring:code-organization` and `/refactoring:inline-defect-prevention` directly. The audit skills also name their paths in subagent prompts, since a subagent does not load them on its own.
+Claude loads it from its description before placing files or adding new code, or you can run `/refactoring:code-organization` directly. The audit skills also name its path in subagent prompts, since a subagent does not load it on its own.

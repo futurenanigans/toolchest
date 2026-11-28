@@ -154,7 +154,6 @@ rl.once('line', line => {
   )
 
   const supervisor = new AgentSupervisor()
-  // Intentionally omit targetBranch to verify default baseRef re-sync & landing works
   const batch1 = await queueRunNext(supervisor, repo, {
     maxParallel: 2,
     homeDir: home,
@@ -176,7 +175,6 @@ rl.once('line', line => {
   expect(await fs.readFile(path.join(repo, 'b.txt'), 'utf8')).toBe('B\n')
   expect(await fs.readFile(path.join(repo, 'c.txt'), 'utf8')).toBe('C\n')
 
-  // Test failed dependency -> blocked status, queueRetry, and queueClear
   await queueAdd(
     repo,
     {
@@ -213,7 +211,6 @@ rl.once('line', line => {
   const listed = await queueList(repo, home)
   expect(listed.find(i => i.id === 'blocked-child')?.status).toBe('blocked')
 
-  // Retry resets fail-parent to queued and unblocks status back to queued
   const retried = await queueRetry(repo, 'fail-parent', { homeDir: home, supervisor })
   expect(retried.status).toBe('queued')
   const afterRetry = await queueList(repo, home)
@@ -375,4 +372,32 @@ test('queueRunNext re-checks the first item against a target branch that moved d
   expect(batch.landed).toEqual([])
   expect(batch.failed[0]?.error).toContain('Post-merge recheck failed')
   expect(await fs.exists(path.join(repo, 'a.txt'))).toBe(false)
+})
+
+test('two server processes racing to dispatch the same item claim it once', async () => {
+  const { repo, home } = await makeTempRepo()
+  await queueAdd(repo, {
+    id: 'race', title: 'Race', goal: 'Race', acceptanceCriteria: [],
+    includeMortise: false, checks: [{ name: 'base-red', command: ['bun', '-e', 'process.exit(1)'] }],
+  }, home)
+  const code = `
+    import { queueRunNext } from ${JSON.stringify(path.resolve(import.meta.dir, '../queue.ts'))}
+    import { AgentSupervisor } from ${JSON.stringify(path.resolve(import.meta.dir, '../supervisor.ts'))}
+    const result = await queueRunNext(new AgentSupervisor(), process.argv[1], { homeDir: process.argv[2] })
+    console.log(result.dispatched)
+  `
+  const run = () => execCommand('bun', ['-e', code, repo, home])
+  const results = await Promise.all([run(), run()])
+  expect(results.map(r => r.stderr)).toEqual(['', ''])
+  expect(results.map(r => r.stdout.trim()).sort()).toEqual(['0', '1'])
+})
+
+test('concurrent edits to distinct fields of one queue item both survive', async () => {
+  const { repo, home } = await makeTempRepo()
+  await queueAdd(repo, { id: 'shared', title: 'Shared', goal: 'Fixture', acceptanceCriteria: [] }, home)
+  await Promise.all([
+    queueUpdate(repo, 'shared', { priority: 7 }, home),
+    queueUpdate(repo, 'shared', { maxIterations: 3 }, home),
+  ])
+  expect(await queueList(repo, home)).toMatchObject([{ id: 'shared', priority: 7, maxIterations: 3 }])
 })

@@ -43,8 +43,9 @@ unpack_zip() {
   if have unzip; then
     unzip -q -o "$zip" -d "$dest"
   elif have powershell.exe; then
-    powershell.exe -NoProfile -NonInteractive -Command \
-      "Expand-Archive -Force -LiteralPath '$(cygpath -w "$zip")' -DestinationPath '$(cygpath -w "$dest")'"
+    GIMLET_ZIP_PATH="$(cygpath -w "$zip")" GIMLET_ZIP_DEST="$(cygpath -w "$dest")" \
+      powershell.exe -NoProfile -NonInteractive -Command \
+        'Expand-Archive -Force -LiteralPath $env:GIMLET_ZIP_PATH -DestinationPath $env:GIMLET_ZIP_DEST'
   else
     die "cannot unpack $zip: neither unzip nor powershell.exe is available"
   fi

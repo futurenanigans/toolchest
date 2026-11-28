@@ -128,9 +128,9 @@ export function createClaudeAdapter(): AdapterDriver {
           }
         }
       } else if (type === 'rate_limit_event') {
-        const info = obj.rate_limit_info as { status?: string } | undefined
+        const info = obj.rate_limit_info as { status?: string; resetsAt?: number } | undefined
         if (info?.status === 'rejected') {
-          events.push({ kind: 'turn_failed', error: 'Claude rate limit rejected', usageLimited: true })
+          events.push({ kind: 'turn_failed', error: 'Claude rate limit rejected', usageLimited: true, resetAt: typeof info?.resetsAt === 'number' ? info.resetsAt * 1000 : undefined })
         }
       } else if (type === 'result') {
         const usageObj = obj.usage as {

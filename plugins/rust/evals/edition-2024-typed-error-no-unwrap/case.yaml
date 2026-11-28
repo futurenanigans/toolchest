@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: edition-2024-typed-error-no-unwrap
+description: On a Rust 2024 crate, implements a parser with a typed error enum and no unwrap/expect calls.
+tags: [active]
+expected_skill: rust:rust
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

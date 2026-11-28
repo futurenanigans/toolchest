@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: dead-code-framework-root-alive
+description: Flags an unreferenced internal helper as dead while keeping a framework-discovered route handler alive.
+tags: [workflow, user-invoked]
+expected_command: /refactoring:dead-code
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  allowed_tools: [Read, Glob, Grep, Skill]

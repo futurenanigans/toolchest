@@ -1,4 +1,7 @@
-DEFERRED.md
+/ROADMAP.md
 /COMPARABLE_REPOS.md
 .trestle/
+.claude/
+__pycache__/
+*.pyc
 plugins/*/evals/results/

@@ -1,0 +1,1 @@
+In src/lib.rs, implement `pub fn parse_port(raw: &str) -> Result<u16, PortError>` that parses a TCP port in 1..=65535 (rejecting empty input, non-numeric input, and 0) and define `PortError`. Do not edit Cargo.toml.

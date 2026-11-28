@@ -1,9 +1,11 @@
+import { spawn } from 'node:child_process'
+import { once } from 'node:events'
 import { afterEach, expect, test } from 'bun:test'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
-import { execCommand, linkOrCopy, resolveCommand } from '../platform'
+import { execCommand, linkOrCopy, resolveCommand, processStartToken, killProcessTree } from '../platform'
 import { appendExperiment, readDiskState, readExperiments } from '../state'
 import { worktreeClean, worktreeCreate, worktreeDiff, worktreeLand, worktreeList } from '../worktrees'
 
@@ -63,7 +65,6 @@ test('worktreeCreate, worktreeList, worktreeDiff (incl. uncommitted edits), work
   const listed = await worktreeList(repo, home)
   expect(listed.some(w => w.id === 'draft-1' && w.tracked && w.existsOnDisk)).toBe(true)
 
-  // Uncommitted edit to tracked file README.md + new file feature.ts
   await fs.writeFile(path.join(wt.path, 'README.md'), 'hello updated\n', 'utf8')
   await fs.writeFile(path.join(wt.path, 'feature.ts'), 'export const x = 1\n', 'utf8')
 
@@ -72,7 +73,6 @@ test('worktreeCreate, worktreeList, worktreeDiff (incl. uncommitted edits), work
   expect(diff.changedFiles).toContain('feature.ts')
   expect(diff.changedFiles).not.toContain('.env')
 
-  // Land auto-commits uncommitted changes WITHOUT committing .env even though .env is not in .gitignore
   const landed = await worktreeLand(repo, 'draft-1', { homeDir: home })
   expect(landed.targetBranch).toBe('main')
   expect(await fs.readFile(path.join(repo, 'feature.ts'), 'utf8')).toBe('export const x = 1\n')
@@ -88,19 +88,16 @@ test('worktreeLand aborts merge cleanly on conflict so main repo is not left dir
   const { repo, home } = await makeTempRepo()
   const wt = await worktreeCreate(repo, 'conflict-wt', { homeDir: home })
 
-  // Divergent edit in worktree
   await fs.writeFile(path.join(wt.path, 'README.md'), 'worktree version\n', 'utf8')
   await execCommand('git', ['add', 'README.md'], { cwd: wt.path })
   await execCommand('git', ['commit', '-m', 'wt edit'], { cwd: wt.path })
 
-  // Divergent edit on main
   await fs.writeFile(path.join(repo, 'README.md'), 'main version\n', 'utf8')
   await execCommand('git', ['add', 'README.md'], { cwd: repo })
   await execCommand('git', ['commit', '-m', 'main edit'], { cwd: repo })
 
   await expect(worktreeLand(repo, 'conflict-wt', { homeDir: home })).rejects.toThrow()
 
-  // Main repo must not be stuck in MERGING state
   const status = await execCommand('git', ['status', '--porcelain'], { cwd: repo })
   expect(status.stdout.trim()).toBe('')
 })
@@ -146,4 +143,83 @@ test('worktreeLand returns the main checkout to the branch it was on', async () 
   expect(head.stdout.trim()).toBe('feature')
   const onMain = await execCommand('git', ['show', 'main:feature.ts'], { cwd: repo })
   expect(onMain.exitCode).toBe(0)
+})
+
+test('long ids with a common prefix land concurrently on separate targets', async () => {
+  const { repo, home } = await makeTempRepo()
+  const prefix = 'feature-'.repeat(5)
+  const targets = ['release-a', 'release-b']
+  for (const branch of targets) await execCommand('git', ['branch', branch], { cwd: repo })
+  const trees = await Promise.all(targets.map(t => worktreeCreate(repo, prefix + t, { homeDir: home })))
+  expect(trees[0]!.id).not.toBe(trees[1]!.id)
+  await Promise.all(trees.map((wt, i) => fs.writeFile(path.join(wt.path, 'target.txt'), targets[i]!)))
+  await Promise.all(trees.map((wt, i) => worktreeLand(repo, wt.id, { targetBranch: targets[i], homeDir: home })))
+  for (const target of targets) {
+    expect((await execCommand('git', ['show', target + ':target.txt'], { cwd: repo })).stdout).toBe(target)
+  }
+  expect((await execCommand('git', ['branch', '--show-current'], { cwd: repo })).stdout.trim()).toBe('main')
+})
+
+test('mismatched process birth tokens leave a reused PID alone', async () => {
+  const child = Bun.spawn([process.execPath, '-e', 'setInterval(() => {}, 1000)'])
+  try {
+    const start = await processStartToken(child.pid)
+    expect(start).toBeTruthy()
+    await killProcessTree(child.pid, 'different birth token')
+    expect(await processStartToken(child.pid)).toBe(start)
+  } finally {
+    child.kill()
+    await child.exited
+  }
+})
+
+test('concurrent worktree creation appends one ignore rule and preserves unrelated landing guards', async () => {
+  const { repo, home } = await makeTempRepo()
+  const ignore = path.join(repo, '.gitignore')
+  await fs.writeFile(ignore, '.env\r\ncache/')
+  await execCommand('git', ['add', '.gitignore'], { cwd: repo })
+  await execCommand('git', ['commit', '-m', 'set ignore rules'], { cwd: repo })
+  const [wt] = await Promise.all(['one', 'two'].map(id => worktreeCreate(repo, id, { homeDir: home })))
+  expect(await fs.readFile(ignore, 'utf8')).toBe('.env\r\ncache/\r\n/.trestle-wt/\r\n')
+  expect((await execCommand('git', ['check-ignore', '-q', '.trestle-wt/one'], { cwd: repo })).exitCode).toBe(0)
+  await fs.writeFile(path.join(wt!.path, 'change.txt'), 'change')
+  await fs.appendFile(ignore, 'other/\n')
+  await expect(worktreeLand(repo, 'one', { homeDir: home })).rejects.toThrow('uncommitted changes')
+  await fs.writeFile(ignore, '.env\r\ncache/\r\n/.trestle-wt/\r\n')
+  await worktreeLand(repo, 'one', { homeDir: home })
+  expect(await fs.readFile(path.join(repo, 'change.txt'), 'utf8')).toBe('change')
+})
+
+test('worktree creation creates a missing .gitignore and honors existing Git exclusions', async () => {
+  const { repo, home } = await makeTempRepo()
+  const file = path.join(repo, '.gitignore')
+  await fs.unlink(file)
+  const exclude = path.join(repo, '.git/info/exclude')
+  await fs.appendFile(exclude, '\n/.trestle-*/\n')
+  await worktreeCreate(repo, 'excluded', { homeDir: home })
+  expect(await fs.exists(file)).toBe(false)
+  await fs.writeFile(exclude, '')
+  await worktreeCreate(repo, 'created', { homeDir: home })
+  expect(await fs.readFile(file, 'utf8')).toBe('/.trestle-wt/\n')
+})
+
+test('killProcessTree terminates an owned child and the descendant holding its output pipe', async () => {
+  const script = `
+    require('node:child_process').spawn(process.execPath,
+      ['-e', 'console.log("ready"); setTimeout(() => process.exit(1), 10_000)'], { stdio: 'inherit' })
+    setTimeout(() => process.exit(1), 10_000)
+  `
+  const child = spawn(process.execPath, ['-e', script], {
+    detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'ignore'],
+  })
+  const closed = once(child, 'close')
+  try {
+    await once(child.stdout, 'data')
+    const token = await processStartToken(child.pid)
+    expect(token).toBeTruthy()
+    await killProcessTree(child.pid, token)
+    await closed
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill()
+  }
 })

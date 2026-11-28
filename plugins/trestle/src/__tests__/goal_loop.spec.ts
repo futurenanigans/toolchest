@@ -143,7 +143,6 @@ rl.once('line', line => {
   const updated = await contractRead(repo, 'goal-42', home)
   expect(updated.acceptanceCriteria[0]?.passed).toBe(true)
 
-  // Repeated run on the same worktree must allocate fresh IDs without colliding
   const res2 = await runGoalLoop(supervisor, {
     repoRoot: repo,
     contractId: 'goal-42',
@@ -251,7 +250,6 @@ test('AgentSupervisor handles missing binary cleanly and reconciles dead PIDs on
   const { repo, home } = await makeTempRepo()
   const supervisor = new AgentSupervisor()
 
-  // Spawn non-existent binary: should transition to failed without crashing process
   await supervisor.spawn({
     repoRoot: repo,
     id: 'missing-bin',
@@ -268,7 +266,6 @@ test('AgentSupervisor handles missing binary cleanly and reconciles dead PIDs on
   expect(waited?.status).toBe('failed')
   expect(waited?.finishedAt).toBeDefined()
 
-  // Seed a dead PID in disk state and reconcile
   await updateDiskState(
     repo,
     cur => ({
@@ -403,6 +400,41 @@ console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false
   expect(waited?.status).toBe('failed')
   expect(waited?.failureKind).toBe('login_failed')
 
+  await supervisor.stop('two-frames')
   await supervisor.stopByWorktree('wt-frames')
   expect(supervisor.list()[0]?.status).toBe('failed')
+})
+
+test('standalone prompt arrives intact at the child, including through a Windows batch shim', async () => {
+  const { repo, home } = await makeTempRepo()
+  const reader = path.join(repo, 'read-prompt.ts')
+  await fs.writeFile(reader, `
+    await Bun.write('received.txt', await Bun.stdin.text())
+    console.log(JSON.stringify({ type: 'step_finish', part: { reason: 'stop' } }))
+  `)
+  const shim = path.join(repo, 'fixture.cmd')
+  await fs.writeFile(shim, `@echo off\r\n"${process.execPath}" "%~dp0read-prompt.ts" %*\r\n`)
+  const supervisor = new AgentSupervisor()
+  const prompt = 'Literal "& followed by a newline\n' + 'x'.repeat(9000)
+  await supervisor.spawn({ repoRoot: repo, homeDir: home, id: 'stdin', stage: 'test',
+    cli: 'opencode', worktreeId: 'stdin', worktreePath: repo, branch: 'main', prompt,
+    commandOverride: process.platform === 'win32' ? shim : [process.execPath, reader] })
+  const [agent] = await supervisor.wait(['stdin'])
+  expect(agent?.status).toBe('done')
+  expect(await fs.readFile(path.join(repo, 'received.txt'), 'utf8')).toBe(prompt)
+  await supervisor.flush()
+  const { agents } = await readDiskState(repo, home)
+  expect(agents.stdin?.status).toBe('done')
+})
+
+test('state updates expire old terminal agents while preserving active agents', async () => {
+  const { repo, home } = await makeTempRepo()
+  const startedAt = Date.now() - 3 * 24 * 3600_000
+  const base = { id: 'live', cli: 'claude' as const, stage: 'test', worktreeId: 'wt', worktreePath: repo,
+    branch: 'main', startedAt, lastActivityAt: startedAt, tail: [] }
+  await updateDiskState(repo, cur => ({ ...cur, agents: {
+    live: { ...base, status: 'running' },
+    old: { ...base, id: 'old', status: 'done', finishedAt: startedAt },
+  } }), home)
+  expect(Object.keys((await readDiskState(repo, home)).agents)).toEqual(['live'])
 })

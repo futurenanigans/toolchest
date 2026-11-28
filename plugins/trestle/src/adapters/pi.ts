@@ -21,7 +21,7 @@ export function createPiAdapter(): AdapterDriver {
       if (opts.effort) args.push('--thinking', opts.effort)
       if (opts.resumeSessionId) args.push('--session', opts.resumeSessionId)
       if (opts.mode === 'read-only') args.push('--tools', 'read,grep,find,ls')
-      args.push(opts.prompt)
+
 
       return {
         cli: 'pi',
@@ -33,6 +33,7 @@ export function createPiAdapter(): AdapterDriver {
           PI_CODING_AGENT_SESSION_DIR: sessionDir,
           PI_SKIP_VERSION_CHECK: '1',
         },
+        initialStdin: opts.prompt,
         closeStdinAfterInitial: true,
       }
     },
@@ -95,13 +96,9 @@ export function createPiAdapter(): AdapterDriver {
           if (msg.stopReason === 'aborted' || msg.stopReason === 'error') {
             terminated = true
             const errMsg = msg.errorMessage || `pi turn ${msg.stopReason}`
-            const lower = errMsg.toLowerCase()
             events.push({
               kind: 'turn_failed',
               error: errMsg,
-              usageLimited: lower.includes('usage limit') || lower.includes('quota') || lower.includes('rate limit'),
-              loginFailed: lower.includes('api key') || lower.includes('unauthorized'),
-              transient: lower.includes('overloaded') || lower.includes('timeout'),
             })
           }
         }
@@ -113,12 +110,9 @@ export function createPiAdapter(): AdapterDriver {
       } else if (type === 'error') {
         terminated = true
         const msg = typeof obj.message === 'string' ? obj.message : 'pi error'
-        const lower = msg.toLowerCase()
         events.push({
           kind: 'turn_failed',
           error: msg,
-          usageLimited: lower.includes('usage limit') || lower.includes('quota') || lower.includes('rate limit'),
-          loginFailed: lower.includes('api key') || lower.includes('unauthorized'),
         })
       }
 

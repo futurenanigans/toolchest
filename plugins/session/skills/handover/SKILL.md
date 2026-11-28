@@ -54,7 +54,7 @@ For every item ask: does the fresh agent need this to reach done-when? If no, dr
 **Priority order, protect the top first:**
 
 1. **Conversation-only facts.** Anything the fresh agent cannot rediscover from the working tree: constraints the user stated ("leave the migration alone", "skip perf for now"), rationale behind decisions, external inputs (ticket text, an error reproduced once, a colleague's requirement), preferences expressed this session. These are lost forever on `/clear`. Keep them even when they seem minor.
-2. **Failed approaches** the fresh agent would plausibly retry, with why they failed.
+2. **Failed approaches** the fresh agent would plausibly retry, with why they failed. If the session hook recorded recent failed shell commands, use them as verified leads and keep only those relevant to the stated goal.
 3. **Decisions that lock in a choice** the fresh agent must respect.
 4. **Files to read or modify**, with `file:line` anchors only where confirmed in Step 3.
 5. **The exact first action.**

@@ -59,7 +59,53 @@ export function compileRules({ allow = [], stop = [], rules = RULES } = {}) {
   if (stopWords.length > 0) {
     compiled.push({ id: "stoplist", severity: "warning", scope: "any", message: "Word on the project stoplist.", regex: new RegExp(wordsPattern(stopWords), "gim") });
   }
+  if (!allowed.has("sentence-length-variance")) {
+    compiled.push({ id: "sentence-length-variance", severity: "info", scope: "any", structural: true, message: "Flat sentence-length variance across 5+ consecutive sentences: vary sentence rhythm." });
+  }
   return compiled;
+}
+
+function checkSentenceLengthVariance(lines, file, rule) {
+  const hits = [];
+  let paraStart = -1;
+  let paraText = [];
+  const flush = () => {
+    if (paraStart < 0 || paraText.length === 0) return;
+    const joined = paraText.join(" ").trim();
+    const sentences = joined.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter((s) => s.length > 0);
+    if (sentences.length >= 5) {
+      const counts = sentences.map((s) => (s.match(/[A-Za-z0-9']+/g) ?? []).length).filter((n) => n > 0);
+      if (counts.length >= 5) {
+        const mean = counts.reduce((a, b) => a + b, 0) / counts.length;
+        const variance = counts.reduce((a, n) => a + (n - mean) ** 2, 0) / counts.length;
+        const stddev = Math.sqrt(variance);
+        if (mean >= 7 && stddev < 2.0) {
+          hits.push({
+            file,
+            line: paraStart + 1,
+            col: 1,
+            rule: rule.id,
+            severity: rule.severity,
+            message: rule.message,
+            match: `${counts.length} sentences, mean ${mean.toFixed(1)} words, stddev ${stddev.toFixed(2)}`,
+          });
+        }
+      }
+    }
+    paraStart = -1;
+    paraText = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed || /^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|\||>|```)/.test(trimmed)) {
+      flush();
+    } else {
+      if (paraStart < 0) paraStart = i;
+      paraText.push(trimmed);
+    }
+  }
+  flush();
+  return hits;
 }
 
 export function lintText(text, { scope, rules, file = "<stdin>", raw = false }) {
@@ -69,6 +115,10 @@ export function lintText(text, { scope, rules, file = "<stdin>", raw = false }) 
   for (const rule of rules) {
     if (rule.scope !== "any" && rule.scope !== scope) continue;
     if (rule.skipFiles && new RegExp(rule.skipFiles).test(baseName(file))) continue;
+    if (rule.structural && rule.id === "sentence-length-variance") {
+      hits.push(...checkSentenceLengthVariance(lines, file, rule));
+      continue;
+    }
     lines.forEach((line, i) => {
       rule.regex.lastIndex = 0;
       for (const m of line.matchAll(rule.regex)) {

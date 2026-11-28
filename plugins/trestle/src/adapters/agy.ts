@@ -27,7 +27,6 @@ export function createAgyAdapter(): AdapterDriver {
         args.push('--dangerously-skip-permissions')
       }
 
-      // Preserve user HOME/USERPROFILE so git, cargo, bun, dotnet, and agy OAuth remain intact.
       return {
         cli: 'agy',
         command: opts.commandOverride ?? 'agy',
@@ -118,13 +117,9 @@ export function createAgyAdapter(): AdapterDriver {
           })
         } else if (res?.status !== 'SUCCESS') {
           const errMsg = res?.error || res?.status || 'agy turn failed'
-          const lower = errMsg.toLowerCase()
           events.push({
             kind: 'turn_failed',
             error: errMsg,
-            usageLimited: lower.includes('quota') || lower.includes('resource_exhausted'),
-            loginFailed: lower.includes('authentication'),
-            transient: lower.includes('unavailable') || lower.includes('overloaded'),
           })
         } else {
           pendingTurns = Math.max(0, pendingTurns - 1)

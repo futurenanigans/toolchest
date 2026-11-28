@@ -1,6 +1,6 @@
 // The pattern advisories: credentials, skipped tests and test deletion, each firing only when an edit holds more
 // matches than the text it replaces, and a verification command whose exit code a pipe hides.
-import { type Check, type CheckInput, type LabelledPattern, countMatches, isBlank, isEditOrWrite, isShell, looksLikeTestFile, newlyAddedLabels } from './text'
+import { type Check, type CheckInput, type LabelledPattern, countMatches, isBlank, isEditOrWrite, isRead, isShell, looksLikeTestFile, newlyAddedLabels } from './text'
 import { maskComments, maskQuoted, pipelines } from './shell'
 
 const PLACEHOLDER = String.raw`[{$<*%]|your|change|placeholder|example|x{3}`
@@ -173,5 +173,74 @@ export const testDeletion: Check = {
     const [before, after] = [declaredTests(oldText), declaredTests(newText)]
     if (after >= before) return null
     return `This change removes test code: the text it replaces declares ${before} tests and the new text declares ${after}. ${REWARD_HACKING}`
+  },
+}
+
+const SAFE_TEMPLATE_SUFFIX = /(?:\.example|\.sample|\.template|\.dist|\.schema|\.d\.ts)$/i
+const CREDENTIAL_FILE_PATH = /(?:^|\/)(?:\.env(?:\.[^/\s'"]+)?|id_(?:rsa|ed25519|ecdsa|dsa)|credentials\.json|\.npmrc|\.pypirc|\.netrc)$|\.(?:pem|key|p12|pfx|jks|keystore)$/i
+const SHELL_READ_COMMAND = new RegExp(
+  COMMAND_PATH + String.raw`(?:cat|head|tail|less|more|sed|awk|grep|rg|bat|base64|xxd|strings|Get-Content|gc|type)(?=\s|$)`,
+  'i',
+)
+
+function isCredentialPath(rawPath: string | undefined): boolean {
+  if (isBlank(rawPath)) return false
+  const cleaned = rawPath.trim().replace(/^['"<]+|['">;,)]+$/g, '').replaceAll('\\', '/')
+  if (cleaned === '' || cleaned.startsWith('-') || SAFE_TEMPLATE_SUFFIX.test(cleaned)) return false
+  return CREDENTIAL_FILE_PATH.test(cleaned)
+}
+
+function shellCredentialTargets(command: string): string[] {
+  const hits = new Set<string>()
+  for (const { masked, raw } of pipelines(command).flat()) {
+    const match = SHELL_READ_COMMAND.exec(masked)
+    const tokens = raw.split(/\s+/)
+    if (match !== null) {
+      for (const token of raw.slice(match[0].length).split(/\s+/)) {
+        if (isCredentialPath(token)) hits.add(token.replace(/^['"<]+|['">;,)]+$/g, ''))
+      }
+    }
+    for (let i = 0; i < tokens.length; i++) {
+      if (tokens[i] === '<' && isCredentialPath(tokens[i + 1])) {
+        hits.add(tokens[i + 1].replace(/^['"]+|['">;]+$/g, ''))
+      } else if (tokens[i].startsWith('<') && tokens[i].length > 1 && isCredentialPath(tokens[i].slice(1))) {
+        hits.add(tokens[i].slice(1).replace(/^['"]+|['">;]+$/g, ''))
+      }
+    }
+  }
+  return [...hits]
+}
+
+export const credentialRead: Check = {
+  name: 'credential-read',
+  deny: true,
+  advise: ({ tool, filePath, command }) => {
+    if (isRead(tool)) {
+      if (!isCredentialPath(filePath)) return null
+      return `Blocked reading credential file (${filePath}) into model context. Inspect only variable names without values, check a .env.example template, or ask the user to supply non-secret configuration.`
+    }
+    if (!isShell(tool) || isBlank(command)) return null
+    const targets = shellCredentialTargets(command)
+    if (targets.length === 0) return null
+    return `Blocked reading credential file(s) (${targets.join(', ')}) into model context. Inspect only variable names without values, check a .env.example template, or ask the user.`
+  },
+}
+
+const GIT_PUSH_FORCE = new RegExp(COMMAND_PATH + String.raw`git\s+(?:-\S+\s+)*push\b.*(?:^|\s)(?:--force(?!-with-lease)|-f)(?=\s|$)`)
+const GIT_RESET_HARD = new RegExp(COMMAND_PATH + String.raw`git\s+(?:-\S+\s+)*reset\b.*(?:^|\s)--hard(?=\s|$)`)
+const GIT_ADD_ALL = new RegExp(COMMAND_PATH + String.raw`git\s+(?:-\S+\s+)*add\b.*(?:^|\s)(?:-A|--all)(?=\s|$)`)
+
+export const destructiveGit: Check = {
+  name: 'destructive-git',
+  advise: ({ tool, command }) => {
+    if (!isShell(tool) || isBlank(command)) return null
+    const warnings: string[] = []
+    for (const { masked } of pipelines(command).flat()) {
+      if (GIT_PUSH_FORCE.test(masked)) warnings.push('git push --force (overwrites remote history; prefer --force-with-lease after confirming)')
+      if (GIT_RESET_HARD.test(masked)) warnings.push('git reset --hard (discards uncommitted work permanently)')
+      if (GIT_ADD_ALL.test(masked)) warnings.push('git add -A (stages every untracked file, including accidental secrets or scratch files; stage explicit paths instead)')
+    }
+    if (warnings.length === 0) return null
+    return `Destructive or overly broad git command detected: ${[...new Set(warnings)].join('; ')}. Confirm the exact target and scope before proceeding.`
   },
 }

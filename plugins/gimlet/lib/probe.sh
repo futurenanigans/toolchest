@@ -26,18 +26,28 @@ fetch_openapi() {
   die "no OpenAPI document at ${OPENAPI_CANDIDATES[*]} under $TARGET; pass --openapi URL or FILE"
 }
 
-ensure_spectral() (
-  local dest="$TOOLS_DIR/spectral/$GIMLET_SPECTRAL_VERSION-$GIMLET_SPECTRAL_OWASP_VERSION"
-  [[ -x "$dest/node_modules/.bin/spectral" ]] && exit 0
-  need npm
-  rm -rf "$dest"; mkdir -p "$dest"
-  npm install --prefix "$dest" --no-audit --no-fund --ignore-scripts --save-exact \
-    "@stoplight/spectral-cli@$GIMLET_SPECTRAL_VERSION" \
-    "@stoplight/spectral-owasp-ruleset@$GIMLET_SPECTRAL_OWASP_VERSION" >&2 \
-    || { rm -rf "$dest"; die "npm install of spectral failed"; }
-)
+spectral_dir() {
+  local lock rules
+  lock="$(sha256_of "$GIMLET_ROOT/config/spectral/package-lock.json")"
+  rules="$(sha256_of "$GIMLET_ROOT/config/spectral-ruleset.yaml")"
+  echo "$TOOLS_DIR/spectral/${lock:0:16}-${rules:0:16}"
+}
 
-spectral_dir() { echo "$TOOLS_DIR/spectral/$GIMLET_SPECTRAL_VERSION-$GIMLET_SPECTRAL_OWASP_VERSION"; }
+ensure_spectral() (
+  local dest config="$GIMLET_ROOT/config/spectral" stage
+  dest="$(spectral_dir)"
+  [[ -x "$dest/node_modules/.bin/spectral" ]] && exit 0
+  mkdir -p "$TOOLS_DIR/spectral"
+  stage="$(mktemp -d "$TOOLS_DIR/spectral/.install.XXXXXX")"
+  trap 'rm -rf "$stage"' EXIT
+  cp "$config"/{package.json,package-lock.json,*.tgz} "$stage/"
+  npm ci --prefix "$stage" --no-audit --no-fund --ignore-scripts >&2
+  cp "$GIMLET_ROOT/config/spectral-ruleset.yaml" "$stage/ruleset.yaml"
+  # A competing installer may have already published the same verified lock.
+  if ! node -e 'require("fs").renameSync(process.argv[1],process.argv[2])' "$stage" "$dest" 2>/dev/null; then
+    [[ -x "$dest/node_modules/.bin/spectral" ]] || exit 1
+  fi
+)
 
 probe_spectral() {
   if ! have npm; then record spectral skipped "npm is not installed"; return; fi
@@ -49,8 +59,6 @@ probe_spectral() {
   fi
   local dir out="$RESULTS/spectral.raw.json" rc=0
   dir="$(spectral_dir)"
-  # The ruleset names the OWASP package, which Spectral resolves from the ruleset's own directory.
-  cp "$GIMLET_ROOT/config/spectral-ruleset.yaml" "$dir/ruleset.yaml"
   "$dir/node_modules/.bin/spectral" lint "$RESULTS/openapi.json" --ruleset "$dir/ruleset.yaml" \
     -f json -o "$out" --quiet > "$RESULTS/spectral.log" 2>&1 || rc=$?
   if [[ $rc -gt 1 || ! -f "$out" ]]; then
@@ -69,6 +77,21 @@ probe_spectral() {
   record spectral ok
 }
 
+run_schemathesis() (
+  local env_dir python cli
+  env_dir="$(mktemp -d)"
+  trap 'rm -rf "$env_dir"' EXIT
+  uv venv --python '>=3.11' "$env_dir" || exit 2
+  python="$env_dir/bin/python"
+  cli="$env_dir/bin/schemathesis"
+  if is_windows; then
+    python="$env_dir/Scripts/python.exe"
+    cli="$env_dir/Scripts/schemathesis.exe"
+  fi
+  uv pip sync --python "$python" --require-hashes "$GIMLET_ROOT/config/schemathesis.lock" || exit 2
+  "$cli" "$@"
+)
+
 probe_schemathesis() {
   if ! have uv; then record schemathesis skipped "uv is not installed (https://docs.astral.sh/uv/)"; return; fi
   local rc=0 report_dir="$RESULTS/schemathesis-report" args=()
@@ -77,7 +100,7 @@ probe_schemathesis() {
         --report json --report-dir "$report_dir")
   [[ -n "$AUTH_HEADER" ]] && args+=(-H "$AUTH_HEADER")
   # Schemathesis writes .schemathesis/ and .hypothesis/ caches into its working directory.
-  (cd "$RESULTS" && uv tool run --from "schemathesis==$GIMLET_SCHEMATHESIS_VERSION" schemathesis "${args[@]}") \
+  (cd "$RESULTS" && run_schemathesis "${args[@]}") \
     > "$RESULTS/schemathesis.log" 2>&1 || rc=$?
   local report="" f
   for f in "$report_dir"/*.json; do
@@ -204,12 +227,10 @@ cmd_probe() {
   echo "gimlet: probes ${probes[*]}; target $TARGET; openapi ${OPENAPI}"
   for t in "${probes[@]}"; do "probe_$t"; done
 
-  local files=()
-  for t in "${ALL_PROBES[@]}"; do [[ -f "$RESULTS/$t.json" ]] && files+=("$RESULTS/$t.json"); done
-  if [[ ${#files[@]} -gt 0 ]]; then jq -s 'add' "${files[@]}" > "$RESULTS/findings.json"; else echo '[]' > "$RESULTS/findings.json"; fi
+  write_report "${ALL_PROBES[@]}"
   print_summary
   echo
-  echo "results: $RESULTS/findings.json"
+  echo "results: $RESULTS/report.json"
   if cut -f2 "$RESULTS/status.tsv" | grep -qx failed; then
     die "one or more probes failed; their findings are missing from the results"
   fi

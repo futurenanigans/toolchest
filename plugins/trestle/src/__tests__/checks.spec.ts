@@ -56,8 +56,8 @@ test('runChecks fails closed when 0 steps are detected unless allowEmpty is true
 
 test('quoteWindowsArg escapes quotes/metacharacters and execCommand bounds captured output', async () => {
   expect(quoteWindowsArg('simple')).toBe('simple')
-  expect(quoteWindowsArg('hello world & %PATH%')).toBe('"hello world & %%PATH%%"')
-  expect(quoteWindowsArg('say "hi"')).toBe('"say \\"hi\\""')
+  expect(quoteWindowsArg('hello world')).toBe('"hello world"')
+  expect(() => quoteWindowsArg('say "&')).toThrow('Unsafe argument')
 
   const res = await execCommand('bun', ['-e', 'process.stdout.write("A".repeat(4000) + "END")'], {
     maxCaptureBytes: 512,
@@ -102,4 +102,44 @@ test.skipIf(process.platform === 'win32')('execCommand timeout kills the grandch
   expect(res.exitCode).toBe(124)
   expect(res.stdout).toBe('')
   expect(Date.now() - started).toBeLessThan(3_000)
+})
+
+test('SARIF gates use findings even on exit zero and reject invalid output', async () => {
+  const worktreePath = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-sarif-'))
+  tempDirs.push(worktreePath)
+  const gate = (output: string) => runChecks({ worktreePath, includeMortise: false, commands: [{
+    name: 'analyzer', command: ['bun', '-e', 'console.log(' + JSON.stringify(output) + ')'], reportFormat: 'sarif',
+  }] })
+  const report = (results: unknown[]) => JSON.stringify({ version: '2.1.0', runs: [{ results }] })
+  expect((await gate(report([]))).passed).toBe(true)
+  expect((await gate(report([{ ruleId: 'example', message: { text: 'fixture finding' } }]))).passed).toBe(false)
+  expect((await gate('{}')).passed).toBe(false)
+})
+
+test('JUnit files identify failed cases by XML structure and decoded attributes', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-junit-'))
+  tempDirs.push(dir)
+  const xml = `<j:testsuites xmlns:j="urn:junit">
+    <j:testsuite><j:testsuite>
+      <j:testcase name='passed'><j:system-out><![CDATA[<failure/>]]></j:system-out></j:testcase>
+      <j:testcase name='skipped'><j:skipped/><!-- <error/> --></j:testcase>
+      <j:testcase name='a &amp; b' classname='suite'><j:failure/><j:error/></j:testcase>
+      <j:testcase name='1 > 0'><j:error>fixture</j:error></j:testcase>
+    </j:testsuite></j:testsuite>
+  </j:testsuites>`
+  const report = await runChecks({ worktreePath: dir, commands: [{
+    name: 'tests', command: ['bun', '-e', 'await Bun.write("result.xml", process.argv[1]); process.exit(1)', xml],
+    reportFormat: 'junit-xml', reportPath: 'result.xml',
+  }] })
+  expect(report.results[0]).toMatchObject({ passed: false, exitCode: 1, failedIds: ['1 > 0', 'suite::a & b'] })
+})
+
+test('malformed JUnit stdout fails verification even when the runner exits zero', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-junit-'))
+  tempDirs.push(dir)
+  const report = await runChecks({ worktreePath: dir, commands: [{
+    name: 'tests', command: ['bun', '-e', 'console.log("<testsuite><testcase/></broken>")'], reportFormat: 'junit-xml',
+  }] })
+  expect(report.results[0]).toMatchObject({ passed: false, invalidReport: true })
+  expect(report.results[0]?.excerpt).toContain('JUnit report')
 })

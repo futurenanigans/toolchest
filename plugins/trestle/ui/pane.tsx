@@ -17,13 +17,14 @@ const STATUS_COLORS: Record<string, string> = {
   running: 'green',
   starting: 'cyan',
   idle: 'yellow',
+  needs_input: 'magenta',
   done: 'blue',
   failed: 'red',
   stopped: 'gray',
 }
 
 function isActiveStatus(status: AgentSummary['status']): boolean {
-  return status === 'starting' || status === 'running' || status === 'idle'
+  return status === 'starting' || status === 'running' || status === 'idle' || status === 'needs_input'
 }
 
 function formatElapsed(startedAt: number, endAt: number): string {
@@ -97,16 +98,18 @@ function renderDisabledClisSection(ui: ResolvedUi, disabled: DisabledCliSummary[
 }
 
 function formatHeader(agents: AgentSummary[]): string {
-  if (agents.length === 0) return 'Trestle — 0 active agent(s)'
+  if (agents.length === 0) return 'Trestle · 0 active agent(s)'
   const active = agents.filter(a => isActiveStatus(a.status)).length
+  const needsInput = agents.filter(a => a.status === 'needs_input').length
   const done = agents.filter(a => a.status === 'done').length
   const failed = agents.filter(a => a.status === 'failed').length
   const stopped = agents.filter(a => a.status === 'stopped').length
   const parts: string[] = [`${active} active`]
+  if (needsInput > 0) parts.push(`${needsInput} needs input`)
   if (done > 0) parts.push(`${done} done`)
   if (failed > 0) parts.push(`${failed} failed`)
   if (stopped > 0) parts.push(`${stopped} stopped`)
-  return `Trestle — ${parts.join(' · ')}`
+  return `Trestle · ${parts.join(' · ')}`
 }
 
 function pickSelected(agents: AgentSummary[], selectedId?: string): AgentSummary | undefined {
@@ -138,7 +141,7 @@ function renderQueueSection(ui: ResolvedUi, queue: QueueSummary | undefined) {
         >
           - [{item.status}] {item.id} ({item.cli}): {item.title}
           {item.dependsOn.length > 0 ? ` (after ${item.dependsOn.join(',')})` : ''}
-          {item.error ? ` — ${item.error.slice(0, 80)}` : ''}
+          {item.error ? ` · ${item.error.slice(0, 80)}` : ''}
         </Text>
       ))}
       {queue.total !== undefined && queue.total > queue.items.length && (
@@ -259,6 +262,9 @@ function renderAgentsSection(
             </Box>
             {a.status === 'failed' && a.error && (
               <Text color="red">  error: {a.error.slice(0, 120)}</Text>
+            )}
+            {a.status === 'needs_input' && (
+              <Text color="magenta">  needs input: {(a.needsInputReason ?? 'waiting for user decision or approval').slice(0, 120)}</Text>
             )}
           </Box>
         )

@@ -1,8 +1,9 @@
+import { promisify } from 'node:util'
 import { constants as fsConstants } from 'node:fs'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 
 export type CommandSpec = string | readonly string[]
 
@@ -21,24 +22,13 @@ export function userHome(): string {
   return os.homedir()
 }
 
-/**
- * Quotes a single argument safely for Windows `cmd.exe` when spawning `.cmd`/`.bat` shims.
- */
 export function quoteWindowsArg(arg: string): string {
-  if (arg.length === 0) return '""'
-  // Escape cmd.exe metacharacters and double quotes
-  const sanitized = arg.replace(/\r?\n/g, ' ')
-  if (!/[\s"&|<>^()%!]/.test(sanitized)) return sanitized
-  const escaped = sanitized
-    .replace(/(\\*)"/g, '$1$1\\"')
-    .replace(/(\\+)$/, '$1$1')
-    .replace(/%/g, '%%')
-  return `"${escaped}"`
+  if (/[^a-zA-Z0-9_./:@=+, #()*\\-]/.test(arg)) {
+    throw new Error('Unsafe argument for a Windows batch shim. Use a native executable for this command.')
+  }
+  return !arg || /[ ()*]/.test(arg) ? `"${arg}"` : arg
 }
 
-/**
- * Checks whether a PID is currently alive (returns false if ESRCH or invalid).
- */
 export function isProcessAlive(pid: number | undefined): boolean {
   if (pid === undefined || !Number.isInteger(pid) || pid <= 0) return false
   try {
@@ -49,11 +39,6 @@ export function isProcessAlive(pid: number | undefined): boolean {
   }
 }
 
-/**
- * Links `src` to `dst` if supported, falling back to copying on Windows or when
- * symlink creation is denied (`EPERM`/`EACCES`). Never throws if `src` does not exist
- * when `optional` is true.
- */
 export async function linkOrCopy(
   src: string,
   dst: string,
@@ -83,11 +68,6 @@ export async function linkOrCopy(
   return true
 }
 
-/**
- * Resolves a command specification (a binary name or a runner array such as
- * `['bun', 'x', '@openai/codex']` or `['dotnet', 'exec', 'awl.dll']`) into a
- * `{ program, args }` pair without invoking a POSIX shell.
- */
 export function resolveCommand(spec: CommandSpec, extraArgs: readonly string[] = []): ResolvedCommand {
   const parts = typeof spec === 'string' ? [spec] : [...spec]
   if (parts.length === 0 || !parts[0]) {
@@ -118,12 +98,29 @@ export function resolveCommand(spec: CommandSpec, extraArgs: readonly string[] =
   }
 }
 
-/**
- * Terminates a process and its descendants cleanly across POSIX and Windows.
- * Never throws if the process has already exited.
- */
-export async function killProcessTree(pid: number | undefined): Promise<void> {
+export async function processStartToken(pid: number | undefined): Promise<string | undefined> {
+  if (!pid || !Number.isSafeInteger(pid) || pid <= 0) return undefined
+  try {
+    if (process.platform === 'linux') {
+      const [stat, boot] = await Promise.all([
+        fs.readFile(`/proc/${pid}/stat`, 'utf8'),
+        fs.readFile('/proc/sys/kernel/random/boot_id', 'utf8'),
+      ])
+      const ticks = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]
+      return ticks ? `${boot.trim()}:${ticks}` : undefined
+    }
+    const result = isWindows()
+      ? await promisify(execFile)('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().Ticks`])
+      : await promisify(execFile)('ps', ['-p', String(pid), '-o', 'lstart='], { env: { ...process.env, LC_ALL: 'C' } })
+    return result.stdout.trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
+export async function killProcessTree(pid: number | undefined, expectedStart?: string): Promise<void> {
   if (pid === undefined || pid <= 0) return
+  if (expectedStart !== undefined && await processStartToken(pid) !== expectedStart) return
 
   if (isWindows()) {
     await new Promise<void>(resolve => {
@@ -131,11 +128,10 @@ export async function killProcessTree(pid: number | undefined): Promise<void> {
         windowsHide: true,
         stdio: 'ignore',
       })
-      killer.on('error', () => {
+      killer.on('error', async () => {
         try {
-          process.kill(pid)
+          if (expectedStart === undefined || await processStartToken(pid) === expectedStart) process.kill(pid)
         } catch {
-          // already exited
         }
         resolve()
       })
@@ -156,13 +152,13 @@ export async function killProcessTree(pid: number | undefined): Promise<void> {
 
   await new Promise(r => setTimeout(r, 250))
 
+  if (expectedStart !== undefined && await processStartToken(pid) !== expectedStart) return
   try {
     process.kill(-pid, 'SIGKILL')
   } catch {
     try {
       process.kill(pid, 'SIGKILL')
     } catch {
-      // already exited
     }
   }
 }
@@ -191,9 +187,6 @@ class BoundedBuffer {
   }
 }
 
-/**
- * Runs a command directly (no POSIX shell) and collects bounded stdout/stderr/exitCode.
- */
 export async function execCommand(
   spec: CommandSpec,
   args: readonly string[],
@@ -251,9 +244,6 @@ export async function execCommand(
   })
 }
 
-/**
- * Resolves a repository root canonically (git top-level if available, else `path.resolve`).
- */
 export async function canonicalRepoRoot(repoRoot: string): Promise<string> {
   const resolved = path.resolve(repoRoot)
   try {
@@ -262,7 +252,6 @@ export async function canonicalRepoRoot(repoRoot: string): Promise<string> {
       return path.resolve(res.stdout.trim())
     }
   } catch {
-    // Fall back to resolved path if not a git repo or git unavailable
   }
   return resolved
 }

@@ -1,11 +1,13 @@
 import * as fs from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import * as path from 'node:path'
 
-import { execCommand, isProcessAlive, killProcessTree, linkOrCopy, userHome } from './platform'
+import { withFileLock } from './locks'
+import { execCommand, killProcessTree, linkOrCopy, userHome } from './platform'
 import { type PersistedWorktree, readDiskState, sessionHomeDir, updateDiskState } from './state'
 import type { AgentSupervisor } from './supervisor'
+import { ensureWorktreeIgnored, onlyWorktreeIgnoreAdded, WORKTREE_ROOT_DIR } from './worktree_ignore'
 
-const WORKTREE_ROOT_DIR = '.trestle-wt'
 const ENV_FILES_TO_LINK = ['.env', '.env.local']
 const MAX_DIFF_CHARS = 100_000
 
@@ -17,6 +19,17 @@ async function git(repoRoot: string, args: readonly string[]): Promise<string> {
   return res.stdout.trim()
 }
 
+export async function resolveAgentWorktree(repoRoot: string, worktreePath: string): Promise<string> {
+  const root = path.join(await fs.realpath(repoRoot), WORKTREE_ROOT_DIR)
+  const candidate = await fs.realpath(worktreePath)
+  const relative = path.relative(root, candidate)
+  if (!relative || relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+    throw new Error('worktreePath must be inside the repository’s .trestle-wt directory')
+  }
+  if (!(await fs.stat(candidate)).isDirectory()) throw new Error('worktreePath must be a directory')
+  return candidate
+}
+
 export function assertRevisionArg(ref: string): string {
   if (!ref || ref.startsWith('-')) throw new Error(`Invalid git revision: '${ref}'`)
   return ref
@@ -25,13 +38,21 @@ export function assertRevisionArg(ref: string): string {
 export function sanitizeId(raw: string): string {
   const cleaned = raw.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/^-+|-+$/g, '')
   if (!cleaned) throw new Error(`Invalid worktree id: ${raw}`)
-  return cleaned.slice(0, 32)
+  if (raw.length <= 32) return cleaned
+  const suffix = createHash('sha256').update(raw).digest('hex').slice(0, 12)
+  return cleaned.slice(0, 19) + '-' + suffix
+}
+
+export async function linkWorktreeEnv(resolvedRoot: string, wtPath: string): Promise<void> {
+  for (const envFile of ENV_FILES_TO_LINK) {
+    await linkOrCopy(path.join(resolvedRoot, envFile), path.join(wtPath, envFile), { optional: true })
+  }
 }
 
 export async function worktreeCreate(
   repoRoot: string,
   rawId: string,
-  options: { baseRef?: string; detached?: boolean; homeDir?: string } = {},
+  options: { baseRef?: string; detached?: boolean; requireNewBranch?: boolean; homeDir?: string } = {},
 ): Promise<PersistedWorktree> {
   const id = sanitizeId(rawId)
   const resolvedRoot = path.resolve(repoRoot)
@@ -45,6 +66,7 @@ export async function worktreeCreate(
   }
   const branch = options.detached ? 'HEAD' : `trestle/${id}`
 
+  await ensureWorktreeIgnored(resolvedRoot)
   await fs.mkdir(path.dirname(wtPath), { recursive: true })
 
   if (options.detached) {
@@ -54,15 +76,14 @@ export async function worktreeCreate(
       cwd: resolvedRoot,
     })
     if (branchExists.exitCode === 0) {
+      if (options.requireNewBranch) throw new Error(`Queue branch already exists: ${branch}`)
       await git(resolvedRoot, ['worktree', 'add', wtPath, branch])
     } else {
       await git(resolvedRoot, ['worktree', 'add', '-b', branch, wtPath, baseRef])
     }
   }
 
-  for (const envFile of ENV_FILES_TO_LINK) {
-    await linkOrCopy(path.join(resolvedRoot, envFile), path.join(wtPath, envFile), { optional: true })
-  }
+  await linkWorktreeEnv(resolvedRoot, wtPath)
 
   const record: PersistedWorktree = {
     id,
@@ -168,7 +189,6 @@ export async function worktreeDiff(
 
   const base = assertRevisionArg(options.baseRef ?? wt.baseRef)
   const statusOut = await git(wt.path, ['status', '--porcelain'])
-  // Diff against base including uncommitted working-tree edits to tracked files
   const trackedFiles = await git(wt.path, ['diff', '--name-only', base])
   const stat = await git(wt.path, ['diff', '--stat', base])
   const fullDiff = await git(wt.path, ['diff', base])
@@ -193,10 +213,6 @@ export async function worktreeDiff(
   return { id, branch: wt.branch, changedFiles, stat, diff, truncated }
 }
 
-/**
- * Stages all changes in a worktree except linked/untracked `.env` / `.env.local` files
- * and commits them if anything was staged.
- */
 export async function commitWorktreeChanges(wtPath: string, message: string): Promise<boolean> {
   const status = await git(wtPath, ['status', '--porcelain'])
   if (!status) return false
@@ -216,22 +232,29 @@ export async function commitWorktreeChanges(wtPath: string, message: string): Pr
   return true
 }
 
-export async function worktreeLand(
+export interface WorktreeLandPreview {
+  id: string
+  preview: true
+  targetBranch: string
+  repoClean: boolean
+  hasChanges: boolean
+  files: string[]
+  stat: string
+  diff: string
+  truncated: boolean
+}
+
+export async function worktreeLandPreview(
   repoRoot: string,
   rawId: string,
-  options: { targetBranch?: string; commitMessage?: string; homeDir?: string } = {},
-): Promise<{ id: string; landedCommit: string; targetBranch: string }> {
+  options: { targetBranch?: string; maxDiffChars?: number; homeDir?: string } = {},
+): Promise<WorktreeLandPreview> {
   const id = sanitizeId(rawId)
   const resolvedRoot = path.resolve(repoRoot)
-  const state = await readDiskState(resolvedRoot, options.homeDir ?? userHome())
+  const homeDir = options.homeDir ?? userHome()
+  const state = await readDiskState(resolvedRoot, homeDir)
   const wt = state.worktrees[id]
   if (!wt) throw new Error(`Unknown worktree: ${id}`)
-  if (wt.branch === 'HEAD') {
-    throw new Error(`Cannot land detached worktree ${id} by branch name; commit or cherry-pick manually`)
-  }
-
-  await commitWorktreeChanges(wt.path, options.commitMessage ?? `trestle: land ${id}`)
-
   const targetBranch = options.targetBranch ?? wt.baseRef
   const targetRefCheck = await execCommand('git', ['show-ref', '--verify', '--quiet', `refs/heads/${targetBranch}`], {
     cwd: resolvedRoot,
@@ -239,39 +262,94 @@ export async function worktreeLand(
   if (targetRefCheck.exitCode !== 0) {
     throw new Error(`Target branch '${targetBranch}' is not a local branch (detached HEAD or missing ref); specify targetBranch explicitly`)
   }
-
   const repoDirty = await git(resolvedRoot, ['status', '--porcelain', '--untracked-files=no'])
-  if (repoDirty.length > 0) {
-    throw new Error(`Target repository ${resolvedRoot} has uncommitted changes; clean before landing`)
+  const ignoreRuleOnly = repoDirty === 'M .gitignore' && await onlyWorktreeIgnoreAdded(resolvedRoot)
+  const repoClean = !repoDirty || ignoreRuleOnly
+  const diff = await worktreeDiff(resolvedRoot, id, {
+    baseRef: targetBranch,
+    maxChars: options.maxDiffChars,
+    homeDir,
+  })
+  return {
+    id,
+    preview: true,
+    targetBranch,
+    repoClean,
+    hasChanges: diff.changedFiles.length > 0 || diff.diff.trim().length > 0,
+    files: diff.changedFiles,
+    stat: diff.stat,
+    diff: diff.diff,
+    truncated: diff.truncated,
   }
+}
 
-  const currentBranch = await git(resolvedRoot, ['rev-parse', '--abbrev-ref', 'HEAD'])
-  const restoreTo = currentBranch === 'HEAD' ? await git(resolvedRoot, ['rev-parse', 'HEAD']) : currentBranch
-  const switched = currentBranch !== targetBranch
-  if (switched) {
-    await git(resolvedRoot, ['checkout', targetBranch])
-  }
-
-  try {
-    try {
-      await git(resolvedRoot, [
-        'merge',
-        '--no-ff',
-        wt.branch,
-        '-m',
-        options.commitMessage ?? `Merge ${wt.branch} into ${targetBranch}`,
-      ])
-    } catch (err) {
-      await execCommand('git', ['merge', '--abort'], { cwd: resolvedRoot }).catch(() => {})
-      throw err
+export async function worktreeLand(
+  repoRoot: string,
+  rawId: string,
+  options: {
+    targetBranch?: string
+    commitMessage?: string
+    homeDir?: string
+    beforeMerge?: () => Promise<void>
+  } = {},
+): Promise<{ id: string; landedCommit: string; targetBranch: string }> {
+  const id = sanitizeId(rawId)
+  const resolvedRoot = path.resolve(repoRoot)
+  const homeDir = options.homeDir ?? userHome()
+  const commonDir = await git(resolvedRoot, ['rev-parse', '--git-common-dir'])
+  return withFileLock(path.resolve(resolvedRoot, commonDir, 'trestle-land.lock'), async () => {
+    const state = await readDiskState(resolvedRoot, homeDir)
+    const wt = state.worktrees[id]
+    if (!wt) throw new Error(`Unknown worktree: ${id}`)
+    if (wt.branch === 'HEAD') {
+      throw new Error(`Cannot land detached worktree ${id} by branch name; commit or cherry-pick manually`)
     }
-    const landedCommit = await git(resolvedRoot, ['rev-parse', 'HEAD'])
-    return { id, landedCommit, targetBranch }
-  } finally {
+
+    await commitWorktreeChanges(wt.path, options.commitMessage ?? `trestle: land ${id}`)
+
+    await options.beforeMerge?.()
+    const targetBranch = options.targetBranch ?? wt.baseRef
+    const targetRefCheck = await execCommand('git', ['show-ref', '--verify', '--quiet', `refs/heads/${targetBranch}`], {
+      cwd: resolvedRoot,
+    })
+    if (targetRefCheck.exitCode !== 0) {
+      throw new Error(`Target branch '${targetBranch}' is not a local branch (detached HEAD or missing ref); specify targetBranch explicitly`)
+    }
+
+    const repoDirty = await git(resolvedRoot, ['status', '--porcelain', '--untracked-files=no'])
+    const ignoreRuleOnly = repoDirty === 'M .gitignore' && await onlyWorktreeIgnoreAdded(resolvedRoot)
+    if (repoDirty && !ignoreRuleOnly) {
+      throw new Error(`Target repository ${resolvedRoot} has uncommitted changes; clean before landing`)
+    }
+
+    const currentBranch = await git(resolvedRoot, ['rev-parse', '--abbrev-ref', 'HEAD'])
+    const restoreTo = currentBranch === 'HEAD' ? await git(resolvedRoot, ['rev-parse', 'HEAD']) : currentBranch
+    const switched = currentBranch !== targetBranch
     if (switched) {
-      await git(resolvedRoot, ['checkout', restoreTo])
+      await git(resolvedRoot, ['checkout', targetBranch])
     }
-  }
+
+    try {
+      try {
+        await git(resolvedRoot, [
+          'merge',
+          '--no-ff',
+          wt.branch,
+          '-m',
+          options.commitMessage ?? `Merge ${wt.branch} into ${targetBranch}`,
+        ])
+      } catch (err) {
+        await execCommand('git', ['merge', '--abort'], { cwd: resolvedRoot }).catch(() => {})
+        throw err
+      }
+      const landedCommit = await git(resolvedRoot, ['rev-parse', 'HEAD'])
+      return { id, landedCommit, targetBranch }
+    } finally {
+      if (switched) {
+        await git(resolvedRoot, ['checkout', restoreTo])
+      }
+    }
+  })
 }
 
 export async function worktreeClean(
@@ -291,8 +369,8 @@ export async function worktreeClean(
 
   for (const agent of Object.values(state.agents)) {
     const isActive = agent.status === 'starting' || agent.status === 'running' || agent.status === 'idle'
-    if (agent.worktreeId === id && isActive && agent.pid && isProcessAlive(agent.pid)) {
-      await killProcessTree(agent.pid)
+    if (agent.worktreeId === id && isActive && agent.pid && agent.processStart) {
+      await killProcessTree(agent.pid, agent.processStart)
     }
   }
 
@@ -314,7 +392,6 @@ export async function worktreeClean(
     await execCommand('git', ['branch', '-D', wt.branch], { cwd: resolvedRoot })
   }
 
-  // Clean up any persistent session homes tied to this worktree
   for (const cli of ['claude', 'codex', 'opencode', 'agy', 'pi'] as const) {
     const sDir = sessionHomeDir(resolvedRoot, `${id}-${cli}`, homeDir)
     await fs.rm(sDir, { recursive: true, force: true }).catch(() => {})

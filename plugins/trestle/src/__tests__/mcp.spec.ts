@@ -1,6 +1,10 @@
 import { expect, test } from 'bun:test'
 import { spawn } from 'node:child_process'
+import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
 import * as path from 'node:path'
+import { handleToolCall } from '../mcp_dispatch'
+import { resolveAgentWorktree } from '../worktrees'
 
 const MCP_ENTRY = path.join(import.meta.dir, '..', 'mcp.ts')
 
@@ -54,4 +58,39 @@ test('MCP server responds to initialize, ping, and tools/list and exits cleanly 
   expect(toolNames).toContain('queue_clear')
   expect(toolNames).toContain('config_get')
   expect(toolNames).toContain('config_set')
+})
+
+test('tool calls validate nested arguments before dispatch', async () => {
+  await expect(handleToolCall('agent_list', null)).rejects.toThrow('Invalid arguments')
+  await expect(handleToolCall('agent_tail', {})).rejects.toThrow('id')
+  await expect(handleToolCall('goal_status', { typo: 'job' })).rejects.toThrow('typo')
+  await expect(handleToolCall('check_run', {
+    worktreePath: '.', commands: [{ name: 'fixture', command: [1] }],
+  })).rejects.toThrow('commands')
+  await expect(handleToolCall('config_set', {
+    scope: 'user', config: { agents: { codex: { defaultEffort: 'unknown' } } },
+  })).rejects.toThrow('defaultEffort')
+  expect(await handleToolCall('goal_status')).toEqual([])
+})
+
+test('agent_spawn only accepts directories physically inside the repository worktree root', async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-spawn-'))
+  try {
+    const managed = path.join(repo, '.trestle-wt')
+    const valid = path.join(managed, 'fixture')
+    const sibling = path.join(repo, '.trestle-wt-other')
+    await fs.mkdir(valid, { recursive: true })
+    await fs.mkdir(sibling)
+    const alias = path.join(managed, 'alias')
+    await fs.symlink(sibling, alias, 'junction')
+    expect(await resolveAgentWorktree(repo, valid)).toBe(await fs.realpath(valid))
+    for (const invalid of [managed, sibling, alias]) {
+      await expect(handleToolCall('agent_spawn', {
+        repoRoot: repo, id: 'fixture', cli: 'claude', stage: 'test', worktreeId: 'fixture',
+        worktreePath: invalid, branch: 'fixture', prompt: 'fixture',
+      })).rejects.toThrow('worktreePath must be inside')
+    }
+  } finally {
+    await fs.rm(repo, { recursive: true, force: true })
+  }
 })

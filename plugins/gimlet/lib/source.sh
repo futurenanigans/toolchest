@@ -70,7 +70,7 @@ scan_secrets() {
     record secrets failed "betterleaks could not be installed; the error is printed above the summary"
     return
   fi
-  local bl common reports=() rc=0 log="$RESULTS/secrets.log"
+  local bl common rc=0 log="$RESULTS/secrets.log"
   bl="$(betterleaks_bin)"
   common=(--redact --no-banner --no-color --exit-code 0 --report-format json)
   : > "$log"

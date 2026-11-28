@@ -3,6 +3,18 @@ import * as path from 'node:path'
 import { linkOrCopy, userHome } from '../platform'
 import type { AdapterDriver, AdapterEvent, LaunchOptions, LaunchSpec } from './types'
 
+function failureFlags(info: unknown) {
+  const [kind, details] = typeof info === 'object' && info !== null
+    ? Object.entries(info)[0] ?? []
+    : [info, undefined]
+  const status = details?.httpStatusCode
+  return {
+    usageLimited: kind === 'usageLimitExceeded' || status === 429,
+    loginFailed: kind === 'unauthorized' || status === 401,
+    transient: kind === 'httpConnectionFailed' || kind === 'responseStreamDisconnected',
+  }
+}
+
 export function createCodexAdapter(): AdapterDriver {
   let threadId: string | undefined
   let activeTurnId: string | undefined
@@ -85,23 +97,18 @@ export function createCodexAdapter(): AdapterDriver {
 
       const events: AdapterEvent[] = []
 
-      // Any JSON-RPC error response must fail the turn immediately rather than hanging
       if (msg.id !== undefined && msg.error) {
         const errObj = msg.error as { message?: string; code?: number; data?: { codexErrorInfo?: string } }
         const message = errObj?.message || `codex RPC error (${errObj?.code ?? 'unknown'})`
-        const lower = message.toLowerCase()
         const info = errObj?.data?.codexErrorInfo ?? ''
         events.push({
           kind: 'turn_failed',
           error: message,
-          usageLimited: info === 'usageLimitExceeded' || lower.includes('quota') || lower.includes('rate limit'),
-          loginFailed: info === 'unauthorized' || lower.includes('unauthorized') || lower.includes('auth'),
-          transient: info === 'httpConnectionFailed' || lower.includes('connection') || lower.includes('timeout'),
+          ...failureFlags(info),
         })
         return events
       }
 
-      // Response to initialize (id: 1) -> start or resume thread
       if (msg.id === 1 && !msg.error) {
         const req = threadId
           ? rpc('thread/resume', { threadId, cwd, sandbox: sandboxMode })
@@ -169,24 +176,23 @@ export function createCodexAdapter(): AdapterDriver {
           })
         }
       } else if (method === 'turn/completed' && params) {
-        const turn = params.turn as { status?: string; error?: { message?: string } } | undefined
+        const turn = params.turn as { status?: string; error?: { message?: string; codexErrorInfo?: unknown } } | undefined
         if (turn?.status === 'failed' || turn?.status === 'interrupted') {
           events.push({
             kind: 'turn_failed',
             error: turn.error?.message || `codex turn ${turn.status}`,
+            ...failureFlags(turn.error?.codexErrorInfo),
           })
         } else {
           events.push({ kind: 'turn_done', finalText: lastAgentText || undefined })
         }
-      } else if (method === 'error' && params) {
+      } else if (method === 'error' && params && params.willRetry !== true) {
         const errObj = params.error as { message?: string; codexErrorInfo?: string } | undefined
         const info = errObj?.codexErrorInfo ?? ''
         events.push({
           kind: 'turn_failed',
-          error: errObj?.message || info || 'codex error',
-          usageLimited: info === 'usageLimitExceeded',
-          loginFailed: info === 'unauthorized',
-          transient: info === 'httpConnectionFailed',
+          error: errObj?.message || (typeof info === 'string' && info) || 'codex error',
+          ...failureFlags(info),
         })
       }
 

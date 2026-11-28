@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: test-noise-audit-identifies-noise
+description: Identifies a constant-literal test as removable noise while protecting a real overdraft regression test, leaving files untouched before approval.
+tags: [workflow, user-invoked]
+expected_command: /testing:test-noise-audit
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  allowed_tools: [Read, Glob, Grep, Bash, Skill]

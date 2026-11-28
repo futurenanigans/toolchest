@@ -34,7 +34,6 @@ test('user config provides defaults and repo configs (checked-in & local) overri
   await fs.mkdir(home, { recursive: true })
   await fs.mkdir(repo, { recursive: true })
 
-  // 1. User-level config sets default tiers and check timeout
   await writeUserConfig(
     {
       defaultTier: 'cheap',
@@ -56,7 +55,6 @@ test('user config provides defaults and repo configs (checked-in & local) overri
     { homeDir: home },
   )
 
-  // 2. Checked-in repo config customizes repo checks
   await writeRepoConfig(
     repo,
     {
@@ -67,7 +65,6 @@ test('user config provides defaults and repo configs (checked-in & local) overri
     { inRepo: true, homeDir: home },
   )
 
-  // 3. Local repo config overrides claude cheap tier without touching git
   await writeRepoConfig(
     repo,
     {
@@ -82,25 +79,20 @@ test('user config provides defaults and repo configs (checked-in & local) overri
 
   const { config } = await loadEffectiveConfig(repo, home)
 
-  // Repo local tier overrides user tier; user balanced tier still inherited
   expect(resolveAgentConfig(config, 'claude', 'cheap').model).toBe('claude-haiku-repo-local')
   expect(resolveAgentConfig(config, 'claude', 'balanced').model).toBe('claude-sonnet-custom')
-  // Default model on claude resolves tier alias 'balanced'
   expect(resolveAgentConfig(config, 'claude').model).toBe('claude-sonnet-custom')
-  // Literal model passes through untouched
   expect(resolveAgentConfig(config, 'claude', 'claude-opus-4-6').model).toBe('claude-opus-4-6')
-  // User defaultTier applies to codex + command override preserved
   const codexResolved = resolveAgentConfig(config, 'codex')
   expect(codexResolved.model).toBe('gpt-6.2-sol')
   expect(codexResolved.commandOverride).toEqual(['bun', 'x', '@openai/codex'])
 
-  // Repo checks merged with user checks defaults
   expect(config.checks?.commands?.[0]?.name).toBe('repo-lint')
   expect(config.checks?.includeMortise).toBe(false)
   expect(config.checks?.timeoutMs).toBe(30_000)
 })
 
-test('runGoalLoop uses per-repo configured checks when contract omits explicit checks', async () => {
+test('runGoalLoop runs configured checks and fails a no-op producer on a green base', async () => {
   const base = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-cfg-goal-'))
   tempDirs.push(base)
   const home = path.join(base, 'home')
@@ -116,7 +108,6 @@ test('runGoalLoop uses per-repo configured checks when contract omits explicit c
   await execCommand('git', ['add', '.gitignore', 'README.md'], { cwd: repo })
   await execCommand('git', ['commit', '-m', 'init'], { cwd: repo })
 
-  // Configure custom check in repo config
   await writeRepoConfig(
     repo,
     {
@@ -160,25 +151,22 @@ test('runGoalLoop uses per-repo configured checks when contract omits explicit c
     homeDir: home,
   })
 
-  expect(res.status).toBe('passed')
+  expect(res.status).toBe('failed')
+  expect(res.error).toContain('no changes')
   expect(res.lastReport?.results[0]?.name).toBe('repo-custom-check')
 })
 
 test('resolveEscalationAgentConfig steps up tiers after configured failures and respects pinned literals', () => {
-  // Starting from cheap: 0-1 failures -> cheap, 2-3 -> balanced, 4+ -> strong
   expect(resolveEscalationAgentConfig(BUILTIN_DEFAULT_CONFIG, 'claude', 'cheap', 0).tier).toBe('cheap')
   expect(resolveEscalationAgentConfig(BUILTIN_DEFAULT_CONFIG, 'claude', 'cheap', 1).tier).toBe('cheap')
   expect(resolveEscalationAgentConfig(BUILTIN_DEFAULT_CONFIG, 'claude', 'cheap', 2).tier).toBe('balanced')
   expect(resolveEscalationAgentConfig(BUILTIN_DEFAULT_CONFIG, 'claude', 'cheap', 4).tier).toBe('strong')
-  // Starting from balanced: 2 failures -> strong
   expect(resolveEscalationAgentConfig(BUILTIN_DEFAULT_CONFIG, 'claude', 'balanced', 2).tier).toBe('strong')
-  // Literal pinned model is never escalated
   const pinned = resolveEscalationAgentConfig(BUILTIN_DEFAULT_CONFIG, 'claude', 'claude-haiku-4-5', 5)
   expect(pinned.model).toBe('claude-haiku-4-5')
   expect(pinned.tier).toBeUndefined()
   expect(BUILTIN_DEFAULT_CONFIG.escalation?.fallbackClis).toEqual(['claude', 'codex'])
 
-  // Every built-in CLI has cheap, balanced, and strong tiers with effort labels
   for (const cli of ['claude', 'codex', 'opencode', 'agy', 'pi'] as const) {
     const cheap = resolveAgentConfig(BUILTIN_DEFAULT_CONFIG, cli, 'cheap')
     const balanced = resolveAgentConfig(BUILTIN_DEFAULT_CONFIG, cli, 'balanced')

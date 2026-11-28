@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: triage-and-variant-sweep
+description: Triages a gimlet report (confirming 1 real SQLi, refuting 1 constant-query false positive) and catches an unflagged sibling SQLi via variant analysis.
+tags: [active]
+expected_skill: gimlet:gimlet
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  allowed_tools: [Read, Glob, Grep, Skill]

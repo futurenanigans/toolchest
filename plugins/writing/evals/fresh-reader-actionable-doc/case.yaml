@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: fresh-reader-actionable-doc
+description: Rewriting a vague handover doc lets a fresh reader run the script and verify the fix from the document alone.
+tags: [writing, reader-outcome]
+expected_skill: writing:writing-style
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

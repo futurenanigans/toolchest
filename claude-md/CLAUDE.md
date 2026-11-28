@@ -1,6 +1,6 @@
 # Global development standards
 
-Language-agnostic principles that apply across projects. Stack-specific rules (framework idioms, analyzer codes, language features, library conventions) do not live in this file. They belong in a skill (see Environment-specific standards) or the project's own `CLAUDE.md`.
+Language-agnostic principles and OS-level platform notes that apply across projects. Stack-specific rules (framework idioms, analyzer codes, language features, library conventions) do not live in this file. They belong in a skill (see Convention skills and stack-specific standards) or the project's own `CLAUDE.md`.
 
 ## House rules are not evidence
 
@@ -203,14 +203,11 @@ Guidance that applies only to some files ships as a skill in the named plugin. E
 | :- | :- | :- |
 | `comments` | writing | any comment or doc comment in code |
 | `code-organization` | refactoring | file placement, new files and folders |
-| `inline-defect-prevention` | refactoring | any code being written |
 | `test-quality` | testing | test files |
 | `dotnet` | dotnet | C# files and projects |
 | `rust` | rust | Rust files and Cargo manifests |
 
 - **.NET**: the `dotnet` skill covers formatting and naming, DI lifetimes, async and CancellationToken, IOptions config, XML docs, analyzer codes, build discipline and hot paths. Standard Microsoft conventions win over a project's deviating local style. The `dotnet-project-standards` skill sets up `.editorconfig` and analyzers and reformats existing code.
 - **Rust**: the `rust` skill covers edition 2024 idioms, module layout, error types, unsafe, async and the pre-completion checks. The `modern-rust` skill holds the full reference for scaffolding and review. An existing project's consistent convention wins over the modern default.
-
-The `pattern-awareness` skill in the refactoring plugin applies while writing code that resembles existing code.
 
 A new stack's conventions go in a skill in that stack's plugin, beside its workflow skills. Never add stack-specific rules to this global file.

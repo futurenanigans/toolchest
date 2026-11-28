@@ -292,3 +292,35 @@ test('a pipeline that keeps the exit code, or pipes something other than a verif
     expect(ran.context).toBeUndefined()
   }
 })
+
+
+test('blocks reading credential files via Bash or Read, while allowing .env.example', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+
+  const catEnv = await $.tool.call({ tool: 'Bash', command: 'cat .env' })
+  expect(catEnv.deny).toMatch(/Blocked reading credential file/)
+
+  const pemRead = await $.tool.call({ tool: 'Read', file_path: '/app/certs/server.pem' })
+  expect(pemRead.deny).toMatch(/Blocked reading credential file/)
+
+  const exampleRead = await $.tool.call({ tool: 'Read', file_path: '/app/.env.example' })
+  expect(exampleRead.deny).toBeUndefined()
+
+  const exampleCat = await $.tool.call({ tool: 'Bash', command: 'cat .env.example' })
+  expect(exampleCat.deny).toBeUndefined()
+})
+
+test('warns on destructive git commands but stays quiet on safe alternatives', async ($, on) => {
+  stubEngine(on)
+  await $.session.start({ cwd: CWD, surface: 'terminal', isInteractive: true })
+
+  for (const command of ['git push --force origin main', 'git reset --hard HEAD~1', 'git add -A']) {
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect(ran.context?.join('\n')).toMatch(/Destructive or overly broad git command/)
+  }
+  for (const command of ['git push --force-with-lease origin feature', 'git add src/index.ts', 'git status']) {
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect(ran.context).toBeUndefined()
+  }
+})

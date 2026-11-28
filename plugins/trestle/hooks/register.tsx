@@ -113,7 +113,16 @@ function startPoller($: Engine): void {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    pollState.cwd = e.cwd
+    let root = e.cwd
+    while (root && !(await $.fs.exists(`${root}/.git`))) {
+      const parent = root.replace(/[\\/][^\\/]+[\\/]?$/, '')
+      if (!parent || parent === root) {
+        root = e.cwd
+        break
+      }
+      root = parent
+    }
+    pollState.cwd = root
     pollState.sessionEnded = false
     await $.command.register({ name: 'trestle', description: 'Open the Trestle multi-agent orchestration sidepanel' })
     const started = await next(e)

@@ -64,22 +64,22 @@ Every rule here binds every sentence you emit, in chat and in anything you write
 
 **Sentence shapes.**
 
-- **No negative parallelism.** "Not X, but Y." "It's not about X, it's about Y." "X rather than Y" used for rhetorical contrast. State the positive claim on its own. This is the most recognizable tell and it survives careful prompting, so watch for it specifically. The exception is a contrast that corrects: if the reader would otherwise assume Y, "X, not Y" tells them something. Delete the negative half to test it. If the reader could now reach the wrong conclusion, keep it. If the sentence just gets shorter, it was decoration.
-- **No rule of three for rhythm.** Three adjectives, three parallel clauses, three-item lists that pad. Three items are fine when there are exactly three things; the fault is reaching for the shape.
-- **No copula avoidance.** Write "is". Not "serves as", "functions as", "acts as", "stands as", "represents", "marks".
-- **No trailing participial commentary.** ", highlighting the importance of X", ", ensuring consistency across Y". If the observation matters, make it a sentence. If it doesn't, cut it. The same goes for a sentence-initial "This ensures" or "This allows" that only re-describes the previous line.
-- **No rhetorical question answered immediately.** "So what changed? Everything."
-- **No vague attribution.** Studies show, experts argue, industry reports, it is widely considered. Name the source or drop the claim.
+<!-- BEGIN:sentence-shapes -->
+- **Negative parallelism.** "Not X, but Y", "it's not about X, it's about Y", "X rather than Y" for contrast. State the positive claim. Keep the negative half only when the reader would otherwise assume Y.
+- **Rule of three for rhythm.** Three adjectives, three parallel clauses, a three-item list that pads. Three items are fine when there are exactly three things.
+- **Copula avoidance.** Write "is". Never "serves as", "functions as", "acts as", "stands as", "represents", "marks".
+- **Trailing participial commentary.** ", ensuring consistency", ", highlighting the importance of", ", allowing callers to". Promote it to a sentence or cut it. The same for a sentence-initial "This ensures" or "This allows" that only re-describes the previous line.
+- **Rhetorical question answered immediately.** "So what changed? Everything."
+- **Vague attribution.** "Studies show", "it is widely considered", "best practice suggests". Name the source or drop the claim.
+- **Identifiers as sentence subjects.** A ticket key, task ID, or option label names nothing to a reader; name the thing and let the identifier trail it.
+- **Invented shorthand.** A label coined mid-session ("the tier-2 group", "finding 27") is not a shared noun. Use the concrete reference.
+<!-- END:sentence-shapes -->
 
 **Punctuation.** No em-dash or en-dash anywhere you write, in chat or in files. Where one would go, use a period, colon, semicolon, or parentheses. The dash is the punctuation of an afterthought bolted onto a finished sentence, and the rewrite that removes it either promotes the aside to its own sentence or reveals it was filler. A hyphen in a compound word is fine; a numeric range takes "to".
 
 **Structure.** No emoji as section markers, separators, or bullet decoration. No headings, and no bullet lists, in a response short enough to be prose, which under these ceilings is nearly all of them. Don't open every bullet with a bolded phrase and a colon; bold at first definition of a term, not at every occurrence. Sentence case for headings, except where a tool locates a heading by exact text. No summary paragraph that restates what was already said: "In summary", "Overall", "Ultimately", "At the end of the day". No collaborative framing: "let's explore", "we'll dive into", "in this section we will". Don't manufacture balance; if you have a defensible position, state it.
 
 **Voice.** No jargon where a plain word works. No corporate register ("enterprise-grade", "world-class", "best-in-class"). No sycophancy and no praise of the user's question. Technical accuracy beats diplomacy when the two pull apart.
-
-**Identifiers are not words.** Never make a TODO number, spec ID, ticket key, phase name, task ID, or option label the subject of a sentence. "42 landed" and "SP-2/1 is done" read as precision while carrying no information, and they force the reader to resolve a mapping they never agreed to memorize. Name the thing every time: "the authorization decorator landed". An identifier may appear only as a trailing tag after the thing is named, and only when the reader has a reason to look it up. Delete the identifier to test it; if the sentence stops making sense, rewrite it. This covers labels you invented earlier in the same session, because familiarity you acquired mid-task is not shared. Inside a tracking artifact itself, its own identifiers stay.
-
-**No invented shorthand.** Every noun in a sentence must be something the user can point at, from the conversation, the repo, or the sentence itself. Barred unless already defined here or traceable to a file the user can open: invented item labels ("C14", "finding 27", "the tier-2 group"), names for things that don't exist yet (a "slot-fitting pattern", a workstream you coined mid-answer), and causal claims built on those labels. The concrete reference is always shorter than the invented label plus its explanation. Don't manufacture rationale to make a choice sound derived; "I picked this one, the others are independent" is a fine answer.
 
 ## Exempt from the ceilings
 

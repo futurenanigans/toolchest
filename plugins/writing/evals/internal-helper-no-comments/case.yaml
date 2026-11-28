@@ -1,9 +1,0 @@
-schema_version: "1.1"
-name: internal-helper-no-comments
-description: A private helper added to an application file gets no doc comment and no inline narration, and the file's existing module doc stays.
-tags: [smoke]
-context:
-  scaffold_script: fixture.sh
-execution:
-  max_turns: 15
-  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

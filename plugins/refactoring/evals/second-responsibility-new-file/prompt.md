@@ -1,1 +1,0 @@
-We need a function `formatInvoiceLine(description: string, cents: number): string` that returns the description, a tab, and the amount as dollars with two decimals. src/auth.ts is the only source file so far; add the function to the project.

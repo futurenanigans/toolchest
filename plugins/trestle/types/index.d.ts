@@ -1,6 +1,6 @@
 export type AgentCli = 'claude' | 'codex' | 'opencode' | 'agy' | 'pi'
 
-export type AgentStatus = 'starting' | 'running' | 'idle' | 'done' | 'failed' | 'stopped'
+export type AgentStatus = 'starting' | 'running' | 'idle' | 'needs_input' | 'done' | 'failed' | 'stopped'
 
 export type AgentFailureKind = 'transient' | 'usage_limit' | 'login_failed' | 'timeout' | 'error'
 
@@ -29,6 +29,8 @@ export interface AgentSummary {
   sessionId?: string
   tail: string[]
   error?: string
+  needsInputReason?: string
+  resetAt?: number
   failureKind?: AgentFailureKind
   usage?: AgentUsage
 }

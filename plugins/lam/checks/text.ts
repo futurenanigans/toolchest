@@ -9,9 +9,11 @@ export type CheckInput = {
   isFirstReadmeEdit: boolean
 }
 
-export type Check = { name: string; advise: (input: CheckInput) => string | null; guidance?: true }
+export type Check = { name: string; advise: (input: CheckInput) => string | null; guidance?: true; deny?: true }
 
 export const isEditOrWrite = (tool: string): boolean => tool === 'Edit' || tool === 'Write'
+
+export const isRead = (tool: string): boolean => tool === 'Read'
 
 export const isShell = (tool: string): boolean => tool === 'Bash' || tool === 'PowerShell'
 

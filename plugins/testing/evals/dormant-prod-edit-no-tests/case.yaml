@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: dormant-prod-edit-no-tests
+description: Editing production code with no test files leaves test-quality unloaded.
+tags: [dormant]
+dormant: true
+expected_skill: testing:test-quality
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

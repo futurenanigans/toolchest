@@ -49,7 +49,7 @@ Run autonomous **Contract-First Goal Loops** and **dependency-aware multi-task q
 ### 3. Evaluate, Update Criteria & Land
 - Compare passing worktrees via `worktree_diff` (supports optional `maxChars`) and any captured `metric` values.
 - Optionally run a read-only subjective review (native Claude subagent, or `agent_spawn` with `mode: "read-only"` on another CLI) and record per-criterion evidence with `contract_update_criterion`.
-- Call `worktree_land` only on a worktree whose goal loop passed: it runs no checks itself. Its auto-commit skips `.env` and `.env.local`, a `.env` the agent committed still merges, and a merge conflict aborts cleanly. Then call `worktree_clean` on all temporary worktrees (`worktree_list` to verify no orphans remain).
+- Call `worktree_land` only on a worktree whose goal loop passed: it runs no checks itself. Its auto-commit skips `.env` and `.env.local`, a `.env` the agent committed still merges, and a merge conflict aborts cleanly. Save any uncommitted changes you need in the remaining drafts. Then call `worktree_clean` on the temporary worktrees (`worktree_list` to verify no orphans remain).
 
 ## Multi-Task Queue Workflow (`queue_add` + `queue_run_next`)
 Use the persistent repo queue (`~/.trestle/<repo-key>/queue.json`) whenever the user has multiple related tasks, a backlog, or a dependency DAG:

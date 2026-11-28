@@ -17,7 +17,7 @@ import {
   checkCliQuota,
   clearQuotaCooldown,
   FIVE_HOURS_MS,
-  parseUsageLimitCooldown,
+  usageLimitCooldown,
   recordCliUsage,
   recordUsageLimitCooldown,
   SEVEN_DAYS_MS,
@@ -47,18 +47,15 @@ test('maxTier clamps tier aliases and hands off to fallbackClis on escalation', 
     },
   })
 
-  // Requesting 'strong' on opencode clamps to 'cheap'
   const clamped = resolveAgentConfig(cfg, 'opencode', 'strong')
   expect(clamped.resolvedFromTier).toBe('cheap')
   expect(clamped.cappedByMaxTier).toBe(true)
 
-  // After 2 failures on opencode (capped at cheap), escalation hands off to claude at balanced
   const handedOff = resolveEscalationAgentConfig(cfg, 'opencode', 'cheap', 2)
   expect(handedOff.cli).toBe('claude')
   expect(handedOff.tier).toBe('balanced')
   expect(handedOff.escalatedToFallbackCli).toBe(true)
 
-  // agy capped at balanced: 2 failures stays on agy (balanced), 4 failures hands off to claude (strong)
   const agyStep1 = resolveEscalationAgentConfig(cfg, 'agy', 'cheap', 2)
   expect(agyStep1.cli).toBe('agy')
   expect(agyStep1.tier).toBe('balanced')
@@ -67,25 +64,23 @@ test('maxTier clamps tier aliases and hands off to fallbackClis on escalation', 
   expect(agyStep2.tier).toBe('strong')
 })
 
-test('parseUsageLimitCooldown uses timed cooldowns for explicit resets and manual disable when unknown or configured', () => {
+test('usageLimitCooldown uses timed cooldowns for explicit resets and manual disable when unknown or configured', () => {
   const now = Date.parse('2026-11-26T12:00:00Z')
 
-  const rel2h = parseUsageLimitCooldown('Rate limit exceeded, resets in 2h 15m', now)
+  const rel2h = usageLimitCooldown(now + 135 * 60_000, now)
   expect(rel2h.window).toBe('5h')
   expect(rel2h.blockedUntil).toBe(now + (2 * 60 + 15) * 60 * 1000)
 
-  const utcDate = parseUsageLimitCooldown('You will regain access on 2026-12-01 at 00:00 UTC.', now)
+  const utcDate = usageLimitCooldown(Date.parse('2026-12-01T00:00:00Z'), now)
   expect(utcDate.window).toBe('weekly')
   expect(utcDate.blockedUntil).toBe(Date.parse('2026-12-01T00:00:00Z'))
 
-  // No explicit reset time -> disabled indefinitely until manual re-enable
-  const unknown = parseUsageLimitCooldown('Usage limit reached', now)
+  const unknown = usageLimitCooldown(undefined, now)
   expect(unknown.window).toBe('manual')
   expect(unknown.blockedUntil).toBeUndefined()
   expect(unknown.manualReenableRequired).toBe(true)
 
-  // Explicit manualReenable flag overrides even when a reset duration is present
-  const forcedManual = parseUsageLimitCooldown('Rate limit exceeded, resets in 2h 15m', now, true)
+  const forcedManual = usageLimitCooldown(now + 135 * 60_000, now, true)
   expect(forcedManual.window).toBe('manual')
   expect(forcedManual.manualReenableRequired).toBe(true)
 })
@@ -95,14 +90,12 @@ test('rolling 5-hour and weekly token/cost caps and reactive cooldowns enforce l
   tempDirs.push(home)
 
   const now = Date.now()
-  // Usage from 6 hours ago counts toward weekly, NOT toward 5h
   await recordCliUsage(
     'opencode',
     { inputTokens: 800, outputTokens: 200, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.5 },
     home,
     now - 6 * 60 * 60 * 1000,
   )
-  // Usage from 1 hour ago counts toward both 5h and weekly
   await recordCliUsage(
     'opencode',
     { inputTokens: 400, outputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0.25 },
@@ -123,8 +116,7 @@ test('rolling 5-hour and weekly token/cost caps and reactive cooldowns enforce l
   expect(weeklyBlocked.allowed).toBe(false)
   expect(weeklyBlocked.window).toBe('weekly')
 
-  // Reactive cooldown blocks regardless of token count, and clearQuotaCooldown resets it
-  await recordUsageLimitCooldown('opencode', 'Free usage limit reached, resets in 3h', home, now)
+  await recordUsageLimitCooldown('opencode', 'Free usage limit reached, resets in 3h', home, now, false, now + 3 * 3600_000)
   const cooled = await checkCliQuota('opencode', undefined, home, now)
   expect(cooled.allowed).toBe(false)
   expect(cooled.window).toBe('5h')
@@ -156,13 +148,12 @@ test('runGoalLoop automatically falls back to fallbackCli when primary CLI is in
     },
     { homeDir: home },
   )
-  // Put opencode into 5h cooldown
   await recordUsageLimitCooldown('opencode', '5h limit reached', home)
 
   const scriptPath = path.join(repo, 'mock-claude.ts')
   await fs.writeFile(
     scriptPath,
-    `console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'fallback ok' }))\n`,
+    `require('fs').writeFileSync('result.txt', 'done'); console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'fallback ok' }))\n`,
     'utf8',
   )
 
@@ -194,4 +185,21 @@ test('runGoalLoop automatically falls back to fallbackCli when primary CLI is in
 
   expect(res.status).toBe('passed')
   expect(supervisor.list()[0]?.cli).toBe('claude')
+})
+
+test('independent processes retain every usage entry in the same quota ledger', async () => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-shared-quota-'))
+  tempDirs.push(home)
+  const script = `
+    import { recordCliUsage } from './quota'
+    for (let i = 0; i < 16; i++) {
+      await recordCliUsage('codex', { inputTokens: 1, outputTokens: 0 }, process.argv[1])
+    }
+  `
+  const processes = Array.from({ length: 3 }, () =>
+    Bun.spawn([process.execPath, '-e', script, home], { cwd: path.dirname(import.meta.dir), stderr: 'inherit' }),
+  )
+  expect(await Promise.all(processes.map(child => child.exited))).toEqual([0, 0, 0])
+  const status = await checkCliQuota('codex', {}, home)
+  expect(status.fiveHour.tokens).toBe(48)
 })

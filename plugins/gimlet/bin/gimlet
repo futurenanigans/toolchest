@@ -19,6 +19,8 @@ source "$GIMLET_ROOT/lib/dotnet.sh"
 source "$GIMLET_ROOT/lib/scan.sh"
 # shellcheck source=../lib/probe.sh
 source "$GIMLET_ROOT/lib/probe.sh"
+# shellcheck source=../lib/query.sh
+source "$GIMLET_ROOT/lib/query.sh"
 
 usage() {
   cat <<EOF
@@ -40,6 +42,13 @@ usage: gimlet <command> [options]
                          header sent with every request
       --only LIST        run only these probes (comma-separated)
       --allow-remote     allow a target that is not on this machine
+  query [REPORT|DIR] [options]
+                         filter merged findings without reading the whole report
+      --severity LIST    filter by severity (comma-separated: error,warning,note)
+      --tool LIST        filter by scanner tool name (comma-separated)
+      --rule LIST        filter by rule id (comma-separated)
+      --path SUBSTR      filter by file path substring
+      --format FMT       output format: text (default), json, or sarif (SARIF 2.1.0)
   install [--version TAG]
                          install opengrep $GIMLET_OPENGREP_PINNED_TAG (checked against its pinned SHA-256),
                          or another release TAG (requires cosign to verify its signature)
@@ -87,6 +96,7 @@ main() {
   case "$cmd" in
     scan) cmd_scan "$@" ;;
     probe) cmd_probe "$@" ;;
+    query) cmd_query "$@" ;;
     install) cmd_install "$@" ;;
     update) cmd_update ;;
     version) cmd_version ;;

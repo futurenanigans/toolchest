@@ -11,7 +11,7 @@ This skill also executes code: it may write and run throwaway reproduction harne
 
 ## Where this skill fits
 
-`bug-hunt` scans the whole current codebase on disk and centers test-skeptic epistemics. `code-review` hunts bugs in a git diff (change-scoped); the `inline-defect-prevention` skill (`${CLAUDE_SKILL_DIR}/../inline-defect-prevention/SKILL.md`) catches them at write time. Reach for `bug-hunt` when there is no diff to anchor on: an audit of code that already exists, where a green test suite has been mistaken for a clean bill of health.
+`bug-hunt` scans the whole current codebase on disk and centers test-skeptic epistemics. `code-review` hunts bugs in a git diff (change-scoped). Reach for `bug-hunt` when there is no diff to anchor on: an audit of code that already exists, where a green test suite has been mistaken for a clean bill of health.
 
 ## Human-authored claims are not oracles
 
@@ -84,6 +84,8 @@ False-positive discipline is make-or-break: twenty "Possible" findings train the
 **Pass 1, surface suspects.** Scan the codebase (or `path` if scoped) two ways and union the results: by category (walk the list above through the code) and by oracle (pick the load-bearing invariants and contracts, then find lines that can violate them). For each suspect record `file:line`, the category, the oracle it appears to violate, and the suspected trigger.
 
 **Pass 2, filter and confirm.** For each suspect: confirm reachability from an entry point, name the violated oracle explicitly (drop it otherwise), attempt reproduction where cheap, and assign confidence. Run every suspect through the Not a bug filter. Confirmed and Probable go in the main report; Possible goes to quarantine.
+
+**Pass 3, variant analysis.** For every Confirmed finding, sweep the codebase for siblings with the same defect shape (the same unchecked boundary, missing guard, wrong operator, or unclosed resource pattern in peer handlers or helpers). Run each variant hit through Pass 2's oracle, reachability, and Not a bug filter so only verified siblings enter the report.
 
 ## Test and prose status: mandatory per finding
 

@@ -1,1 +1,0 @@
-In src/pricing.ts, add an unexported function `applyDiscount(totalCents: number, percent: number): number` that returns the total reduced by the percentage, rounded down to a whole cent and never below zero, and use it from a new exported function `discountedTotal(lines: Line[], percent: number): number`. This file is application code, not a published package.

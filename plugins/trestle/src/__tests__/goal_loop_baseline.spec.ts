@@ -55,7 +55,6 @@ test('a check red on baseRef ends the job blocked before any agent is spawned, n
   const { repo, home } = await makeTempRepo()
   const wt = await worktreeCreate(repo, 'wt-base-red', { homeDir: home })
 
-  // Marker file would be created if the agent were ever spawned
   const spawnedMarker = path.join(repo, 'agent-was-spawned.txt')
   const agentScript = path.join(repo, 'should-not-run.ts')
   await fs.writeFile(
@@ -101,10 +100,6 @@ test('under baseline: no-new-failures, unchanged base-red set passes and grown s
   const { repo, home } = await makeTempRepo()
   const wt = await worktreeCreate(repo, 'wt-nnf', { homeDir: home })
 
-  // Check script emitting libtest-json:
-  // - On base ('base'): fails only 'watchdog::clock_test'
-  // - When state.txt === 'regressed': fails 'watchdog::clock_test' AND 'new::regression'
-  // - When state.txt === 'fixed': fails only 'watchdog::clock_test' (unchanged base-red set)
   const checkScript = path.join(repo, 'libtest-check.ts')
   await fs.writeFile(
     checkScript,
@@ -122,10 +117,8 @@ process.exit(1)
   await execCommand('git', ['add', 'libtest-check.ts'], { cwd: repo })
   await execCommand('git', ['commit', '-m', 'add check script'], { cwd: repo })
 
-  // Recreate worktree from updated main so libtest-check.ts exists in both base and wt
   const wt2 = await worktreeCreate(repo, 'wt-nnf-2', { homeDir: home })
 
-  // Agent script: records prompts received, on iter 1 writes 'regressed', on iter 2 writes 'fixed'
   const promptsLog = path.join(repo, 'prompts.jsonl')
   const agentScript = path.join(repo, 'agent-nnf.ts')
   await fs.writeFile(
@@ -183,25 +176,21 @@ rl.once('line', line => {
     homeDir: home,
   })
 
-  // Iteration 1 regressed (failed), Iteration 2 restored base-red-only set (passed!)
   expect(res.status).toBe('passed')
   expect(res.iterations).toBe(2)
 
-  // Inspect prompt sent to iteration 2
   const prompts = (await fs.readFile(promptsLog, 'utf8'))
     .trim()
     .split('\n')
     .map(l => (JSON.parse(l) as { prompt: string }).prompt)
   const iter2Prompt = prompts[1]!
 
-  // Base-red prose check must appear under the base heading, NOT under Fix These
   expect(iter2Prompt).toContain('Failing on `main` before your change; do not fix unless the objective says so')
   const [beforeFix, afterFix] = iter2Prompt.split('## Previous Iteration Verification Failures (Fix These)')
   expect(beforeFix).toContain('base-prose-red')
   expect(afterFix).not.toContain('base-prose-red')
   expect(afterFix).toContain('new::regression')
 
-  // Iteration 1 must be listed as continued work, NOT under Known Dead Ends
   expect(iter2Prompt).toContain('Current Worktree State (Continued Work)')
   expect(iter2Prompt).not.toContain('Known Dead Ends / Prior Attempts (Do Not Repeat)')
 
@@ -259,7 +248,6 @@ test('three iterations failing the same check with the same excerpt end stuck wi
   expect(res.status).toBe('stuck')
   expect(res.iterations).toBe(3)
   expect(res.error).toContain('constant-fail')
-  // Must NEVER have escalated out of cheap tier
   const modelsUsed = supervisor.list().map(a => a.model)
   expect(modelsUsed).toEqual(['claude-haiku-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5'])
 })
@@ -313,4 +301,29 @@ test('under no-new-failures, a step that fails with no test IDs is a new failure
   )
   expect(gate.effectivePassed).toBe(false)
   expect(gate.newFailures.map(r => r.name)).toEqual(['test'])
+})
+
+test.each(['require-green', 'no-new-failures'] as const)('a failure reproduced on the pinned base is attributed to the base under %s', async policy => {
+  const { repo, home } = await makeTempRepo()
+  await fs.writeFile(path.join(repo, '.env.local'), 'fixture')
+  const wt = await worktreeCreate(repo, 'flaky', { homeDir: home })
+  const marker = path.join(home, 'first-check')
+  const check = `
+    const fs = require('node:fs')
+    if (fs.readFileSync('.env.local', 'utf8') !== 'fixture') process.exit(2)
+    if (fs.existsSync(${JSON.stringify(marker)})) {
+      console.log(JSON.stringify({ type: 'test', event: 'failed', name: 'slow-boundary' }))
+      process.exit(1)
+    }
+    fs.writeFileSync(${JSON.stringify(marker)}, 'base was green')
+  `
+  await contractCreate(repo, { id: 'flaky', title: 'Flaky', goal: 'Update state', acceptanceCriteria: [], baseline: policy,
+    checks: [{ name: 'suite', command: ['bun', '-e', check], reportFormat: 'libtest-json' }] }, home)
+  const agent = path.join(home, 'agent.ts')
+  await fs.writeFile(agent, "require('fs').writeFileSync('state.txt', 'changed'); console.log(JSON.stringify({type:'result', result:'done'}))")
+  const res = await runGoalLoop(new AgentSupervisor(), { repoRoot: repo, contractId: 'flaky', cli: 'claude',
+    worktreeId: wt.id, worktreePath: wt.path, branch: wt.branch, commandOverride: ['bun', agent], homeDir: home })
+  expect(res.status).toBe(policy === 'require-green' ? 'blocked' : 'passed')
+  expect(res.iterations).toBe(1)
+  expect(res.baseline?.report.results[0]?.failedIds).toEqual(['slow-boundary'])
 })

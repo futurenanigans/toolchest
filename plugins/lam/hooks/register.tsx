@@ -5,7 +5,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface as Engine, PluginOptions, Register, ToolCallInput } from 'claude-code'
 
 import type { LamCounts, StatusSegment } from '../types'
-import { type CheckInput, CORRECTING_CHECKS, adviseAll, isReadme, isShell } from '../checks'
+import { type CheckInput, CORRECTING_CHECKS, adviseAll, isRead, isReadme, isShell } from '../checks'
 import { fetchRemotes, statusSegments } from './status'
 
 const PANE = 'guard-stats'
@@ -33,6 +33,7 @@ async function readIfFile($: Engine, path: string | undefined): Promise<string> 
 async function checkInput($: Engine, e: ToolCallInput): Promise<CheckInput | null> {
   const tool = e.tool
   if (isShell(tool)) return { tool, command: stringField(e, 'command'), oldText: '', isFirstReadmeEdit: false }
+  if (isRead(tool)) return { tool, filePath: stringField(e, 'file_path'), oldText: '', isFirstReadmeEdit: false }
   if (tool !== 'Edit' && tool !== 'Write') return null
 
   const filePath = stringField(e, 'file_path')
@@ -91,6 +92,17 @@ export const register: Register = (on, options) => {
     const input = await checkInput($, e)
     const advice = input === null ? [] : adviseAll(input)
     if (advice.length === 0) return next(e)
+
+    const denials = advice.filter(a => a.deny)
+    if (denials.length > 0) {
+      await update($, corrections, current => {
+        const tallied: LamCounts = { ...current }
+        for (const { check, corrects } of denials) if (corrects) tallied[check] = (tallied[check] ?? 0) + 1
+        return tallied
+      })
+      await refreshStatus($, options)
+      return { deny: denials.map(a => a.message).join('\n\n') }
+    }
 
     const ran = await next(e)
     if (ran.deny !== undefined || (ran.isError === true && !isShell(e.tool))) return ran

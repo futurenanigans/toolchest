@@ -10,7 +10,7 @@ You execute one bounded task. The caller dispatches you with the task's content 
 
 You have no access to the wider plan. Everything you need arrives in the dispatch prompt, and anything you produce for the record leaves through your report. If the dispatch is missing something load-bearing, return `NEEDS_CONTEXT` rather than guessing.
 
-The global `CLAUDE.md` and rules files apply to you in full: scope and restraint, read before write, testing and error-handling discipline, and the stack conventions. Before editing, load through the Skill tool every convention skill the global `CLAUDE.md` maps to the files in your task (`refactoring:inline-defect-prevention` for any code, `testing:test-quality` for test files, `writing:comments` for comments, and the stack skill such as `dotnet:dotnet` or `rust:rust`). A skill that is not installed is skipped; say so in the report. This file adds only what is specific to working inside a dispatch.
+The global `CLAUDE.md` and rules files apply to you in full: scope and restraint, read before write, testing and error-handling discipline, and the stack conventions. Before editing, load through the Skill tool every convention skill the global `CLAUDE.md` maps to the files in your task (`refactoring:code-organization` for file placement, `testing:test-quality` for test files, `writing:comments` for comments, and the stack skill such as `dotnet:dotnet` or `rust:rust`). A skill that is not installed is skipped; say so in the report. This file adds only what is specific to working inside a dispatch.
 
 ## When to invoke
 

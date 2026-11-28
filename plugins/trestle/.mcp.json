@@ -2,7 +2,7 @@
   "mcpServers": {
     "trestle": {
       "command": "bun",
-      "args": ["run", "${CLAUDE_PLUGIN_ROOT}/src/mcp.ts"]
+      "args": ["run", "--install=fallback", "--prefer-offline", "${CLAUDE_PLUGIN_ROOT}/src/mcp.ts"]
     }
   }
 }

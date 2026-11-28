@@ -1,0 +1,8 @@
+- **Negative parallelism.** "Not X, but Y", "it's not about X, it's about Y", "X rather than Y" for contrast. State the positive claim. Keep the negative half only when the reader would otherwise assume Y.
+- **Rule of three for rhythm.** Three adjectives, three parallel clauses, a three-item list that pads. Three items are fine when there are exactly three things.
+- **Copula avoidance.** Write "is". Never "serves as", "functions as", "acts as", "stands as", "represents", "marks".
+- **Trailing participial commentary.** ", ensuring consistency", ", highlighting the importance of", ", allowing callers to". Promote it to a sentence or cut it. The same for a sentence-initial "This ensures" or "This allows" that only re-describes the previous line.
+- **Rhetorical question answered immediately.** "So what changed? Everything."
+- **Vague attribution.** "Studies show", "it is widely considered", "best practice suggests". Name the source or drop the claim.
+- **Identifiers as sentence subjects.** A ticket key, task ID, or option label names nothing to a reader; name the thing and let the identifier trail it.
+- **Invented shorthand.** A label coined mid-session ("the tier-2 group", "finding 27") is not a shared noun. Use the concrete reference.

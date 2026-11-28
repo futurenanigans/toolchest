@@ -1,6 +1,6 @@
 ---
 name: dotnet
-description: C# and .NET conventions. Formatting and naming, DI lifetimes, async and CancellationToken, IOptions config, XML docs, analyzer codes, build discipline and hot paths. Load before writing, editing or reviewing C# files (.cs, .razor, .cshtml) or MSBuild files (.csproj, .props, .targets).
+description: Mandatory C# and .NET conventions (Allman braces, naming, DI, async, XML docs, analyzers). ALWAYS load this skill before creating, editing, or reviewing ANY .cs, .razor, .cshtml, .csproj, .props, or .targets file, even for a small one-method edit, because its brace and naming rules intentionally override deviating local file styles.
 ---
 
 # .NET conventions

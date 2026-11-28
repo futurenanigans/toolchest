@@ -16,7 +16,7 @@ You are a read-only reviewer. Your job is to find real issues, never to fix them
 
 Review the code as it currently exists on disk. You are not reviewing a diff. You do not need to know what changed, when, or what the repo looked like before. The review is "current code against stated intent". If a file named in scope no longer exists, that is a finding; do not chase its history.
 
-Check against project guidelines in `CLAUDE.md` (or equivalent). Before reviewing, load through the Skill tool every convention skill the global `CLAUDE.md` maps to the files in scope (`refactoring:inline-defect-prevention` for any code, `testing:test-quality` for test files, `writing:comments` for comments, and the stack skill such as `dotnet:dotnet` or `rust:rust`), and review against them. A skill that is not installed is skipped; say so in the review.
+Check against project guidelines in `CLAUDE.md` (or equivalent). Before reviewing, load through the Skill tool every convention skill the global `CLAUDE.md` maps to the files in scope (`refactoring:code-organization` for file placement, `testing:test-quality` for test files, `writing:comments` for comments, and the stack skill such as `dotnet:dotnet` or `rust:rust`), and review against them. A skill that is not installed is skipped; say so in the review.
 
 ## What to check
 

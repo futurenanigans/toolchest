@@ -1,20 +1,12 @@
 import type { AdapterDriver, AdapterEvent, LaunchOptions, LaunchSpec } from './types'
 
-export function createOpencodeAdapter(options: { readyTimeoutMs?: number } = {}): AdapterDriver {
-  let serverUrl = ''
-  let sessionId: string | undefined
-  let authHeader = ''
+export function createOpencodeAdapter(): AdapterDriver {
   let lastText = ''
-  const readyTimeoutMs = options.readyTimeoutMs ?? 30_000
 
   return {
     cli: 'opencode',
 
     async prepare(opts: LaunchOptions): Promise<LaunchSpec> {
-      sessionId = opts.resumeSessionId
-      serverUrl = ''
-      authHeader = ''
-
       const config: Record<string, unknown> = {}
       if (opts.mode === 'read-only') {
         config.permissions = [
@@ -32,7 +24,7 @@ export function createOpencodeAdapter(options: { readyTimeoutMs?: number } = {})
         args.push('--model', modelArg)
       }
       if (opts.resumeSessionId) args.push('--session', opts.resumeSessionId)
-      args.push(opts.prompt)
+
 
       return {
         cli: 'opencode',
@@ -43,29 +35,9 @@ export function createOpencodeAdapter(options: { readyTimeoutMs?: number } = {})
           OPENCODE_DISABLE_AUTOUPDATE: '1',
           OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
         },
+        initialStdin: opts.prompt,
         closeStdinAfterInitial: true,
       }
-    },
-
-    async ready(spec: LaunchSpec, isExited?: () => boolean): Promise<void> {
-      if (!spec.serverUrl) return
-      const deadline = Date.now() + readyTimeoutMs
-      while (Date.now() < deadline) {
-        if (isExited?.()) {
-          throw new Error('opencode process exited before server became ready')
-        }
-        try {
-          const res = await fetch(`${spec.serverUrl}/api/info`, {
-            headers: spec.serverHeaders,
-            signal: AbortSignal.timeout(1000),
-          })
-          if (res.ok) return
-        } catch {
-          // Wait for server startup
-        }
-        await new Promise(r => setTimeout(r, 150))
-      }
-      throw new Error(`opencode server did not become ready at ${spec.serverUrl} within ${readyTimeoutMs}ms`)
     },
 
     parseLine(line: string): AdapterEvent[] {
@@ -81,7 +53,6 @@ export function createOpencodeAdapter(options: { readyTimeoutMs?: number } = {})
 
       const events: AdapterEvent[] = []
       if (typeof obj.sessionID === 'string' && obj.sessionID) {
-        sessionId = obj.sessionID
         events.push({ kind: 'session', sessionId: obj.sessionID })
       }
 
@@ -121,7 +92,7 @@ export function createOpencodeAdapter(options: { readyTimeoutMs?: number } = {})
           events.push({ kind: 'turn_done', finalText: lastText || undefined })
         }
       } else if (type === 'error') {
-        const nested = obj.error as { name?: string; type?: string; message?: string; data?: { message?: string } } | undefined
+        const nested = obj.error as { name?: string; type?: string; message?: string; status?: number; data?: { message?: string; statusCode?: number } } | undefined
         const errName =
           (typeof obj.name === 'string' && obj.name) ||
           (typeof nested?.name === 'string' && nested.name) ||
@@ -133,33 +104,21 @@ export function createOpencodeAdapter(options: { readyTimeoutMs?: number } = {})
           (typeof nested?.data?.message === 'string' && nested.data.message) ||
           errName ||
           'opencode error'
-        const lower = msg.toLowerCase()
+        const status = nested?.status ?? nested?.data?.statusCode
         events.push({
           kind: 'turn_failed',
           error: msg,
-          usageLimited: errName === 'provider.quota' || lower.includes('quota') || lower.includes('rate limit'),
-          loginFailed: errName === 'provider.auth' || lower.includes('unauthorized') || lower.includes('auth'),
-          transient:
-            errName === 'provider.transport' ||
-            errName === 'provider.internal' ||
-            lower.includes('transport:') ||
-            lower.includes('socket connection was closed'),
+          usageLimited: errName === 'provider.quota' || status === 429,
+          loginFailed: errName === 'provider.auth' || status === 401,
+          transient: errName === 'provider.transport' || errName === 'provider.internal',
         })
       }
 
       return events
     },
 
-    steer(text: string) {
-      if (!serverUrl || !sessionId) {
-        return { kind: 'unsupported', reason: 'opencode standalone run does not expose an external steer URL; resume with sessionId instead' }
-      }
-      return {
-        kind: 'http',
-        url: `${serverUrl}/api/session/${sessionId}/prompt`,
-        headers: { Authorization: authHeader },
-        body: { content: text, delivery: 'steer' },
-      }
+    steer() {
+      return { kind: 'unsupported', reason: 'Resume the standalone run with its sessionId to send another prompt' }
     },
   }
 }

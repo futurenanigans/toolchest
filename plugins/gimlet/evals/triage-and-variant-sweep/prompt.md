@@ -1,0 +1,1 @@
+Triage the security findings in results/report.json against the C# controllers under Controllers/. Identify which findings are real, which are false positives (with proof), and check whether the same vulnerability exists anywhere else in Controllers/. Do not edit files.

@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: nuget-update-plan-discipline
+description: Plans a NuGet package update by separating patch/minor from major upgrades, checking breaking changes and transitive/vulnerability state instead of blindly bumping everything.
+tags: [workflow, user-invoked]
+expected_command: /dotnet:nuget-package-update
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Skill]

@@ -55,7 +55,6 @@ async function testCli(
     readOnly: { passed: false, durationMs: 0, detail: '' },
   }
 
-  // 1. Read-only invocation + model verification
   const roWt = await worktreeCreate(repo, `live-ro-${cli}`, { homeDir: home })
   const roStart = Date.now()
   try {
@@ -101,7 +100,6 @@ async function testCli(
     await worktreeClean(repo, roWt.id, { homeDir: home, supervisor }).catch(() => {})
   }
 
-  // 2. Optional writer goal-loop verification (writes 42 into answer.txt and passes deterministic check_run)
   if (runWriterGoal) {
     const wrWt = await worktreeCreate(repo, `live-wr-${cli}`, { homeDir: home })
     const wrStart = Date.now()
@@ -175,7 +173,7 @@ async function main(): Promise<void> {
   )
 
   const { config } = await loadEffectiveConfig()
-  console.log(`Trestle Live CLI Harness — testing: ${clis.join(', ')} (writer goal loop: ${!skipWriter})`)
+  console.log(`Testing Trestle CLIs: ${clis.join(', ')} (writer goal loop: ${!skipWriter})`)
   const { base, repo, home } = await makeTempRepo()
   const supervisor = new AgentSupervisor()
 
@@ -188,11 +186,11 @@ async function main(): Promise<void> {
       const r = await testCli(supervisor, repo, home, cli, model, !skipWriter)
       results.push(r)
       console.log(
-        `  read-only: ${r.readOnly.passed ? 'PASS' : 'FAIL'} (${r.readOnly.durationMs}ms) ${r.readOnly.sessionId ? `[session=${r.readOnly.sessionId.slice(0, 12)}]` : ''} — ${r.readOnly.detail}`,
+        `  read-only: ${r.readOnly.passed ? 'PASS' : 'FAIL'} (${r.readOnly.durationMs}ms) ${r.readOnly.sessionId ? `[session=${r.readOnly.sessionId.slice(0, 12)}]` : ''} · ${r.readOnly.detail}`,
       )
       if (r.writerGoal) {
         console.log(
-          `  writer-goal: ${r.writerGoal.passed ? 'PASS' : 'FAIL'} (${r.writerGoal.durationMs}ms) — ${r.writerGoal.detail}`,
+          `  writer-goal: ${r.writerGoal.passed ? 'PASS' : 'FAIL'} (${r.writerGoal.durationMs}ms) · ${r.writerGoal.detail}`,
         )
       }
     }

@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: dormant-bugfix-keeps-anchored-comment
+description: Fixing an arithmetic bug keeps an existing valid anchored constraint comment and adds no extra comments.
+tags: [dormant]
+dormant: true
+expected_skill: writing:comments
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

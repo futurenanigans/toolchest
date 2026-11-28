@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
 import * as path from 'node:path'
 
 import { createAgyAdapter } from '../adapters/agy'
@@ -52,10 +53,9 @@ test('codex adapter replays vendored sample jsonl, supports turn/steer, and fail
     expect(steer.data).toContain('stop sleeping')
   }
 
-  // JSON-RPC error response must emit turn_failed immediately
   const errAdapter = createCodexAdapter()
   const errEvents = errAdapter.parseLine(
-    JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: -32000, message: 'unauthorized api key' } }),
+    JSON.stringify({ jsonrpc: '2.0', id: 1, error: { code: -32000, message: 'unauthorized api key', data: { codexErrorInfo: 'unauthorized' } } }),
   )
   expect(errEvents).toHaveLength(1)
   expect(errEvents[0]?.kind).toBe('turn_failed')
@@ -64,9 +64,9 @@ test('codex adapter replays vendored sample jsonl, supports turn/steer, and fail
   }
 })
 
-test('opencode adapter replays vendored sample jsonl and fails fast on exit or timeout', async () => {
+test('opencode adapter replays vendored sample jsonl and reports standalone steer as unsupported', async () => {
   const raw = await fs.readFile(path.join(SAMPLES_DIR, 'opencode.jsonl'), 'utf8')
-  const adapter = createOpencodeAdapter({ readyTimeoutMs: 200 })
+  const adapter = createOpencodeAdapter()
   const events: AdapterEvent[] = []
   for (const line of raw.split('\n')) {
     events.push(...adapter.parseLine(line))
@@ -77,16 +77,10 @@ test('opencode adapter replays vendored sample jsonl and fails fast on exit or t
   expect(events.some(e => e.kind === 'message' && e.text === 'done')).toBe(true)
   expect(events.some(e => e.kind === 'usage' && e.usage.inputTokens > 0 && (e.usage.costUsd ?? 0) > 0)).toBe(true)
 
-  const spec = {
-    ...(await adapter.prepare({ runHome: '/tmp/oc', cwd: '/tmp', prompt: 'hi', mode: 'read-only' })),
-    serverUrl: 'http://127.0.0.1:1',
-  }
-  await expect(adapter.ready!(spec, () => true)).rejects.toThrow('exited before server became ready')
-  await expect(adapter.ready!(spec, () => false)).rejects.toThrow('did not become ready')
+  expect(adapter.steer('update').kind).toBe('unsupported')
 
-  // Nested error object parsing
   const errEvents = adapter.parseLine(
-    JSON.stringify({ type: 'error', error: { type: 'unknown', message: 'Transport: socket connection was closed' } }),
+    JSON.stringify({ type: 'error', error: { type: 'provider.transport', message: 'Transport: socket connection was closed' } }),
   )
   expect(errEvents).toHaveLength(1)
   expect(errEvents[0]?.kind).toBe('turn_failed')
@@ -129,7 +123,6 @@ test('pi adapter replays vendored sample jsonl', async () => {
   expect(events.some(e => e.kind === 'session' && e.sessionId === '00000000-0000-4000-8000-000000000010')).toBe(true)
   expect(events.some(e => e.kind === 'usage' && e.usage.inputTokens > 0)).toBe(true)
 
-  // stopReason: 'error' must emit turn_failed and suppress subsequent agent_end turn_done
   const errAdapter = createPiAdapter()
   const errEvs = errAdapter.parseLine(
     JSON.stringify({
@@ -139,7 +132,35 @@ test('pi adapter replays vendored sample jsonl', async () => {
   )
   expect(errEvs[0]?.kind).toBe('turn_failed')
   if (errEvs[0]?.kind === 'turn_failed') {
-    expect(errEvs[0].usageLimited).toBe(true)
+    expect(errEvs[0].usageLimited).toBeFalsy()
   }
   expect(errAdapter.parseLine(JSON.stringify({ type: 'agent_end' }))).toEqual([])
+})
+
+test('one-shot adapters send quoted prompts intact over stdin', async () => {
+  const prompt = 'Show the literal characters "& in the output.\n' + 'x'.repeat(9000)
+  const runHome = await fs.mkdtemp(path.join(os.tmpdir(), 'trestle-prompt-'))
+  try {
+    for (const driver of [createOpencodeAdapter(), createPiAdapter()]) {
+      const spec = await driver.prepare({ runHome, cwd: runHome, mode: 'read-only', prompt })
+      expect(spec.initialStdin).toBe(prompt)
+      expect(spec.args).not.toContain(prompt)
+      expect(spec.closeStdinAfterInitial).toBe(true)
+    }
+  } finally {
+    await fs.rm(runHome, { recursive: true, force: true })
+  }
+})
+
+test('error prose is display-only and the Claude reset is carried in milliseconds', () => {
+  const rpc = createCodexAdapter().parseLine(JSON.stringify({ id: 1, error: { message: 'author unavailable' } }))
+  const standalone = createOpencodeAdapter().parseLine(JSON.stringify({ type: 'error', message: 'author unavailable' }))
+  for (const [event] of [rpc, standalone]) {
+    expect(event?.kind).toBe('turn_failed')
+    if (event?.kind === 'turn_failed') expect(event.loginFailed).toBeFalsy()
+  }
+  const [rate] = createClaudeAdapter().parseLine(JSON.stringify({
+    type: 'rate_limit_event', rate_limit_info: { status: 'rejected', resetsAt: 1800000000 },
+  }))
+  expect(rate?.kind === 'turn_failed' && rate.resetAt).toBe(1800000000000)
 })

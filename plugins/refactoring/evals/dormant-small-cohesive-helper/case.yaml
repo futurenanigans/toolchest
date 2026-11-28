@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: dormant-small-cohesive-helper
+description: Adding a small cohesive helper to a 20-line module stays in that file instead of over-splitting.
+tags: [dormant]
+dormant: true
+expected_skill: refactoring:code-organization
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Edit, Write, Skill]

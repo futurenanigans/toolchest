@@ -1,0 +1,8 @@
+{
+  "name": "gimlet-spectral",
+  "private": true,
+  "dependencies": {
+    "@stoplight/spectral-cli": "6.17.1",
+    "@stoplight/spectral-owasp-ruleset": "file:stoplight-spectral-owasp-ruleset-2.0.1.tgz"
+  }
+}

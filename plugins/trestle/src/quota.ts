@@ -3,6 +3,7 @@ import * as path from 'node:path'
 
 import type { AgentCli, AgentUsage, DisabledCliSummary } from '../types'
 import type { QuotaWindowConfig } from './config'
+import { withFileLock } from './locks'
 import { userHome } from './platform'
 
 export const FIVE_HOURS_MS = 5 * 60 * 60 * 1000
@@ -69,14 +70,12 @@ function isCooldownActive(cd: CooldownEntry | undefined, now: number): cd is Coo
   return cd.blockedUntil > now
 }
 
-let quotaQueue: Promise<void> = Promise.resolve()
-
 async function updateQuotaLedger(
   updater: (cur: QuotaLedgerFile) => QuotaLedgerFile,
   homeDir = userHome(),
 ): Promise<QuotaLedgerFile> {
-  let result!: QuotaLedgerFile
-  const run = quotaQueue.then(async () => {
+  const target = quotaLedgerPath(homeDir)
+  return withFileLock(target + '.lock', async () => {
     const cur = await readQuotaLedger(homeDir)
     const now = Date.now()
     const prunedEntries = cur.entries.filter(e => now - e.ts <= SEVEN_DAYS_MS)
@@ -87,24 +86,16 @@ async function updateQuotaLedger(
       }
     }
     const next = updater({ version: 1, entries: prunedEntries, cooldowns: prunedCooldowns })
-    const target = quotaLedgerPath(homeDir)
-    await fs.mkdir(path.dirname(target), { recursive: true })
     const tmp = path.join(
       path.dirname(target),
       `quotas.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`,
     )
     await fs.writeFile(tmp, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
     await fs.rename(tmp, target)
-    result = next
+    return next
   })
-  quotaQueue = run.catch(() => {})
-  await run
-  return result
 }
 
-/**
- * Records a completed turn's token/cost usage into the user-wide rolling 5h/weekly ledger.
- */
 export async function recordCliUsage(
   cli: AgentCli,
   usage: AgentUsage,
@@ -125,65 +116,22 @@ export async function recordCliUsage(
   )
 }
 
-/**
- * Parses a provider usage-limit error message:
- * - If `manualReenable` is true, or no explicit reset timestamp/duration is present,
- *   returns an indefinite manual-reenable disable (`window: 'manual'`, no `blockedUntil`).
- * - If an explicit reset time/duration is present, returns a timed `'5h'` or `'weekly'` cooldown.
- */
-export function parseUsageLimitCooldown(
-  errorText: string,
-  now = Date.now(),
-  manualReenable = false,
-): { window: '5h' | 'weekly' | 'manual'; blockedUntil?: number; manualReenableRequired?: boolean } {
-  if (manualReenable) {
-    return { window: 'manual', manualReenableRequired: true }
+export function usageLimitCooldown(resetAt: number | undefined, now: number, manualReenable = false): Pick<CooldownEntry, 'window' | 'blockedUntil' | 'manualReenableRequired'> {
+  if (!manualReenable && resetAt !== undefined && Number.isFinite(resetAt) && resetAt > now) {
+    return { window: resetAt - now > FIVE_HOURS_MS ? 'weekly' : '5h', blockedUntil: resetAt }
   }
-
-  const lower = errorText.toLowerCase()
-
-  // Explicit ISO/UTC date (e.g. "regain access on 2026-12-01 at 00:00 UTC")
-  const dateMatch = errorText.match(/(\d{4}-\d{2}-\d{2})(?:[T\s]+(?:at\s+)?(\d{2}:\d{2})(?::(\d{2}))?)?\s*(?:UTC|Z)?/i)
-  if (dateMatch) {
-    const iso = `${dateMatch[1]}T${dateMatch[2] ?? '00:00'}:${dateMatch[3] ?? '00'}Z`
-    const parsedTs = Date.parse(iso)
-    if (!Number.isNaN(parsedTs) && parsedTs > now) {
-      const window = parsedTs - now > FIVE_HOURS_MS ? 'weekly' : '5h'
-      return { window, blockedUntil: parsedTs }
-    }
-  }
-
-  // Relative duration (e.g. "resets in 2h 15m", "try again in 45m", "in 3 days")
-  const daysMatch = lower.match(/in\s+(\d+)\s*(?:d|day|days)\b/)
-  if (daysMatch) {
-    const ms = Number(daysMatch[1]) * 24 * 60 * 60 * 1000
-    return { window: 'weekly', blockedUntil: now + ms }
-  }
-  const hmMatch = lower.match(/(?:in|after)\s+(?:(\d+)\s*h(?:ours?|rs?)?)?\s*(?:(\d+)\s*m(?:in(?:ute)?s?)?)?/)
-  if (hmMatch && (hmMatch[1] || hmMatch[2])) {
-    const hours = Number(hmMatch[1] ?? 0)
-    const mins = Number(hmMatch[2] ?? 0)
-    const ms = (hours * 60 + mins) * 60 * 1000
-    if (ms > 0) {
-      return { window: ms > FIVE_HOURS_MS ? 'weekly' : '5h', blockedUntil: now + ms }
-    }
-  }
-
-  // No explicit reset time -> disable provider until manually re-enabled via quota_clear_cooldown
   return { window: 'manual', manualReenableRequired: true }
 }
 
-/**
- * Records a reactive cooldown / auto-disable when a CLI returns a `usage_limit` error.
- */
 export async function recordUsageLimitCooldown(
   cli: AgentCli,
   errorText: string,
   homeDir = userHome(),
   now = Date.now(),
   manualReenable = false,
+  resetAt?: number,
 ): Promise<CooldownEntry> {
-  const { window, blockedUntil, manualReenableRequired } = parseUsageLimitCooldown(errorText, now, manualReenable)
+  const { window, blockedUntil, manualReenableRequired } = usageLimitCooldown(resetAt, now, manualReenable)
   const entry: CooldownEntry = {
     cli,
     window,
@@ -229,10 +177,6 @@ export async function getActiveCooldownSummaries(
   return out
 }
 
-/**
- * Evaluates whether `cli` is currently within its reactive cooldowns and rolling
- * 5-hour / weekly token & USD budgets.
- */
 export async function checkCliQuota(
   cli: AgentCli,
   quotaCfg?: QuotaWindowConfig,

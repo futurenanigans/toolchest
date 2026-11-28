@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: handover-requires-goal
+description: When invoked without a goal and two unrelated tasks are uncommitted, asks the user which goal to carry forward instead of writing a brief.
+tags: [workflow, user-invoked]
+expected_command: /session:handover
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 15
+  allowed_tools: [Read, Glob, Grep, Bash, Write, Edit, Skill]

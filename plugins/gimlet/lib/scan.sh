@@ -15,9 +15,9 @@ relative_to_root() {
 }
 
 relative_to_root_list() {
-  local line out=()
-  while IFS= read -r line; do out+=("$(relative_to_root "$line")"); done
-  echo "${out[*]}"
+  local line paths=()
+  while IFS= read -r line; do paths+=("$(relative_to_root "$line")"); done
+  echo "${paths[*]}"
 }
 
 selected() {
@@ -61,6 +61,21 @@ parse_scanner_list() {
   for t in "${list_items[@]}"; do
     [[ " ${ALL_SCANNERS[*]} " == *" $t "* ]] || die "unknown scanner '$t' (known: ${ALL_SCANNERS[*]})"
   done
+}
+
+write_report() {
+  local tool files=()
+  for tool in "$@"; do
+    [[ -f "$RESULTS/$tool.json" ]] && files+=("$RESULTS/$tool.json")
+  done
+  if [[ ${#files[@]} -gt 0 ]]; then
+    jq -s 'add' "${files[@]}" > "$RESULTS/findings.json"
+  else
+    echo '[]' > "$RESULTS/findings.json"
+  fi
+  jq -Rn --slurpfile findings "$RESULTS/findings.json" '
+    {scanners: [inputs | split("\t") | {tool: .[0], status: .[1], detail: .[2]}],
+     findings: $findings[0]}' "$RESULTS/status.tsv" > "$RESULTS/report.json"
 }
 
 print_summary() {
@@ -160,13 +175,10 @@ cmd_scan() {
     mv "$RESULTS/osv.dedup.json" "$RESULTS/osv.json"
   fi
 
-  local t files=()
-  for t in "${ALL_SCANNERS[@]}"; do [[ -f "$RESULTS/$t.json" ]] && files+=("$RESULTS/$t.json"); done
-  if [[ ${#files[@]} -gt 0 ]]; then jq -s 'add' "${files[@]}" > "$RESULTS/findings.json"; else echo '[]' > "$RESULTS/findings.json"; fi
-
+  write_report "${ALL_SCANNERS[@]}"
   print_summary
   echo
-  echo "results: $RESULTS/findings.json"
+  echo "results: $RESULTS/report.json"
   if cut -f2 "$RESULTS/status.tsv" | grep -qx failed; then
     die "one or more scanners failed; their findings are missing from the results"
   fi

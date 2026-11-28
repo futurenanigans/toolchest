@@ -1,20 +1,19 @@
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 
+import { junitFailureIds } from './junit'
+import { Mutex } from './locks'
 import { execCommand, type CommandSpec } from './platform'
 
-export type CheckReportFormat = 'libtest-json' | 'nextest-json' | 'junit-xml'
+export type CheckReportFormat = 'libtest-json' | 'nextest-json' | 'junit-xml' | 'sarif'
 
 export interface CheckCommandSpec {
   name: string
   command: CommandSpec
   args?: string[]
   metricPattern?: string
-  /** Set `false` for fast/lightweight checks (lint/typecheck/unit) that can run without acquiring the heavy build/test mutex */
   heavy?: boolean
-  /** Structured test output format for exact failing-set comparison under `baseline: "no-new-failures"` */
   reportFormat?: CheckReportFormat
-  /** Optional relative path to a report file (e.g. JUnit XML file) instead of stdout */
   reportPath?: string
 }
 
@@ -25,7 +24,7 @@ export interface CheckStepResult {
   durationMs: number
   excerpt: string
   metric?: string
-  /** Structured failing test identifiers when `reportFormat` is declared on the check */
+  invalidReport?: boolean
   failedIds?: string[]
 }
 
@@ -41,6 +40,7 @@ export interface CheckRunOptions {
   includeMortise?: boolean
   mutationSessionId?: string
   timeoutMs?: number
+  onlySteps?: ReadonlySet<string>
   allowEmpty?: boolean
 }
 
@@ -48,26 +48,7 @@ const MAX_EXCERPT_CHARS = 16_000
 const EXCERPT_HEAD_CHARS = 6_000
 const EXCERPT_TAIL_CHARS = 10_000
 
-class AsyncMutex {
-  private queue: Promise<void> = Promise.resolve()
-
-  async run<T>(fn: () => Promise<T>): Promise<T> {
-    let release!: () => void
-    const next = new Promise<void>(r => {
-      release = r
-    })
-    const prev = this.queue
-    this.queue = prev.then(() => next)
-    await prev
-    try {
-      return await fn()
-    } finally {
-      release()
-    }
-  }
-}
-
-const checkMutex = new AsyncMutex()
+const checkMutex = new Mutex()
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -86,7 +67,6 @@ async function detectNodeTestStep(worktreePath: string): Promise<CheckCommandSpe
   try {
     pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8')) as { scripts?: Record<string, string> }
   } catch {
-    // Fallback to lockfile detection
   }
 
   const hasTestScript = Boolean(pkg.scripts?.test && !pkg.scripts.test.includes('no test specified'))
@@ -183,13 +163,30 @@ function extractMetric(pattern: string | undefined, stdout: string, stderr: stri
   }
 }
 
-/**
- * Parses structured failing test identifiers from libtest JSON, nextest JSON, or JUnit XML.
- * Never parses free-form prose: returns `undefined` when no `reportFormat` is declared.
- */
 export function parseStructuredFailures(format: CheckReportFormat | undefined, raw: string): string[] | undefined {
   if (!format) return undefined
+  if (format === 'junit-xml') return junitFailureIds(raw)
   const failed = new Set<string>()
+
+  if (format === 'sarif') {
+    const report = JSON.parse(raw)
+    if (report?.version !== '2.1.0' || !Array.isArray(report.runs) || !report.runs.length) {
+      throw new Error('Expected a SARIF 2.1.0 report with at least one run')
+    }
+    const findings: string[] = []
+    const occurrences = new Map<string, number>()
+    for (const run of report.runs) {
+      if (!Array.isArray(run.results)) throw new Error('Missing SARIF results')
+      for (const result of run.results) {
+        const location = result.locations?.[0]?.physicalLocation
+        const key = JSON.stringify([result.ruleId, location?.artifactLocation?.uri, location?.region?.startLine, result.message?.text])
+        const occurrence = (occurrences.get(key) ?? 0) + 1
+        occurrences.set(key, occurrence)
+        findings.push(key + '#' + occurrence)
+      }
+    }
+    return findings.sort()
+  }
 
   if (format === 'libtest-json' || format === 'nextest-json') {
     for (const line of raw.split('\n')) {
@@ -201,25 +198,7 @@ export function parseStructuredFailures(format: CheckReportFormat | undefined, r
           failed.add(obj.name)
         }
       } catch {
-        // Ignore non-JSON lines emitted alongside structured test output
       }
-    }
-    return Array.from(failed).sort()
-  }
-
-  if (format === 'junit-xml') {
-    const caseRe = /<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/gi
-    let m: RegExpExecArray | null
-    while ((m = caseRe.exec(raw)) !== null) {
-      const attrs = m[1] ?? ''
-      const body = m[2] ?? ''
-      if (!/<(?:failure|error)\b/i.test(body)) continue
-      const nameMatch = attrs.match(/\bname="([^"]+)"/i)
-      const classMatch = attrs.match(/\bclassname="([^"]+)"/i)
-      const name = nameMatch?.[1]
-      if (!name) continue
-      const cls = classMatch?.[1]
-      failed.add(cls ? `${cls}::${name}` : name)
     }
     return Array.from(failed).sort()
   }
@@ -227,14 +206,9 @@ export function parseStructuredFailures(format: CheckReportFormat | undefined, r
   return undefined
 }
 
-/**
- * Runs verification steps. Heavy steps (builds, full test suites, mutation runs — the default)
- * run under a process-wide mutex so parallel worktrees do not thrash CPU/RAM. Fast steps
- * explicitly marked `heavy: false` run without waiting behind slow builds/mutation runs.
- * Fails closed when 0 steps are detected unless `allowEmpty: true`.
- */
 export async function runChecks(options: CheckRunOptions): Promise<CheckRunReport> {
-  const steps = await detectDefaultSteps(options.worktreePath, options)
+  const steps = (await detectDefaultSteps(options.worktreePath, options))
+    .filter(step => !options.onlySteps || options.onlySteps.has(step.name))
   const needsMutex = steps.some(s => s.heavy !== false)
 
   const execute = async (): Promise<CheckRunReport> => {
@@ -254,15 +228,18 @@ export async function runChecks(options: CheckRunOptions): Promise<CheckRunRepor
         const metric = extractMetric(step.metricPattern, res.stdout, res.stderr)
         let reportSource = res.stdout
         if (fullReportPath) {
-          reportSource = await fs.readFile(fullReportPath, 'utf8').catch(() => res.stdout)
+          reportSource = step.reportFormat === 'sarif'
+            ? await fs.readFile(fullReportPath, 'utf8')
+            : await fs.readFile(fullReportPath, 'utf8').catch(() => res.stdout)
         }
         const failedIds = parseStructuredFailures(step.reportFormat, reportSource)
+        const findings = step.reportFormat === 'sarif' ? failedIds?.length ?? 0 : 0
         results.push({
           name: step.name,
-          passed: res.exitCode === 0,
+          passed: res.exitCode === 0 && findings === 0,
           exitCode: res.exitCode,
           durationMs: Date.now() - start,
-          excerpt: res.exitCode === 0 ? '' : formatExcerpt(res.stdout, res.stderr),
+          excerpt: findings ? `${findings} SARIF finding(s)` : res.exitCode === 0 ? '' : formatExcerpt(res.stdout, res.stderr),
           ...(metric ? { metric } : {}),
           ...(failedIds !== undefined ? { failedIds } : {}),
         })
@@ -273,6 +250,7 @@ export async function runChecks(options: CheckRunOptions): Promise<CheckRunRepor
           exitCode: 1,
           durationMs: Date.now() - start,
           excerpt: (err as Error).message,
+          ...(step.reportFormat === 'sarif' || step.reportFormat === 'junit-xml' ? { invalidReport: true } : {}),
         })
       }
     }

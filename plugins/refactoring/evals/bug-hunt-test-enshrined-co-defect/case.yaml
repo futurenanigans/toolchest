@@ -1,0 +1,10 @@
+schema_version: "1.1"
+name: bug-hunt-test-enshrined-co-defect
+description: Identifies a boundary bug even when an existing passing unit test asserts the buggy output, flagging the test as a co-defect.
+tags: [workflow, user-invoked]
+expected_command: /refactoring:bug-hunt
+context:
+  scaffold_script: fixture.sh
+execution:
+  max_turns: 20
+  allowed_tools: [Read, Glob, Grep, Bash, Skill]
