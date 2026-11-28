@@ -75,7 +75,7 @@ jobs:
           bun-version: 1.3.14
       - name: Pass quoted and long prompts through a Windows batch shim
         working-directory: plugins/trestle
-        run: bun test src/__tests__/goal_loop.spec.ts -t "standalone prompt arrives intact"
+        run: bun install --frozen-lockfile && bun test src/__tests__/goal_loop.spec.ts -t "standalone prompt arrives intact"
       - name: Exercise Gimlet under Git Bash
         shell: bash
         run: |
